@@ -230,3 +230,7 @@ Maintain a friendly, conversational tone throughout. Focus on Rust's philosophy,
    - Real-world analogy (spreadsheets/Excel, physics, or architecture)
    - "Design Choice" insight
    - "💡 Insight" for key takeaway or advanced application
+
+---
+
+In general make the text part pyramidal, even though conversational, meaning that focus on the essence first, then add 1 level of detail, then another level of detail and so on
