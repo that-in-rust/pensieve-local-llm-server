@@ -83,9 +83,34 @@ Spring Boot Application Structure
                          └─────────────┘
 ```
 
-- Can we say that controller is the like the control tower 
+- Can we say that controller is the like the control tower of an airport which tells you where your airline needs to go or whom does it need to talk to?
+    - The URL is built up of prefix.domain-name.country-suffix/some-path/some-more-path and the person who knows where this URL should hit is the controller - it is like a first point of contact for the backend application
+    - Everythign for the controller is like something whcih is sent by the frontend of the application
 
+- In a simple web application, the controller routes hands the baton to the service layer - which is basically a class in Java which has the business logic of what to do with the parameters or any data received from the controller - it then does SOMETHING with it - can be from transformation to denial - but it will hand it back to the controller
+    - Service layer is the business logic layer
 
+- When we look at data which is permenntn, needs to be edited, destroyed, aggregated, persisted or other wise held on to in our servers for long term - it is NOT a transient message - it is something worth storing for longer - then it is the repository layer most likely implmented in the following types of data stores
+    - Relational Databases (SQL): MySQL, PostgreSQL, MS SQL Server, Oracle
+    - Document-Oriented Databases (NoSQL): MongoDB, CouchDB
+    - Key-Value Stores (NoSQL): Redis, Amazon DynamoDB, Riak
+    - Wide-Column Stores (NoSQL): Apache Cassandra, Google Bigtable, HBase
+    - Graph Databases: Neo4J, OrientDB, ArangoDB
+    - Object-Oriented Databases: Couchbase, ObjectStore
+    - In-Memory Databases: Redis, Memcached
+    - Time Series Databases: InfluxDB, Druid, eXtremeDB
+    - Search Engines: Elasticsearch, Solr
+    - Cloud Databases: Microsoft Azure SQL Database, Amazon RDS, Oracle Autonomous Database
+    - Columnar Databases: Google BigQuery, MariaDB, Azure SQL Data Warehouse
+    - Hierarchical Databases: IBM IMS, Windows Registry
+    - Rust Aligned Databases:
+        - SQL: sqlx (PostgreSQL, MySQL, SQLite), diesel (PostgreSQL, SQLite, MySQL)
+        - NoSQL: mongodb (MongoDB), redis (Redis)
+        - Time Series: influx_db_client (InfluxDB)
+        - Key-Value: sled, rocksdb, leveldb
+        - Graph: cassandra-cpp (Cassandra)
+    - Each of these has their pros and cons, you have to think of them as different kind of arrows which Arjuna had in his kamaan, and each one is relevant for a specific use case, you cannot spend a brahmastra to kill a fly, just like you would not use a simple wooden arrow to try to kill duryodhana, you have to realize that context is everything, and the choice of the database is heavily driven by the use case at hand according to what user experience we want to create in the context of the business we are in
+        - simplest example is if you want a lot of agggreation types queries showing up in your application then the NoSQL thing is not for you, you need an RDBMS to run blazing fast aggreation queries of some type
 
 💡 Insight: This layered architecture promotes separation of concerns, making your code more modular and easier to maintain.
 
