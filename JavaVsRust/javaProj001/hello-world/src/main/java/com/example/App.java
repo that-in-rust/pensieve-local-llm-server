@@ -19,4 +19,10 @@ public class App {
         System.out.println("Order received: Hello World!");
         return "Hello World!";
     }
+
+    @GetMapping("/helloAmul")
+    public String sayHelloAmul() {
+        System.out.println("Order received: Hello Amul, see this works differently!");
+        return "Hello Amul - see this website is working differently!";
+    }
 }
