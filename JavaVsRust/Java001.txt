@@ -1,2 +1,112 @@
+Date 18 October 2024
+Friday
 
+Key ideas
+
+- Human minds process pyramids better
+- Hence LLMs also process pyramids better
+
+Whatever we might want to do
+
+problem solving can be at the level of random conversations & data collections, but problem communication shall always be like a pyramid
+
+3 months
+- we want to master basic backend
+- learn about a lot of computer science broad peripheral concepts which surround backend development
+- going deep is not the goal, but breezing fast is, because he LLMs can accelerate our own progression
+
+--- Session 1 ---
+
+Q1: How to spin up a simple server in Java which prints "Hello World" when I press tell me something button
+
+and how does it work?
+
+A1: 
+
+
+
+"Hey, ever wondered how your favorite websites magically appear when you click a button? Let's build our own mini-internet magic!"
+
+Picture this: You're at a fancy restaurant. You press a button, and voila! A waiter appears with your order. That's exactly what we're going to do with our Java server, but instead of food, it'll serve up a "Hello World" message!
+
+Let's break it down:
+
+1. 🏗️ Setting up our kitchen (development environment):
+   - Install Java Development Kit (JDK) and Maven in one go:
+     ```bash
+     sudo apt update && sudo apt install -y openjdk-11-jdk maven
+     ```
+   - Create a Spring Boot project:
+     ```bash
+        cd /home/amuldotexe/Desktop/GitHub202410/pensieve/JavaVsRust/javaProj001
+        mvn archetype:generate -DgroupId=com.example -DartifactId=hello-world -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
+        cd hello-world
+
+        # These Commands navigate to the project directory, generate a Maven project, and then navigate into the newly created project directory.
+        # Repeating them might create an error if the project already exists, as Maven will not overwrite an existing project by default.
+
+     ```
+   - Update the pom.xml file with Spring Boot configuration:
+     ```xml:JavaVsRust/javaProj001/hello-world/pom.xml
+     <?xml version="1.0" encoding="UTF-8"?>
+     <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+       <modelVersion>4.0.0</modelVersion>
+       
+       <parent>
+         <groupId>org.springframework.boot</groupId>
+         <artifactId>spring-boot-starter-parent</artifactId>
+         <version>2.5.5</version>
+         <relativePath/> <!-- lookup parent from repository -->
+       </parent>
+       
+       <groupId>com.example</groupId>
+       <artifactId>hello-world</artifactId>
+       <version>0.0.1-SNAPSHOT</version>
+       <name>hello-world</name>
+       <description>Demo project for Spring Boot</description>
+       
+       <properties>
+         <java.version>11</java.version>
+       </properties>
+       
+       <dependencies>
+         <dependency>
+           <groupId>org.springframework.boot</groupId>
+           <artifactId>spring-boot-starter-web</artifactId>
+         </dependency>
+         
+         <dependency>
+           <groupId>org.springframework.boot</groupId>
+           <artifactId>spring-boot-starter-test</artifactId>
+           <scope>test</scope>
+         </dependency>
+       </dependencies>
+       
+       <build>
+         <plugins>
+           <plugin>
+             <groupId>org.springframework.boot</groupId>
+             <artifactId>spring-boot-maven-plugin</artifactId>
+           </plugin>
+         </plugins>
+       </build>
+     </project>
+     ```
+   - Organize your project structure:
+     ```bash
+     mkdir -p src/main/java/com/example/helloworld/controller
+     mkdir -p src/main/java/com/example/helloworld/service
+     mkdir -p src/main/java/com/example/helloworld/repository
+     mkdir -p src/main/resources
+     mkdir -p src/test/java/com/example/helloworld
+     ```
+
+-----------------------
+
+   cd /home/amuldotexe/Desktop/GitHub202410/pensieve/JavaVsRust/javaProj001/hello-world
+
+   mvn spring-boot:run
+
+   http://localhost:8080/hello
 
