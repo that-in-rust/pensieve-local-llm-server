@@ -1,0 +1,63 @@
+# Cumulative Mistakes and Lessons Learned - Java Spring Boot Server Setup
+
+## General Lesson
+Maintain consistency between package declarations and directory structure throughout your project. This includes test files, which should mirror the package structure of the main code they are testing. Regularly check for and correct any mismatches to prevent compilation issues and maintain a clean, organized project structure.
+
+## Specific Mistakes and Solutions
+
+### 1. Project Structure and Package Declaration Mismatch
+- **Issue**: Package declarations in Java files didn't match the directory structure.
+- **Root Cause**: Lack of attention to Maven's standard directory layout.
+- **Solution**: Ensure package declarations match the directory structure (e.g., `src/main/java/com/example/...`).
+- **Lesson**: Always align your package declarations with your project's directory structure.
+
+### 2. Dependency Version Conflicts
+- **Issue**: Compilation errors due to outdated test dependencies (JUnit).
+- **Root Cause**: Mixing Spring Boot 2.5.5 (which uses JUnit 5) with older JUnit syntax.
+- **Solution**: Update test files to use JUnit 5 syntax and ensure `pom.xml` includes correct test dependencies.
+- **Lesson**: When upgrading frameworks, always check and update associated testing frameworks and syntax.
+
+### 3. Incorrect Maven Command Execution
+- **Issue**: Confusion about where to run Maven commands.
+- **Root Cause**: Lack of understanding of Maven project structure.
+- **Solution**: Always run Maven commands in the directory containing `pom.xml`.
+- **Lesson**: Familiarize yourself with Maven project structure and command execution context.
+
+### 4. Incomplete Spring Boot Configuration
+- **Issue**: "No plugin found for prefix 'spring-boot'" error.
+- **Root Cause**: Missing Spring Boot Maven plugin and parent in `pom.xml`.
+- **Solution**: Properly configure `pom.xml` with Spring Boot parent, dependencies, and plugins.
+- **Lesson**: When setting up a Spring Boot project, ensure all necessary configurations are present in `pom.xml`.
+
+### 5. Over-engineering Initial Project Structure
+- **Issue**: Creating unnecessary directories (services, repositories) for a simple application.
+- **Root Cause**: Anticipating future complexity prematurely.
+- **Solution**: Start with the minimal required structure and expand as needed.
+- **Lesson**: Follow the YAGNI (You Aren't Gonna Need It) principle. Add complexity only when required.
+
+### 6. Inconsistent File Locations
+- **Issue**: Misplacement of main application and controller files.
+- **Root Cause**: Lack of adherence to Maven's standard directory layout.
+- **Solution**: Place files in directories that match their package declarations.
+- **Lesson**: Stick to Maven's standard directory layout to avoid confusion and build issues.
+
+### 7. Package Declaration in Test Files
+- **Issue**: Linter error in AppTest.java - "The declared package "com.example" does not match the expected package """.
+- **Root Cause**: Mismatch between the file's location and its package declaration.
+- **Solution**: Either move the file to match the declared package or remove the package declaration if it's meant to be in the default package.
+- **Lesson**: Ensure test files follow the same package structure as the main code, or use the default package consistently if that's the intended design.
+
+### 8. Inconsistent Project Structure
+- **Issue**: Multiple project directories (javaProj001 and hello-world) leading to confusion.
+- **Root Cause**: Creating nested project structures without clear separation.
+- **Solution**: Maintain a clear, single project structure. Either use javaProj001 as the main project or keep hello-world as a standalone project.
+- **Lesson**: Keep project structures clean and avoid unnecessary nesting that can lead to path and package confusion.
+
+### 9. Test File Location Mismatch
+- **Issue**: Linter error in AppTest.java - "The declared package "com.example" does not match the expected package """.
+- **Root Cause**: The test file was placed directly under src/test/java/ instead of in a directory structure matching its package declaration.
+- **Solution**: Move the AppTest.java file to src/test/java/com/example/ to match its declared package.
+- **Lesson**: Ensure that the physical location of your Java files in the project structure matches their package declarations. This applies to both main and test code.
+
+## Summary
+When setting up a Java Spring Boot server, pay close attention to project structure, dependency management, and build tool configurations. Start simple, follow standard conventions, and gradually add complexity as needed. Regularly check for consistency between package declarations and file locations, especially after moving or creating new files. Always ensure your project structure is clean and follows Maven conventions to avoid confusion and build issues.
