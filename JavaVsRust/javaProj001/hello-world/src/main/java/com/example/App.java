@@ -25,4 +25,11 @@ public class App {
         System.out.println("Order received: Hello Amul, see this works differently!");
         return "Hello Amul - see this website is working differently!";
     }
+    @GetMapping("/helloNP")
+    public String sayHelloNeeti() {
+        System.out.println("Order received: Hello NP, see this works differently!");
+        return "Hi NP, I learnt to build a simple Springboot website, and a gentle reminder that I love you!";
+    }
+
+
 }
