@@ -362,7 +362,7 @@ Behold, the masterpiece of a Spring Boot Maven project! Let's paint a picture of
 │ │   │   │           └── 📄 Hello.java                                         │
 │ │   │   │                                                                     │
 │ │   │   └── 📁 resources/             🗃️ Configuration files & static content │
-│ │   │       ├── 📄 application.properties  ⚙️ App configuration               │
+│ │   │       ├── 📄 application.properties  ⚙️ App configuration                │
 │ │   │       ├── 📁 static/            🖼️ Static web assets                    │
 │ │   │       └── 📁 templates/         📝 View templates (e.g., Thymeleaf)     │
 │ │   │                                                                         │
