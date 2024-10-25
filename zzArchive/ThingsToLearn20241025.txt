@@ -416,5 +416,3 @@ General
         |-- Service Level Objectives
         |-- Error Budgets
         |-- Chaos Engineering
-
-[The rest of the content remains the same as in the previous version]
