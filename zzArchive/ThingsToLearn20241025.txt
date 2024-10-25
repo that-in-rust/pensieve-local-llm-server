@@ -1,0 +1,420 @@
+https://roadmap.alexhyett.com/backend-developer-roadmap/
+
+----
+
+=== Level 1 Backend Learning Map ===
+
+Backend Developer Learning Tree
+
+General
+|
+|-- Pick a Language
+|   |
+|   |-- Rust
+|   |   |-- Memory Safety
+|   |   |-- Concurrency
+|   |   |-- Performance
+|   |
+|   |-- Java
+|       |-- JVM
+|       |-- Spring Framework
+|       |-- Microservices
+|
+|-- Networking
+|   |
+|   |-- TCP/IP Protocol Suite
+|   |   |-- Application Layer
+|   |   |-- Transport Layer
+|   |   |-- Internet Layer
+|   |   |-- Network Access Layer
+|
+|-- Coding Principles
+|   |
+|   |-- SOLID
+|   |-- DRY
+|   |-- KISS
+|   |-- YAGNI
+|
+|-- Developing APIs
+|   |
+|   |-- REST
+|   |-- GraphQL
+|   |-- gRPC
+|
+|-- RDBMS Databases
+|   |
+|   |-- Database Design
+|   |-- SQL Syntax
+|   |-- Postgres
+|
+|-- ORMs
+|   |
+|   |-- Diesel (Rust)
+|   |-- Hibernate (Java)
+|
+|-- NoSQL Databases
+|   |
+|   |-- Document Stores
+|   |-- Key-Value Stores
+|
+|-- Logging
+|   |
+|   |-- log4rs (Rust)
+|   |-- Log4j (Java)
+|
+|-- Caching
+|   |
+|   |-- In Memory Caching
+|   |-- Distributed Caching
+|
+|-- Testing
+|   |
+|   |-- Unit Testing
+|   |-- Integration Testing
+|
+|-- CI/CD
+|   |
+|   |-- GitHub Actions
+|   |-- Jenkins
+|
+|-- Cloud
+|   |
+|   |-- Azure
+|   |-- AWS
+|
+|-- Containerisation
+|   |
+|   |-- Docker
+|   |-- Kubernetes
+|
+|-- Design Principles
+|   |
+|   |-- GOF Patterns
+|   |-- Domain Driven Design
+|
+|-- Software Architecture
+|   |
+|   |-- Microservices
+|   |-- Serverless
+|
+|-- Advanced APIs
+|   |
+|   |-- Authentication & Authorisation
+|   |-- Dependency Injection
+|
+|-- Monitoring
+|   |
+|   |-- Grafana
+|   |-- Prometheus
+|
+|-- DevOps
+|   |
+|   |-- IAC
+|   |-- Orchestration
+|
+|-- Internet
+|   |
+|   |-- Domain Names
+|   |-- DNS
+|   |-- Web Hosting
+|
+|-- Computers
+|   |
+|   |-- Fundamentals
+|   |-- Data Types
+|   |-- Data Structures
+|   |-- Threads & Concurrency
+|   |-- Memory Management
+|   |-- I/O
+|
+|-- Linux Commands
+    |
+    |-- grep
+    |-- cat
+    |-- tail
+    |-- curl
+    |-- ssh
+
+----
+
+=== Level 2 Backend Learning Map ===
+
+Backend Developer Learning Tree
+
+General
+|
+|-- Pick a Language
+|   |
+|   |-- Rust
+|   |   |-- Memory Safety
+|   |   |   |-- Ownership
+|   |   |   |-- Borrowing
+|   |   |   |-- Lifetimes
+|   |   |-- Concurrency
+|   |   |   |-- Async/Await
+|   |   |   |-- Channels
+|   |   |   |-- Mutexes
+|   |   |-- Performance
+|   |       |-- Zero-cost Abstractions
+|   |       |-- Low-level Control
+|   |       |-- Inline Assembly
+|   |
+|   |-- Java
+|       |-- JVM
+|       |   |-- Garbage Collection
+|       |   |   |-- Generational GC
+|       |   |   |-- G1 Collector
+|       |   |   |-- ZGC
+|       |   |-- JIT Compilation
+|       |   |   |-- HotSpot
+|       |   |   |-- GraalVM
+|       |   |-- Memory Model
+|       |       |-- Heap vs Stack
+|       |       |-- PermGen vs Metaspace
+|       |-- Spring Framework
+|       |   |-- Dependency Injection
+|       |   |-- Aspect-Oriented Programming
+|       |   |-- Spring Security
+|       |   |-- Spring WebFlux
+|       |-- Microservices
+|           |-- Spring Boot
+|           |-- Service Discovery
+|           |-- Circuit Breakers
+|           |-- API Gateway
+|           |-- Service Mesh
+|
+|-- Computer Science Fundamentals
+|   |
+|   |-- Computational Theory
+|   |   |-- Automata Theory
+|   |   |-- Computability
+|   |   |-- Complexity Theory
+|   |
+|   |-- Programming Paradigms
+|   |   |-- Imperative
+|   |   |-- Declarative
+|   |   |-- Functional
+|   |   |-- Object-Oriented
+|   |
+|   |-- Compiler Design
+|   |   |-- Lexical Analysis
+|   |   |-- Parsing
+|   |   |-- Code Generation
+|   |   |-- Optimization
+|   |
+|   |-- Computer Architecture
+|       |-- Instruction Set Architecture
+|       |-- Pipelining
+|       |-- Cache Hierarchy
+|       |-- SIMD
+|
+|-- Operating Systems
+|   |
+|   |-- Process Management
+|   |   |-- Scheduling
+|   |   |-- Inter-Process Communication
+|   |   |-- Synchronization
+|   |
+|   |-- Memory Management
+|   |   |-- Virtual Memory
+|   |   |-- Paging
+|   |   |-- Segmentation
+|   |
+|   |-- File Systems
+|   |   |-- Journaling
+|   |   |-- RAID
+|   |   |-- Distributed File Systems
+|   |
+|   |-- I/O Systems
+|   |   |-- Polling vs Interrupts
+|   |   |-- DMA
+|   |   |-- Device Drivers
+|   |
+|   |-- Virtualization
+|       |-- Hypervisors
+|       |-- Containers
+|       |-- Unikernels
+|
+|-- Networking
+|   |
+|   |-- TCP/IP Protocol Suite
+|   |   |-- Application Layer
+|   |   |   |-- HTTP/HTTPS
+|   |   |   |   |-- RESTful Services
+|   |   |   |   |-- SSL/TLS
+|   |   |   |   |-- HTTP/2
+|   |   |   |   |-- HTTP/3 (QUIC)
+|   |   |   |-- FTP
+|   |   |   |-- SMTP
+|   |   |   |-- DNS
+|   |   |       |-- DNS Resolution
+|   |   |       |-- DNS Caching
+|   |   |       |-- DNSSEC
+|   |   |
+|   |   |-- Transport Layer
+|   |   |   |-- TCP
+|   |   |   |   |-- Handshake
+|   |   |   |   |-- Congestion Control
+|   |   |   |   |-- Flow Control
+|   |   |   |   |-- Retransmission Strategies
+|   |   |   |-- UDP
+|   |   |       |-- Datagram
+|   |   |       |-- Low Latency
+|   |   |       |-- QUIC
+|   |   |
+|   |   |-- Internet Layer
+|   |   |   |-- IP Addressing
+|   |   |   |   |-- IPv4
+|   |   |   |   |-- IPv6
+|   |   |   |   |-- Subnetting
+|   |   |   |-- ICMP
+|   |   |   |-- ARP
+|   |   |   |-- NAT
+|   |   |   |-- IPsec
+|   |   |
+|   |   |-- Network Access Layer
+|   |       |-- Ethernet
+|   |       |-- Wi-Fi
+|   |       |-- MAC Addressing
+|   |       |-- VLANs
+|   |       |-- STP (Spanning Tree Protocol)
+|   |
+|   |-- Network Programming
+|       |-- Sockets
+|       |-- Non-blocking I/O
+|       |-- Multiplexing (select, poll, epoll)
+|       |-- Zero-copy
+|
+|-- Distributed Systems
+|   |
+|   |-- Consistency Models
+|   |   |-- Strong Consistency
+|   |   |-- Eventual Consistency
+|   |   |-- Causal Consistency
+|   |
+|   |-- Consensus Algorithms
+|   |   |-- Paxos
+|   |   |-- Raft
+|   |   |-- Byzantine Fault Tolerance
+|   |
+|   |-- Distributed Storage
+|   |   |-- Sharding
+|   |   |-- Replication
+|   |   |-- Partitioning
+|   |
+|   |-- Distributed Computing
+|       |-- MapReduce
+|       |-- Stream Processing
+|       |-- Batch Processing
+|
+|-- Security
+|   |
+|   |-- Cryptography
+|   |   |-- Symmetric Encryption
+|   |   |-- Asymmetric Encryption
+|   |   |-- Hashing
+|   |   |-- Digital Signatures
+|   |
+|   |-- Web Security
+|   |   |-- OWASP Top 10
+|   |   |-- XSS
+|   |   |-- CSRF
+|   |   |-- SQL Injection
+|   |
+|   |-- Network Security
+|   |   |-- Firewalls
+|   |   |-- IDS/IPS
+|   |   |-- VPNs
+|   |
+|   |-- Authentication & Authorization
+|       |-- OAuth 2.0
+|       |-- OpenID Connect
+|       |-- JWT
+|       |-- SAML
+|
+|-- Databases
+|   |
+|   |-- RDBMS
+|   |   |-- Query Optimization
+|   |   |-- Indexing Strategies
+|   |   |-- ACID Properties
+|   |   |-- Isolation Levels
+|   |
+|   |-- NoSQL
+|   |   |-- CAP Theorem
+|   |   |-- BASE Properties
+|   |   |-- Consistency Patterns
+|   |
+|   |-- NewSQL
+|   |   |-- Distributed SQL
+|   |   |-- Horizontal Scaling
+|   |
+|   |-- Database Internals
+|       |-- Storage Engines
+|       |-- Query Processing
+|       |-- Transaction Processing
+|
+|-- Software Architecture
+|   |
+|   |-- Architectural Patterns
+|   |   |-- Layered Architecture
+|   |   |-- Event-Driven Architecture
+|   |   |-- Microservices
+|   |   |-- Serverless
+|   |
+|   |-- Design Patterns
+|   |   |-- Creational Patterns
+|   |   |-- Structural Patterns
+|   |   |-- Behavioral Patterns
+|   |
+|   |-- Scalability
+|   |   |-- Horizontal vs Vertical Scaling
+|   |   |-- Load Balancing
+|   |   |-- Caching Strategies
+|   |
+|   |-- Reliability
+|       |-- Fault Tolerance
+|       |-- Disaster Recovery
+|       |-- High Availability
+|
+|-- Performance Engineering
+|   |
+|   |-- Profiling
+|   |   |-- CPU Profiling
+|   |   |-- Memory Profiling
+|   |   |-- I/O Profiling
+|   |
+|   |-- Optimization Techniques
+|   |   |-- Code Optimization
+|   |   |-- Database Query Optimization
+|   |   |-- Network Optimization
+|   |
+|   |-- Benchmarking
+|       |-- Load Testing
+|       |-- Stress Testing
+|       |-- Capacity Planning
+|
+|-- DevOps & SRE
+    |
+    |-- Continuous Integration/Deployment
+    |   |-- Build Automation
+    |   |-- Deployment Strategies
+    |   |-- Feature Flags
+    |
+    |-- Infrastructure as Code
+    |   |-- Terraform
+    |   |-- Ansible
+    |   |-- CloudFormation
+    |
+    |-- Monitoring & Observability
+    |   |-- Metrics
+    |   |-- Logging
+    |   |-- Tracing
+    |   |-- Alerting
+    |
+    |-- Site Reliability Engineering
+        |-- Service Level Objectives
+        |-- Error Budgets
+        |-- Chaos Engineering
+
+[The rest of the content remains the same as in the previous version]
