@@ -234,3 +234,76 @@ Maintain a friendly, conversational tone throughout. Focus on Rust's philosophy,
 ---
 
 In general make the text part pyramidal, even though conversational, meaning that focus on the essence first, then add 1 level of detail, then another level of detail and so on
+
+
+---
+
+More examples of visual explanations:
+
+      Arrays are fixed-size collections of the same type. Slices are views into arrays or other slices.
+
+      Example 1: Arrays
+      ```rust
+      fn main() {
+          // Declare an array of 5 integers
+          let numbers: [i32; 5] = [1, 2, 3, 4, 5];
+          //   |       |    |     |
+          //   |       |    |     Array literal
+          //   |       |    Array size
+          //   |       Array type (32-bit integers)
+          //   Variable name
+
+          // Access elements
+          println!("First number: {}", numbers[0]);
+          //                           |       |
+          //                           |       Index
+          //                           Array name
+
+          // Get array length
+          println!("Array length: {}", numbers.len());
+          //                           |       |
+          //                           |       len() method
+          //                           Array name
+      }
+      ```
+
+      Example 2: Slices
+      ```rust
+      fn print_slice(slice: &[i32]) {
+      //  |          |      |
+      //  |          |      Slice type (reference to array of i32)
+      //  |          Parameter name
+      //  Function name
+          for number in slice {
+          //  |      |  |
+          //  |      |  Slice to iterate over
+          //  |      'in' keyword for iteration
+          //  Loop variable
+              print!("{} ", number);
+          }
+          println!();
+      }
+
+      fn main() {
+          let numbers = [1, 2, 3, 4, 5];
+          
+          // Create a slice of the whole array
+          print_slice(&numbers);
+          //          |
+          //          Reference to create a slice
+
+          // Create a slice of part of the array
+          print_slice(&numbers[1..4]);
+          //          |       |
+          //          |       Range syntax for slicing
+          //          Array to slice
+      }
+      ```
+
+      These examples demonstrate:
+      1. Creating and using arrays
+      2. Accessing array elements and length
+      3. Creating slices from arrays
+      4. Passing slices to functions
+      5. Using range syntax for slicing
+
