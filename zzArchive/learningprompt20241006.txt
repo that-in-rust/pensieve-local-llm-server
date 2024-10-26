@@ -376,3 +376,5 @@ More examples of visual explanations:
 
 PROMPTS LOG:
 -  Explain to me TCP IP visually using the kind of ASCII art that is there in learningprompt20241006.txt
+- This is good - just make the language adjectives adverbs expressions more soothing and less intense
+- Can you suggest code in Rust that helps us build intuition for TCP IP innovatevely creatively
