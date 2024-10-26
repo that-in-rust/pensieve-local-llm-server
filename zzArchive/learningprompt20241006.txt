@@ -370,3 +370,9 @@ More examples of visual explanations:
       1. Defining a function that returns an `Option<T>`
       2. Using `match` to handle both `Some` and `None` cases
       3. Safely working with potentially absent values
+
+-----
+
+
+PROMPTS LOG:
+-  Explain to me TCP IP visually using the kind of ASCII art that is there in learningprompt20241006.txt
