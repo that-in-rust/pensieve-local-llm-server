@@ -175,65 +175,12 @@ General
 |       |   |-- Dependency Injection
 |       |   |-- Aspect-Oriented Programming
 |       |   |-- Spring Security
-|       |   |-- Spring WebFlux
 |       |-- Microservices
 |           |-- Spring Boot
 |           |-- Service Discovery
 |           |-- Circuit Breakers
 |           |-- API Gateway
 |           |-- Service Mesh
-|
-|-- Computer Science Fundamentals
-|   |
-|   |-- Computational Theory
-|   |   |-- Automata Theory
-|   |   |-- Computability
-|   |   |-- Complexity Theory
-|   |
-|   |-- Programming Paradigms
-|   |   |-- Imperative
-|   |   |-- Declarative
-|   |   |-- Functional
-|   |   |-- Object-Oriented
-|   |
-|   |-- Compiler Design
-|   |   |-- Lexical Analysis
-|   |   |-- Parsing
-|   |   |-- Code Generation
-|   |   |-- Optimization
-|   |
-|   |-- Computer Architecture
-|       |-- Instruction Set Architecture
-|       |-- Pipelining
-|       |-- Cache Hierarchy
-|       |-- SIMD
-|
-|-- Operating Systems
-|   |
-|   |-- Process Management
-|   |   |-- Scheduling
-|   |   |-- Inter-Process Communication
-|   |   |-- Synchronization
-|   |
-|   |-- Memory Management
-|   |   |-- Virtual Memory
-|   |   |-- Paging
-|   |   |-- Segmentation
-|   |
-|   |-- File Systems
-|   |   |-- Journaling
-|   |   |-- RAID
-|   |   |-- Distributed File Systems
-|   |
-|   |-- I/O Systems
-|   |   |-- Polling vs Interrupts
-|   |   |-- DMA
-|   |   |-- Device Drivers
-|   |
-|   |-- Virtualization
-|       |-- Hypervisors
-|       |-- Containers
-|       |-- Unikernels
 |
 |-- Networking
 |   |
@@ -284,135 +231,301 @@ General
 |       |-- Non-blocking I/O
 |       |-- Multiplexing (select, poll, epoll)
 |       |-- Zero-copy
+|       |-- Asynchronous I/O
 |
-|-- Distributed Systems
+|-- Coding Principles
 |   |
-|   |-- Consistency Models
-|   |   |-- Strong Consistency
-|   |   |-- Eventual Consistency
-|   |   |-- Causal Consistency
+|   |-- SOLID
+|   |   |-- Single Responsibility
+|   |   |-- Open/Closed
+|   |   |-- Liskov Substitution
+|   |   |-- Interface Segregation
+|   |   |-- Dependency Inversion
 |   |
-|   |-- Consensus Algorithms
-|   |   |-- Paxos
-|   |   |-- Raft
-|   |   |-- Byzantine Fault Tolerance
+|   |-- DRY
+|   |-- KISS
+|   |-- YAGNI
+|
+|-- Developing APIs
 |   |
-|   |-- Distributed Storage
+|   |-- REST
+|   |   |-- Stateless
+|   |   |-- Resource-based
+|   |   |-- HATEOAS
+|   |   |-- Versioning
+|   |   |-- Rate Limiting
+|   |
+|   |-- GraphQL
+|   |   |-- Flexible Queries
+|   |   |-- Single Endpoint
+|   |   |-- Schema Definition
+|   |   |-- Resolvers
+|   |   |-- Subscriptions
+|   |
+|   |-- gRPC
+|   |   |-- High Performance
+|   |   |-- HTTP/2
+|   |   |-- Protocol Buffers
+|   |   |-- Bi-directional Streaming
+|   |   |-- Service Definition
+|
+|-- RDBMS Databases
+|   |
+|   |-- Database Design
+|   |   |-- Normalization
+|   |   |-- ER Diagrams
+|   |   |-- Denormalization
+|   |   |-- Indexing Strategies
+|   |   |-- Schema Migrations
+|   |
+|   |-- SQL Syntax
+|   |   |-- Joins
+|   |   |-- Subqueries
+|   |   |-- Transactions
+|   |   |-- Window Functions
+|   |   |-- CTEs (Common Table Expressions)
+|   |
+|   |-- Postgres
+|   |   |-- Advanced SQL
+|   |   |-- JSON Support
+|   |   |-- Extensions (e.g., PostGIS)
+|   |   |-- Full-Text Search
+|
+|-- ORMs
+|   |
+|   |-- Diesel (Rust)
+|   |   |-- Type-safe SQL
+|   |   |-- Migrations
+|   |   |-- Connection Pooling
+|   |   |-- Query Builders
+|   |
+|   |-- Hibernate (Java)
+|   |   |-- Lazy Loading
+|   |   |-- Caching
+|   |   |-- Criteria API
+|   |   |-- Hibernate Validator
+|
+|-- NoSQL Databases
+|   |
+|   |-- Document Stores
+|   |   |-- MongoDB
+|   |   |   |-- Flexible Schema
+|   |   |   |-- Aggregation Framework
+|   |   |   |-- Sharding
+|   |   |   |-- Replication
+|   |
+|   |-- Key-Value Stores
+|   |   |-- Redis
+|   |   |   |-- In-memory
+|   |   |   |-- Pub/Sub
+|   |   |   |-- Redis Streams
+|   |   |   |-- Caching Strategies
+|
+|-- Logging
+|   |
+|   |-- log4rs (Rust)
+|   |   |-- Configuration
+|   |   |-- Appenders
+|   |   |-- Filters
+|   |   |-- Log Levels
+|   |
+|   |-- Log4j (Java)
+|   |   |-- Log Levels
+|   |   |-- Pattern Layouts
+|   |   |-- Async Logging
+|   |   |-- Log Rotation
+|
+|-- Caching
+|   |
+|   |-- In Memory Caching
+|   |   |-- LRU Cache
+|   |   |-- TTL
+|   |   |-- Cache Eviction Policies
+|   |   |-- Cache Invalidation
+|   |
+|   |-- Distributed Caching
+|   |   |-- Consistency
 |   |   |-- Sharding
 |   |   |-- Replication
-|   |   |-- Partitioning
-|   |
-|   |-- Distributed Computing
-|       |-- MapReduce
-|       |-- Stream Processing
-|       |-- Batch Processing
+|   |   |-- Cache Coherency
 |
-|-- Security
+|-- Testing
 |   |
-|   |-- Cryptography
-|   |   |-- Symmetric Encryption
-|   |   |-- Asymmetric Encryption
-|   |   |-- Hashing
-|   |   |-- Digital Signatures
+|   |-- Unit Testing
+|   |   |-- Test Coverage
+|   |   |-- Mocking
+|   |   |-- Property-based Testing
+|   |   |-- Test-Driven Development (TDD)
 |   |
-|   |-- Web Security
-|   |   |-- OWASP Top 10
-|   |   |-- XSS
-|   |   |-- CSRF
-|   |   |-- SQL Injection
-|   |
-|   |-- Network Security
-|   |   |-- Firewalls
-|   |   |-- IDS/IPS
-|   |   |-- VPNs
-|   |
-|   |-- Authentication & Authorization
-|       |-- OAuth 2.0
-|       |-- OpenID Connect
-|       |-- JWT
-|       |-- SAML
+|   |-- Integration Testing
+|   |   |-- Test Containers
+|   |   |-- Endpoints
+|   |   |-- Data Seeding
+|   |   |-- Environment Configuration
 |
-|-- Databases
+|-- CI/CD
 |   |
-|   |-- RDBMS
-|   |   |-- Query Optimization
-|   |   |-- Indexing Strategies
-|   |   |-- ACID Properties
-|   |   |-- Isolation Levels
+|   |-- GitHub Actions
+|   |   |-- Workflows
+|   |   |-- Secrets Management
+|   |   |-- Matrix Builds
+|   |   |-- Caching Dependencies
 |   |
-|   |-- NoSQL
-|   |   |-- CAP Theorem
-|   |   |-- BASE Properties
-|   |   |-- Consistency Patterns
+|   |-- Jenkins
+|   |   |-- Pipelines
+|   |   |-- Plugins
+|   |   |-- Blue Ocean
+|   |   |-- Distributed Builds
+|
+|-- Cloud
 |   |
-|   |-- NewSQL
-|   |   |-- Distributed SQL
-|   |   |-- Horizontal Scaling
+|   |-- Azure
+|   |   |-- Azure Functions
+|   |   |-- Azure Storage
+|   |   |-- Azure DevOps
+|   |   |-- Azure Kubernetes Service (AKS)
+|   |   |-- Azure Cosmos DB
 |   |
-|   |-- Database Internals
-|       |-- Storage Engines
-|       |-- Query Processing
-|       |-- Transaction Processing
+|   |-- AWS
+|       |-- AWS Lambda
+|       |-- AWS S3
+|       |-- AWS CloudFormation
+|       |-- AWS Elastic Beanstalk
+|       |-- AWS DynamoDB
+|
+|-- Containerisation
+|   |
+|   |-- Docker
+|   |   |-- Dockerfiles
+|   |   |-- Container Lifecycle
+|   |   |-- Docker Compose
+|   |   |-- Multi-stage Builds
+|   |
+|   |-- Kubernetes
+|   |   |-- Pods
+|   |   |-- Services
+|   |   |-- Helm Charts
+|   |   |-- Ingress Controllers
+|   |   |-- ConfigMaps & Secrets
+|
+|-- Design Principles
+|   |
+|   |-- GOF Patterns
+|   |   |-- Singleton
+|   |   |-- Factory
+|   |   |-- Observer
+|   |   |-- Strategy
+|   |   |-- Decorator
+|   |
+|   |-- Domain Driven Design
+|   |   |-- Entities
+|   |   |-- Value Objects
+|   |   |-- Aggregates
+|   |   |-- Repositories
+|   |   |-- Bounded Contexts
 |
 |-- Software Architecture
 |   |
-|   |-- Architectural Patterns
-|   |   |-- Layered Architecture
+|   |-- Microservices
+|   |   |-- Decoupling
+|   |   |-- Resilience
 |   |   |-- Event-Driven Architecture
-|   |   |-- Microservices
-|   |   |-- Serverless
+|   |   |-- API Gateway
+|   |   |-- Service Mesh
 |   |
-|   |-- Design Patterns
-|   |   |-- Creational Patterns
-|   |   |-- Structural Patterns
-|   |   |-- Behavioral Patterns
-|   |
-|   |-- Scalability
-|   |   |-- Horizontal vs Vertical Scaling
-|   |   |-- Load Balancing
-|   |   |-- Caching Strategies
-|   |
-|   |-- Reliability
-|       |-- Fault Tolerance
-|       |-- Disaster Recovery
-|       |-- High Availability
+|   |-- Serverless
+|   |   |-- Event-driven
+|   |   |-- Cost-effective
+|   |   |-- Function as a Service (FaaS)
+|   |   |-- Statelessness
 |
-|-- Performance Engineering
+|-- Advanced APIs
 |   |
-|   |-- Profiling
-|   |   |-- CPU Profiling
-|   |   |-- Memory Profiling
-|   |   |-- I/O Profiling
+|   |-- Authentication & Authorisation
+|   |   |-- JWT
+|   |   |-- OAuth
+|   |   |-- OpenID Connect
+|   |   |-- API Keys
+|   |   |-- Rate Limiting
 |   |
-|   |-- Optimization Techniques
-|   |   |-- Code Optimization
-|   |   |-- Database Query Optimization
-|   |   |-- Network Optimization
-|   |
-|   |-- Benchmarking
-|       |-- Load Testing
-|       |-- Stress Testing
-|       |-- Capacity Planning
+|   |-- Dependency Injection
+|   |   |-- Inversion of Control
+|   |   |-- Containers
+|   |   |-- Service Locators
+|   |   |-- Scoped vs Singleton Services
 |
-|-- DevOps & SRE
+|-- Monitoring
+|   |
+|   |-- Grafana
+|   |   |-- Dashboards
+|   |   |-- Alerts
+|   |   |-- Data Sources
+|   |   |-- Annotations
+|   |
+|   |-- Prometheus
+|   |   |-- Metrics
+|   |   |-- Exporters
+|   |   |-- Alertmanager
+|   |   |-- Recording Rules
+|   |
+|   |-- ELK Stack
+|   |   |-- Elasticsearch
+|   |   |-- Logstash
+|   |   |-- Kibana
+|   |
+|   |-- APM (Application Performance Monitoring)
+|       |-- New Relic
+|       |-- Datadog APM
+|       |-- Jaeger
+|
+|-- DevOps
+|   |
+|   |-- IAC
+|   |   |-- Terraform
+|   |   |-- Pulumi
+|   |   |-- AWS CDK
+|   |   |-- Ansible
+|   |   |-- Chef
+|   |
+|   |-- Orchestration
+|       |-- Spacelift
+|       |-- Terraform Cloud
+|       |-- Jenkins X
+|       |-- Kubernetes Operators
+|
+|-- Internet
+|   |
+|   |-- Domain Names
+|   |-- DNS
+|   |-- Web Hosting
+|   |-- CDN
+|   |-- SSL/TLS Certificates
+|
+|-- Computers
+|   |
+|   |-- Fundamentals
+|   |-- Data Types
+|   |-- Data Structures
+|   |-- Threads & Concurrency
+|   |-- Memory Management
+|   |-- I/O
+|   |-- Operating Systems
+|       |-- Process Management
+|       |-- Memory Management
+|       |-- File Systems
+|       |-- Concurrency Models
+|       |-- Virtual Memory
+|       |-- Scheduling Algorithms
+|
+|-- Linux Commands
     |
-    |-- Continuous Integration/Deployment
-    |   |-- Build Automation
-    |   |-- Deployment Strategies
-    |   |-- Feature Flags
-    |
-    |-- Infrastructure as Code
-    |   |-- Terraform
-    |   |-- Ansible
-    |   |-- CloudFormation
-    |
-    |-- Monitoring & Observability
-    |   |-- Metrics
-    |   |-- Logging
-    |   |-- Tracing
-    |   |-- Alerting
-    |
-    |-- Site Reliability Engineering
-        |-- Service Level Objectives
-        |-- Error Budgets
-        |-- Chaos Engineering
+    |-- grep
+    |-- cat
+    |-- tail
+    |-- curl
+    |-- ssh
+    |-- awk
+    |-- sed
+    |-- find
+    |-- chmod
+    |-- chown
