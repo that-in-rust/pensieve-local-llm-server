@@ -274,15 +274,6 @@ In summary, Tokio offers excellent performance and safety guarantees, making it 
 
 
 
-Next steps for next 5 sessions
-- Code a small async application in Rust using Tokio
-    - use all major functionalities of Tokio
-
-
-
-
-
-
 
 
 
