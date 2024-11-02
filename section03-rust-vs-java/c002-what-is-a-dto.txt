@@ -125,10 +125,161 @@ Key Characteristics:
     │  │     Fields      │  │
     │  │ name: String    │  │
     │  │ address: String │  │
-    │  │ toppings: Vec   │ │
+    │  │ toppings: Vec   │  │
     │  └─────────────────┘  │
     └───────────────────────┘
     
     💡 Insight: Both Java and Rust use DTOs to facilitate data transfer, but Rust leverages its ownership system for memory safety and efficient data handling.
     
     🔍 Design Choice: Using DTOs enforces separation of concerns, ensuring that changes in one layer don't directly impact others.
+
+
+Do we have special libraries for DTOs in Java and Rust?
+
+// Start of Selection
+Ever felt like you need a universal translator for your data? That's what specialized DTO libraries do!
+
+### Java DTO Libraries
+
+Ever felt like you need a universal translator for your data? That's what specialized DTO libraries do!
+
+### Java DTO Libraries
+
+**1. Lombok: Minimal Boilerplate**
+
+```java
+// Lombok reduces repetitive code
+import lombok.Data;
+
+@Data
+public class UserDTO {
+    private String name;  // 📝 Customer name
+    private int age;      // 📅 Customer age
+}
+
+// Usage
+UserDTO user = new UserDTO();
+user.setName("Alice");   // 🔄 Set name to Alice
+user.setAge(30);         // 🔄 Set age to 30
+System.out.println(user); // 🖨️ Print UserDTO{name='Alice', age=30}
+```
+
+- `@Data` annotation automatically generates getters, setters, `toString()`, `equals()`, and `hashCode()` methods.
+
+**ELI15: Advanced Lombok with Builder Pattern**
+
+```java
+// Lombok's @Builder simplifies complex object creation
+import lombok.Builder;
+import lombok.ToString;
+
+@Builder
+@ToString
+public class OrderDTO {
+    private String orderId;     // 🆔 Unique Order ID
+    private String product;     // 📦 Product name
+    private int quantity;       // 🔢 Quantity ordered
+    private double price;       // 💲 Price per unit
+}
+
+// Usage with Builder
+public class Main {
+    public static void main(String[] args) {
+        OrderDTO order = OrderDTO.builder()
+                                 .orderId("ORD123")
+                                 .product("Laptop")
+                                 .quantity(2)
+                                 .price(1500.00)
+                                 .build();
+        System.out.println(order); // 🖨️ OrderDTO(orderId=ORD123, product=Laptop, quantity=2, price=1500.0)
+    }
+}
+```
+
+- `@Builder` annotation enables the builder pattern, making it easier to create instances of classes with multiple fields.
+- `@ToString` provides a readable `toString()` implementation for easy debugging and logging.
+
+💡 **Insight:** Using Lombok's builder pattern enhances code readability and maintainability, especially when dealing with classes that have numerous fields or optional parameters.
+
+🔍 **Design Choice:** The builder pattern separates the construction of an object from its representation, allowing for more flexible and readable object creation without boilerplate code.
+
+**2. MapStruct: Type-Safe Mappers**
+
+```java
+// MapStruct generates mapper implementations
+import org.mapstruct.Mapper;
+import org.mapstruct.factory.Mappers;
+
+@Mapper
+public interface UserMapper {
+    UserMapper INSTANCE = Mappers.getMapper(UserMapper.class);
+    
+    UserDTO toDTO(User user);
+    User toEntity(UserDTO dto);
+}
+
+// Usage
+User user = new User("Alice", 30);
+UserDTO dto = UserMapper.INSTANCE.toDTO(user);
+System.out.println(dto);
+```
+
+- Automatically maps between entity and DTO classes with type safety.
+
+### Rust DTO Libraries
+
+**1. Serde: Serialization & Deserialization**
+
+```rust
+// Serde enables easy serialization
+use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UserDTO {
+    pub name: String,
+    pub age: u32,
+}
+
+fn main() {
+    let user = UserDTO {
+        name: String::from("Alice"),
+        age: 30,
+    };
+    
+    // Serialize to JSON
+    let json = serde_json::to_string(&user).unwrap();
+    println!("Serialized DTO: {}", json);
+    
+    // Deserialize back to struct
+    let deserialized: UserDTO = serde_json::from_str(&json).unwrap();
+    println!("Deserialized DTO: {:?}", deserialized);
+}
+```
+
+**2. Diesel: ORM with DTO Support**
+
+```rust
+// Diesel integrates ORM with DTOs
+use diesel::prelude::*;
+use serde::{Serialize, Deserialize};
+
+#[derive(Queryable, Serialize, Deserialize)]
+pub struct UserDTO {
+    pub id: i32,
+    pub name: String,
+    pub age: i32,
+}
+
+// Assuming a users table exists
+fn get_user(connection: &PgConnection, user_id: i32) -> UserDTO {
+    use crate::schema::users::dsl::*;
+    
+    users.filter(id.eq(user_id))
+         .first::<UserDTO>(connection)
+         .expect("Error loading user")
+}
+```
+
+💡 **Insight:** Java and Rust utilize these libraries to simplify data transfer between different layers, ensuring data consistency and reducing boilerplate code.
+
+🔍 **Design Choice:** These libraries enforce a clear separation of concerns, allowing developers to focus on business logic while handling data serialization and mapping efficiently.
