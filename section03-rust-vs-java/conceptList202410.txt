@@ -1,3 +1,7 @@
+
+
+
+Unclassified, Unprioritized list of concepts:
 [ ] What is JVM - and how does it work?
 [ ] What is JRE?
 [ ] What is JDK?
