@@ -1,0 +1,53 @@
+Standard operating procedure for Nov 2024
+
+- Pick a topic in this order itself
+- Open text file in cursor
+- Spend 20 minutes minimum asking the following questions to cursor
+    - What is this concept in ELI15
+    - Give a simple runnable example of this concept in Java
+    - Why was this concept needed in Java when this was designed as a language/framework feature
+    - Do we have a similar concept in Rust
+    - If Yes, then how is it different from Java concept
+    - Give 1 simple runnable example of this concept in Rust
+    - If no, then why did Rust not choose to implement this concept
+    - What functional need does this concept fulfill in Java, and since it is not there in Rust how does Rust achieve the same functionality
+
+
+Topics list to cover in Nov 2024
+
+==
+
+Inversion of Control (IoC)
+Dependency Injection (DI)
+Aspect-Oriented Programming (AOP)
+Spring MVC
+Transaction Management
+Data Access (JDBC and ORM)
+Spring Boot
+Spring Security
+Spring Data
+Spring Cloud
+Spring Integration
+Testing Support
+Spring Reactive Programming (WebFlux)
+
+
+
+Java Basics and Syntax
+Variables, Data Types, and Operators: Learn about primitive types, reference types, and common operators.
+Control Flow: Master conditional statements (if, switch) and loops (for, while, do-while).
+Methods and Functions: Understand method syntax, return types, parameters, and overloading.
+
+Object-Oriented Programming (OOP)
+Classes and Objects: Understand how to create classes and instantiate objects.
+Inheritance: Learn about extending classes and the super keyword.
+Polymorphism: Familiarize yourself with method overriding and interfaces.
+Encapsulation: Use access modifiers (public, private, protected) and getter/setter methods.
+Abstraction: Understand abstract classes and interfaces and when to use each.
+
+Data Structures and Collections Framework
+Arrays: Basics of arrays and multidimensional arrays.
+Java Collections Framework: Learn about ArrayList, LinkedList, HashMap, HashSet, Queue, Stack, and TreeMap.
+Generics: Type-safe handling of collections with generics (List<String> vs. List<Object>).
+
+
