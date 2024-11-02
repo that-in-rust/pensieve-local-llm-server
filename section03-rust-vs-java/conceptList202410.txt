@@ -1,1 +1,6 @@
 
+- What is JVM - and how does it work?
+- What is JRE?
+- What is JDK?
+- What is the difference between JVM, JRE, and JDK?
+- What is the difference between Java and Kotlin?

@@ -1,0 +1,70 @@
+/*Write basic Java Program for printing Hello World*/
+
+```java
+public class HelloWorld {
+    public static void main(String[] args) {
+        System.out.println("Hello World");
+    }
+}
+
+HelloWorld.main(null);
+```
+
+
+
+Let's break down what's happening here:
+
+Program Structure:
+┌─────────────────────────────┐
+│     HelloWorld Class        │
+│  ┌─────────────────────┐    │
+│  │    main() method    │    │
+│  │ ┌─────────────────┐ │    │
+│  │ │ println command │ │    │
+│  │ └─────────────────┘ │    │
+│  └─────────────────────┘    │
+└─────────────────────────────┘
+
+Code Breakdown:
+public class HelloWorld {
+//     |     |
+//     |     Class name (must match filename)
+//     Access modifier (visible to all)
+
+    public static void main(String[] args) {
+    //     |      |    |    |      |
+    //     |      |    |    |      Command line arguments array
+    //     |      |    |    Parameter type (String array)
+    //     |      |    Return type (nothing)
+    //     |      Belongs to class, not instances
+    //     Access modifier (callable from anywhere)
+    //
+    // static: Method can be called without creating object
+    // void: Method doesn't return anything
+    // main: Special method name Java looks for to start program
+
+        System.out.println("Hello World");
+        //     |   |   |
+        //     |   |   Print method (adds newline)
+        //     |   Standard output stream
+        //     Built-in class with I/O utilities
+    }
+}
+
+Memory Layout:
+Stack                    Heap
+┌──────┐                ┌─────────────┐
+│ args │ → null         │             │
+└──────┘                │ "Hello World"│ <- String literal stored in String pool
+                        │             │
+                        └─────────────┘
+
+JVM Execution:
+1. JVM looks for class with main()
+2. Loads HelloWorld class
+3. Executes main() method
+4. Creates String in heap
+5. Prints to console
+6. Program ends
+
+

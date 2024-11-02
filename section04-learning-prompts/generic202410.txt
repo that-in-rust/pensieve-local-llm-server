@@ -67,3 +67,4 @@ In general make the text part pyramidal, even though conversational, meaning tha
 
 ---
 
+Explain this following using the style of visual ASCII art - for ELI15
