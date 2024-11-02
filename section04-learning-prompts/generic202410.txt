@@ -64,7 +64,7 @@ Maintain a friendly, conversational tone throughout. Focus on Rust's philosophy,
 
 In general make the text part pyramidal, even though conversational, meaning that focus on the essence first, then add 1 level of detail, then another level of detail and so on
 
-
+Append to this header explanation ELI15 - using 1 example - maybe even code - and do all this inthe style of @visualASCII202410.txt 
 ---
 
 Explain this following using the style of visual ASCII art - for ELI15
