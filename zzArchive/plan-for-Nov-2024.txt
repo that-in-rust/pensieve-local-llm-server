@@ -1,5 +1,7 @@
 Standard operating procedure for Nov 2024
 
+Stream A
+
 - Pick a topic in this order itself
 - Open text file in cursor
 - Spend 20 minutes minimum asking the following questions to cursor
@@ -12,6 +14,14 @@ Standard operating procedure for Nov 2024
     - If no, then why did Rust not choose to implement this concept
     - What functional need does this concept fulfill in Java, and since it is not there in Rust how does Rust achieve the same functionality
 
+
+Stream b
+- Everyday spend 20 minutes reading documentation & code of tokio & document each thing as a way to learn Rust programming via serendipity algorithm
+    - Read the doc or code for 20 minutes
+    - Document the key insights using cursor
+    - Write 1 simple runnable example of this concept in Rust
+
+==========
 
 Topics list to cover in Nov 2024
 
