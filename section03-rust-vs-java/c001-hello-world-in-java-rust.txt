@@ -1,13 +1,43 @@
+If you see this txt file having syntax highlighting, it means that you are vscode-lumos VSIX
+
 /*Write basic Java Program for printing Hello World*/
 
 ```java
-public class HelloWorld {
+public class HelloWorldLumos {
+    
+    // Main method to execute the program
     public static void main(String[] args) {
-        System.out.println("Hello World");
+        System.out.println("Lumos! Hello, World from Java!");
+        
+        // Call the illuminate method
+        illuminate();
+    }
+    
+    // A simple utility method to "illuminate" the console with a message
+    public static void illuminate() {
+        System.out.println("✨ The magic of syntax highlighting in Java! ✨");
     }
 }
 
-HelloWorld.main(null);
+```
+
+/*Write basic Rust Program for printing Hello World*/
+
+
+```rust
+fn main() {
+    // Print the initial greeting
+    println!("Lumos! Hello, World from Rust!");
+    
+    // Call the illuminate function
+    illuminate();
+}
+
+// A simple function to "illuminate" the console with a message
+fn illuminate() {
+    println!("✨ The magic of syntax highlighting in Rust! ✨");
+}
+
 ```
 
 
