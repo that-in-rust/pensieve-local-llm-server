@@ -8,3 +8,4 @@ Unclassified, Unprioritized list of concepts:
 [ ] What is the difference between JVM, JRE, and JDK?
 [ ] What is the difference between Java and Kotlin?
 [ ] What is a DTO in Java? What is the parallel in Rust?
+[ ] What are the basic componenets of a VS Code extension?
