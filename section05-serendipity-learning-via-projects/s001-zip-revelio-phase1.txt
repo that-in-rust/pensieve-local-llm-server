@@ -43,6 +43,45 @@ Explain the tokio spawn_blocking function using this example - what does this co
         //  │   └── Handle thread errors
         //  └────── Wait for thread to finish
 ```
+The closure part is: move || -> Result<ZipAnalysis>
+  ┌────┐ ┌┐ ┌─────────────────────┐
+  │move│ ││ │Return type          │ 
+  │    │ ││ │(Result<ZipAnalysis>)│
+  └────┘ └┘ └─────────────────────┘
+    ↑     ↑
+    │     └─ Empty params list ||
+    └─ Keyword to take ownership
+
+what does an empty params list mean for a closure?
+
+it means the closure takes no parameters - it will just execute its body using only captured variables from the outer scope. in our case, it uses zip_path which it captured, but doesn't need any additional inputs.
+
+
+Future explained:
+spawn_blocking returns a JoinHandle<Result<ZipAnalysis>>
+
+JoinHandle is a type from tokio that represents an asynchronous task running in the background. It lets us:
+- Check if task completed
+- Get result when done
+- Cancel task if needed
+- Handle errors if task panics
+
+JoinHandle isn't shown in the closure syntax because it's the implicit return type of spawn_blocking itself. The closure syntax only shows what WE provide (the move closure returning Result<ZipAnalysis>). spawn_blocking then wraps our closure's return type in JoinHandle automatically.
+
+Think of it like this:
+spawn_blocking: Fn(closure) -> JoinHandle<closure_return_type>
+In our case:
+spawn_blocking: Fn(closure) -> JoinHandle<Result<ZipAnalysis>>
+
+Result<ZipAnalysis> means the task will either return:
+- Ok(ZipAnalysis) - Success with ZIP analysis data
+- Err(e) - An error occurred during analysis
+JoinHandle is a Future that resolves when thread completes
+Like an IOU that will eventually contain our analysis
+IOU = "I Owe You" - a promise to deliver something later
+Just like a real IOU promises future payment, 
+this promises future data when the thread finishes
+We .await it to get the actual value when ready
 
 In tokio:
 - task is a module that provides task management utilities
@@ -54,20 +93,6 @@ now we will store in analysis variable the result of the spawn_blocking
 but what is spawn_blocking - is it a function or a closure?
 
 spawn_blocking is a function that takes a closure as an argument and returns a future
-
-ELI15: Think of spawn_blocking like asking your friend to do a time-consuming task for you. 
-Let's say you're playing a video game and need to get a snack from the kitchen:
-
-- spawn_blocking is like saying "hey friend, can you get me a snack?"
-- The closure is like the instructions you give: "go to kitchen, open fridge, grab juice"
-- The future is like a "promise" that your friend will come back with the snack
-- Your friend (the new thread) goes to do the task while you keep playing (main thread)
-- When they come back with the snack, you can use .await to get it
-
-This way your game doesn't freeze while waiting for the snack - you can keep playing!
-
-
-
 
 Closures vs Functions:
 Functions:
