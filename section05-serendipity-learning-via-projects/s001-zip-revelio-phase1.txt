@@ -115,6 +115,11 @@ let numbers = vec![1, 2, 3, 4, 5];
 let doubled: Vec<i32> = numbers.iter().map(|&x| x * 2).collect(); // Closure doubles each element
 println!("Doubled: {:?}", doubled); // Output: Doubled: [2, 4, 6, 8, 10]
 
+// Why closures were needed:
+// Closures allow us to define inline, anonymous functions that can capture variables from their surrounding scope.
+// In this example, the closure captures each element of the iterator and doubles it, making the code concise and expressive.
+// Without closures, we would need to define a separate function to achieve the same result, which would be less convenient and less readable.
+
 ```
 
 
