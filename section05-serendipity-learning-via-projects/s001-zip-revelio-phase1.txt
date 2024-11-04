@@ -43,45 +43,6 @@ Explain the tokio spawn_blocking function using this example - what does this co
         //  │   └── Handle thread errors
         //  └────── Wait for thread to finish
 ```
-The closure part is: move || -> Result<ZipAnalysis>
-  ┌────┐ ┌┐ ┌─────────────────────┐
-  │move│ ││ │Return type          │ 
-  │    │ ││ │(Result<ZipAnalysis>)│
-  └────┘ └┘ └─────────────────────┘
-    ↑     ↑
-    │     └─ Empty params list ||
-    └─ Keyword to take ownership
-
-what does an empty params list mean for a closure?
-
-it means the closure takes no parameters - it will just execute its body using only captured variables from the outer scope. in our case, it uses zip_path which it captured, but doesn't need any additional inputs.
-
-
-Future explained:
-spawn_blocking returns a JoinHandle<Result<ZipAnalysis>>
-
-JoinHandle is a type from tokio that represents an asynchronous task running in the background. It lets us:
-- Check if task completed
-- Get result when done
-- Cancel task if needed
-- Handle errors if task panics
-
-JoinHandle isn't shown in the closure syntax because it's the implicit return type of spawn_blocking itself. The closure syntax only shows what WE provide (the move closure returning Result<ZipAnalysis>). spawn_blocking then wraps our closure's return type in JoinHandle automatically.
-
-Think of it like this:
-spawn_blocking: Fn(closure) -> JoinHandle<closure_return_type>
-In our case:
-spawn_blocking: Fn(closure) -> JoinHandle<Result<ZipAnalysis>>
-
-Result<ZipAnalysis> means the task will either return:
-- Ok(ZipAnalysis) - Success with ZIP analysis data
-- Err(e) - An error occurred during analysis
-JoinHandle is a Future that resolves when thread completes
-Like an IOU that will eventually contain our analysis
-IOU = "I Owe You" - a promise to deliver something later
-Just like a real IOU promises future payment, 
-this promises future data when the thread finishes
-We .await it to get the actual value when ready
 
 In tokio:
 - task is a module that provides task management utilities
@@ -123,3 +84,304 @@ In this example:
 3. Returns Result<ZipAnalysis> when done
 4. First ? handles JoinError if thread panics
 5. Second ? handles Result from ZipAnalysis
+
+
+
+
+The closure part is: move || -> Result<ZipAnalysis>
+  ┌────┐ ┌┐ ┌─────────────────────┐
+  │move│ ││ │Return type          │ 
+  │    │ ││ │(Result<ZipAnalysis>)│
+  └────┘ └┘ └─────────────────────┘
+    ↑     ↑
+    │     └─ Empty params list ||
+    └─ Keyword to take ownership
+
+what does an empty params list mean for a closure?
+
+it means the closure takes no parameters - it will just execute its body using only captured variables from the outer scope. in our case, it uses zip_path which it captured, but doesn't need any additional inputs.
+
+```rust
+// Example 1: Capturing Environment
+let x = 10;
+let add_to_x = |y| y + x; // Closure captures x from the environment
+println!("Result: {}", add_to_x(5)); // Output: Result: 15
+
+```
+
+```rust
+// Example 2: Using Closures in Iterators
+let numbers = vec![1, 2, 3, 4, 5];
+let doubled: Vec<i32> = numbers.iter().map(|&x| x * 2).collect(); // Closure doubles each element
+println!("Doubled: {:?}", doubled); // Output: Doubled: [2, 4, 6, 8, 10]
+
+```
+
+
+
+Future explained:
+spawn_blocking returns a JoinHandle<Result<ZipAnalysis>>
+
+JoinHandle is a type from tokio that represents an asynchronous task running in the background. It lets us:
+- Check if task completed
+- Get result when done
+- Cancel task if needed
+- Handle errors if task panics
+
+JoinHandle isn't shown in the closure syntax because it's the implicit return type of spawn_blocking itself. The closure syntax only shows what WE provide (the move closure returning Result<ZipAnalysis>). spawn_blocking then wraps our closure's return type in JoinHandle automatically.
+
+Think of it like this:
+spawn_blocking: Fn(closure) -> JoinHandle<closure_return_type>
+In our case:
+spawn_blocking: Fn(closure) -> JoinHandle<Result<ZipAnalysis>>
+
+Result<ZipAnalysis> means the task will either return:
+- Ok(ZipAnalysis) - Success with ZIP analysis data
+- Err(e) - An error occurred during analysis
+
+Is Result<ZipAnalysis> an enum?
+
+Yes! Result is an enum with two variants:
+- Ok(T): Contains successful value of type T
+- Err(E): Contains error value of type E
+
+So Result<ZipAnalysis> means:
+- Ok(ZipAnalysis): Success case with ZIP analysis
+- Err(anyhow::Error): Error case with error details
+
+This lets us handle both success and failure cases explicitly.
+
+JoinHandle is a Future that resolves when thread completes
+Like an IOU that will eventually contain our analysis
+IOU = "I Owe You" - a promise to deliver something later
+Just like a real IOU promises future payment, 
+this promises future data when the thread finishes
+We .await it to get the actual value when ready
+
+
+How Async Works in Our ZIP Reader phase 1 (exp003) (ELI15)
+----------------------------------------
+
+Current Implementation:
+```
+Main Thread        Worker Thread
+    |                  |
+    |--spawn_blocking->|
+    |                  |--read ZIP-->
+    |                  |--process-->
+    |<--results--------|
+    |
+    |--write report-->
+```
+
+Is it actually faster? Not really! Here's why:
+1. We're still using just ONE thread to read the ZIP
+2. We're still using just ONE thread to write the report
+3. The async part just keeps our main thread free while waiting
+
+It's like having a helper do your homework while you do something else - the homework doesn't get done faster, but at least you're not stuck waiting!
+
+
+
+
+Making it Actually Parallel
+-------------------------
+
+Option 1: Chunk-based Reading
+```rust
+let chunks = split_zip_into_chunks(zip_file, 4);  // Split into 4 parts
+let mut tasks = Vec::new();
+
+for chunk in chunks {
+    tasks.push(tokio::spawn(async move {
+        process_chunk(chunk)
+    }));
+}
+
+let results = futures::future::join_all(tasks).await;
+```
+
+Option 2: Parallel File Processing
+```rust
+// Process multiple files in parallel
+let mut tasks = Vec::new();
+for i in 0..archive.len() {
+    let mut archive_clone = archive.clone();  // Need thread-safe ZIP reader
+    tasks.push(tokio::spawn(async move {
+        process_file(archive_clone.by_index(i))
+    }));
+}
+```
+
+Option 3: Pipeline Processing
+```
+Reader Thread -> Processor Thread -> Writer Thread
+     |                  |                |
+  read chunk       analyze files     write report
+     |                  |                |
+  read next         analyze next      write next
+```
+
+Challenges with Parallelization:
+1. ZIP format is sequential - hard to read chunks randomly
+2. Need thread-safe ZIP reader (current zip crate isn't)
+3. Must maintain file order in final report
+4. Risk of disk I/O becoming bottleneck
+
+Potential Solutions:
+1. Use rayon for parallel processing
+2. Implement custom thread-safe ZIP reader
+3. Memory map large ZIP files
+4. Use buffered reading/writing
+
+Example with rayon:
+```rust
+use rayon::prelude::*;
+
+let results: Vec<FileInfo> = archive
+    .file_names()
+    .par_iter()  // Parallel iterator
+    .map(|name| process_file(name))
+    .collect();
+```
+============
+
+
+Remember: True parallelization requires:
+1. Thread-safe data structures
+2. Careful coordination
+3. Handling out-of-order results
+4. Managing system resources
+
+The current async implementation is more about "not blocking" than "going faster". 
+
+For real speed gains, we'd need to rework how we handle the ZIP data!
+
+
+Rayon + Tokio: The Dynamic Duo! 🦸‍♂️🦸‍♀️
+--------------------------------
+
+"Think of Tokio as a master coordinator and Rayon as a team of super-fast workers.
+Together, they can make your ZIP processing zoom! 🏃‍♂️💨"
+
+How They Work Together:
+```
+Tokio (Async)     Rayon (Parallel)
+    🎮               👥👥👥👥
+    │               Workers Pool
+    │                   │
+    └───────────────────┘
+         Cooperation
+```
+
+Processing Flow:
+```
+                   ┌─── Worker1 ───┐
+ZIP File ──► Tokio ├─── Worker2 ───┤ ──► Results
+   📦        🎮    ├─── Worker3 ───┤     📊
+                   └─── Worker4 ───┘
+```
+
+
+
+Example Implementation:
+```rust
+use rayon::prelude::*;
+use tokio;
+
+async fn process_zip(path: PathBuf) -> Result<ZipAnalysis> {
+    // Tokio handles the async file operations
+    let file_data = tokio::fs::read(&path).await?;
+    
+    // Spawn blocking for CPU-intensive work with Rayon
+    tokio::task::spawn_blocking(move || {
+        // Rayon parallelizes the processing
+        let results: Vec<FileInfo> = archive_entries
+            .par_iter()           // 👥 Parallel iterator
+            .map(|entry| {        // 🔄 Process each entry
+                process_entry(entry)
+            })
+            .collect();           // 📦 Gather results
+
+        Ok(ZipAnalysis::new(results))
+    }).await?
+}
+```
+
+Memory Layout:
+```
+Heap Memory:
+┌─────────────────┐
+│    ZIP Data     │ ◄── Multiple Rayon workers
+│ ┌───┬───┬───┐   │     read from same data
+│ │ 1 │ 2 │ 3 │   │     (zero-copy sharing)
+└─┴───┴───┴───┴───┘
+
+Thread Layout:
+┌─────────────┐
+│ Main Thread │ Tokio runtime
+└──────┬──────┘
+       │
+   ┌───┴───┐
+   │ Rayon │ Thread pool
+   └───┬───┘
+    ┌──┴──┐
+    │ /// │ Worker threads
+    └─────┘
+```
+
+Performance Benefits:
+```
+Single Thread:   [=====>] 100s
+Tokio Only:     [=====>] 100s
+Rayon Only:     [===>]    60s
+Tokio + Rayon:  [=>]      30s*
+
+* Theoretical best case with:
+  - Multiple CPU cores
+  - Fast disk I/O
+  - Large ZIP files
+```
+
+Best Practices:
+1. Use Tokio for 📥 I/O Operations:
+   ```rust
+   // Let Tokio handle file operations
+   let file = tokio::fs::File::open(path).await?;
+   ```
+
+2. Use Rayon for 🧮 CPU-Heavy Work:
+   ```rust
+   // Let Rayon handle parallel processing
+   entries.par_iter().for_each(|e| process(e));
+   ```
+
+3. Combine Their Powers:
+   ```rust
+   // Tokio manages async flow
+   tokio::spawn(async move {
+       // Rayon handles parallel computation
+       let results = pool.install(|| {
+           data.par_iter()
+               .map(|item| heavy_compute(item))
+               .collect()
+       });
+   });
+   ```
+
+Remember:
+- 🎮 Tokio = Async I/O (waiting for files)
+- 👥 Rayon = Parallel CPU (processing data)
+- 🤝 Together = Best of both worlds!
+
+Warning Signs You Need This:
+```
+Bad Signs        Good Signs
+┌──────────┐    ┌──────────┐
+│ CPU 25%  │    │ CPU 100% │
+│ Waiting  │    │ All Cores│
+│ Single   │    │ Large    │
+│ Thread   │    │ Files    │
+└──────────┘    └──────────┘
+```
+
