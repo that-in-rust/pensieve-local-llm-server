@@ -1,0 +1,23 @@
+04 Nov 2024 0800 hrs
+
+Monday
+
+we will note down all the concepts that we are learning in this project
+
+let's start with what scares us the most:
+async programming in rust
+
+
+Imagine you're playing a video game and need to load a big map.
+With a normal function, the game would freeze until loading finishes.
+But with async, the game keeps running while the map loads in the background!
+
+That's why we use async here - reading ZIP files can be slow,
+but we don't want to freeze the whole program while we wait.
+The async function lets other code run while we're reading the ZIP.
+
+Normal:     Async:
+  [WAIT]      [Other]
+  [WAIT]  vs  [Other]
+  [WAIT]      [Other]
+  [Done]      [Done]
