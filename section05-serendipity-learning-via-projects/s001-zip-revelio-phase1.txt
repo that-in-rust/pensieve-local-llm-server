@@ -21,3 +21,28 @@ Normal:     Async:
   [WAIT]  vs  [Other]
   [WAIT]      [Other]
   [Done]      [Done]
+
+
+Explain the tokio spawn_blocking function using this example - what does this code do?
+
+```rust
+        let analysis = tokio::task::spawn_blocking(move || -> Result<ZipAnalysis> {
+            //      |                |        |     |      |
+            //      |                |        |     |      Return type
+            //      |                |        |     Closure start
+            //      |                |        move keyword for ownership
+            //      |                Spawn blocking operation
+            //      Store result
+        }).await??;
+
+        // spawn_blocking is used for CPU-intensive tasks that would block the async runtime
+        // It runs the closure in a separate thread pool optimized for blocking operations
+        // This keeps the main async thread free to handle other tasks
+        
+        // In this example:
+        // 1. spawn_blocking creates new thread to read ZIP file (blocking I/O)
+        // 2. move closure captures zip_path and owns it in new thread
+        // 3. Returns Result<ZipAnalysis> when done
+        // 4. First ? handles JoinError if thread panics
+        // 5. Second ? handles Result from ZipAnalysis
+```
