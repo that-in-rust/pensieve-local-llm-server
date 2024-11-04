@@ -27,22 +27,74 @@ Explain the tokio spawn_blocking function using this example - what does this co
 
 ```rust
         let analysis = tokio::task::spawn_blocking(move || -> Result<ZipAnalysis> {
-            //      |                |        |     |      |
-            //      |                |        |     |      Return type
-            //      |                |        |     Closure start
-            //      |                |        move keyword for ownership
-            //      |                Spawn blocking operation
-            //      Store result
-        }).await??;
-
-        // spawn_blocking is used for CPU-intensive tasks that would block the async runtime
-        // It runs the closure in a separate thread pool optimized for blocking operations
-        // This keeps the main async thread free to handle other tasks
-        
-        // In this example:
-        // 1. spawn_blocking creates new thread to read ZIP file (blocking I/O)
-        // 2. move closure captures zip_path and owns it in new thread
-        // 3. Returns Result<ZipAnalysis> when done
-        // 4. First ? handles JoinError if thread panics
-        // 5. Second ? handles Result from ZipAnalysis
+        //  ┌─────────┐  ┌────────────────────┐  ┌───────────────────────────┐
+        //  │ Store   │  │ Create new thread  │  │ Closure that will run     │
+        //  │ result  │  │ for blocking work  │  │ in the new thread         │
+        //  └─────────┘  └────────────────────┘  └───────────────────────────┘
+        //                                              ↓
+        //                                       ┌─────────────────┐
+        //                                       │ move = take     │
+        //                                       │ ownership of    │
+        //                                       │ used variables  │
+        //                                       └─────────────────┘
+        }).await??;  
+        //  ↑   ↑↑
+        //  │   │└─ Handle Result from ZipAnalysis
+        //  │   └── Handle thread errors
+        //  └────── Wait for thread to finish
 ```
+
+In tokio:
+- task is a module that provides task management utilities
+- spawn_blocking is a function that runs blocking code in a dedicated thread pool
+so it doesn't block tokio's async event loop
+
+now we will store in analysis variable the result of the spawn_blocking 
+
+but what is spawn_blocking - is it a function or a closure?
+
+spawn_blocking is a function that takes a closure as an argument and returns a future
+
+ELI15: Think of spawn_blocking like asking your friend to do a time-consuming task for you. 
+Let's say you're playing a video game and need to get a snack from the kitchen:
+
+- spawn_blocking is like saying "hey friend, can you get me a snack?"
+- The closure is like the instructions you give: "go to kitchen, open fridge, grab juice"
+- The future is like a "promise" that your friend will come back with the snack
+- Your friend (the new thread) goes to do the task while you keep playing (main thread)
+- When they come back with the snack, you can use .await to get it
+
+This way your game doesn't freeze while waiting for the snack - you can keep playing!
+
+
+
+
+Closures vs Functions:
+Functions:
+  fn add(x: i32) { x + 1 }
+  - Standalone, can't capture variables
+  - Must declare types
+
+Closures:
+  let add = |x| { x + 1 };
+  - Can capture variables from scope i.e. it can use variables which are not passed to it as parameters
+  - Type inference
+  - Syntax: |params| { body }
+
+Here we use a closure because:
+1. We need to capture zip_path from outer scope
+2. It's a one-off task specific to this context
+3. We need move semantics to transfer ownership to new thread
+
+A thread pool is like a team of workers waiting for jobs
+Instead of creating/destroying threads for each task (expensive!)
+The pool keeps some threads ready to handle work as it comes in
+When one worker finishes, they go back to the pool to wait for the next job
+This keeps the main async thread free to handle other tasks
+
+In this example:
+1. spawn_blocking creates new thread to read ZIP file (blocking I/O)
+2. move closure captures zip_path and owns it in new thread
+3. Returns Result<ZipAnalysis> when done
+4. First ? handles JoinError if thread panics
+5. Second ? handles Result from ZipAnalysis
