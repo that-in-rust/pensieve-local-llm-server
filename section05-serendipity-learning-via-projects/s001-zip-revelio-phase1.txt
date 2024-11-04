@@ -198,9 +198,26 @@ let chunks = split_zip_into_chunks(zip_file, 4);  // Split into 4 parts
 let mut tasks = Vec::new();
 
 for chunk in chunks {
+    //  |       |       |
+    //  |       |       Loop variable (each chunk)
+    //  |       Collection to iterate over
+    //  Loop keyword
     tasks.push(tokio::spawn(async move {
+    //  |     |   |     |       |     |
+    //  |     |   |     |       |     Move ownership of chunk into async block
+    //  |     |   |     |       Async block
+    //  |     |   |     Spawn a new task
+    //  |     |   Tokio runtime
+    //  |     Push task handle into tasks vector
+    //  Tasks vector
         process_chunk(chunk)
+    //  |           |
+    //  |           Function to process each chunk
+    //  Pass chunk to function
     }));
+    //  | |
+    //  | Close async block
+    //  Close spawn function
 }
 
 let results = futures::future::join_all(tasks).await;
