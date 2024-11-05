@@ -82,10 +82,10 @@ IoC: Like buying a laptop - manufacturer handles component integration
 More analogies for SDE2 interviews:
 
 1. Restaurant Kitchen:
-Traditional: Home cooking where you manage all ingredients and cooking steps
-IoC: Professional kitchen where sous chefs prepare ingredients for the head chef
+Traditional: Home cooking where people manage all ingredients and cooking steps coordinating with each other
+IoC: Professional kitchen where sous chefs prepare ingredients for the head chef & each person has to do their job & not interfere with others, so they are not aware of each other
 
-2. Modern Factory:
+2. Modern Factory - best example:
 Traditional: Manual assembly line where workers explicitly coordinate
 IoC: Automated factory where central system orchestrates robots and conveyor belts
 
@@ -101,70 +101,6 @@ IoC: Using Kubernetes where the control plane handles pod lifecycle and networki
 Traditional: Explicitly managing connections, transactions, and resource cleanup
 IoC: Connection pools and transaction managers handling lifecycle automatically
 
-
-
-
-
-
-
-
-
-========================================
-Section 1 via Basic Springboot example
-========================================
-
-```java
-// 1. Simple Domain Model
-public record User(Long id, String name) {}  // ← Immutable data class
-
-// 2. Repository Layer
-@Repository  // ← Marks as data access component
-public interface UserRepository {
-    Optional<User> findById(Long id);
-    //    |          |      |
-    //    |          |      Parameter
-    //    |          Return type
-    //    Java Optional for null safety
-}
-
-// 3. Service Layer
-@Service  // ← Marks as business logic component
-public class UserService {
-    private final UserRepository repository;  // ← Final for immutability
-    
-    // Constructor injection - no @Autowired needed in modern Spring
-    public UserService(UserRepository repository) {
-        this.repository = repository;
-    }
-    
-    public User getUser(Long id) {
-        return repository.findById(id)
-            .orElseThrow(() -> new RuntimeException("User not found"));
-    }
-}
-
-// 4. Controller Layer
-@RestController  // ← Combines @Controller and @ResponseBody
-@RequestMapping("/api/users")  // ← Base URL path
-public class UserController {
-    private final UserService service;
-    
-    public UserController(UserService service) {
-        this.service = service;
-    }
-    
-    @GetMapping("/{id}")  // ← HTTP GET endpoint
-    //    |        |
-    //    |        Path variable placeholder
-    //    HTTP method annotation
-    public User getUser(@PathVariable Long id) {
-        //           |            |
-        //           |            Parameter type
-        //           Binds URL path variable
-        return service.getUser(id);
-    }
-}
-```
 
 Key Points in This Example:
 ```
@@ -194,85 +130,6 @@ HTTP Request
 
 
 
-========================================
-Section 2 via Springboot
-========================================
-
-
-
-
-Advanced Spring Implementation Pattern:
-```java
-@Configuration
-public class ApplicationContext {
-    // Lifecycle Management Phase
-    @Bean
-    @Scope("singleton")  // ── Container manages object lifecycle
-    //  |       |         //  |       |
-    //  |       |         //  |       Scope type (singleton)
-    //  |       Annotation keyword
-
-    public TransactionManager txManager(
-    //  |              |         |
-    //  |              |         Method name: txManager
-    //  |              Return type: TransactionManager class
-    //  Access modifier: public
-
-        @Qualifier("primary") DataSource dataSource,  // ── Qualified injection
-        //  |       |         |         |
-        //  |       |         |         Parameter name
-        //  |       |         Parameter type
-        //  |       Qualifier value
-        //  Annotation keyword
-
-        @Value("${tx.timeout}") Duration timeout     // ── External configuration
-        //  |       |           |         |
-        //  |       |         |         Parameter name
-        //  |       |         Parameter type
-        //  |       Value expression
-        //  Annotation keyword
-    ) {
-        return TransactionManager.builder()
-            .dataSource(dataSource)
-            .timeout(timeout)
-            .build();
-        //  |       |         |         |
-        //  |       |         |         Build method
-        //  |       |         Timeout configuration
-        //  |       Data source configuration
-        //  Builder pattern
-    }
-}
-
-// Domain Logic Phase
-@Service
-@Transactional  // ←── AOP through IoC container
-public class OrderService {
-    private final OrderRepository repository;
-    private final EventPublisher publisher;
-    
-    // Constructor injection enforces immutability
-    public OrderService(
-        OrderRepository repository,
-        EventPublisher publisher
-    ) {
-        this.repository = repository;
-        this.publisher = publisher;
-    }
-    
-    public Order process(OrderRequest request) {
-        // Business logic remains pure, infrastructure concerns handled by container
-        return repository.findById(request.getId())
-            .map(this::enrichOrder)
-            .map(repository::save)
-            .map(order -> {
-                publisher.publish(new OrderProcessedEvent(order));
-                return order;
-            })
-            .orElseThrow(() -> new OrderNotFoundException(request.getId()));
-    }
-}
-```
 
 Architectural Patterns Matrix:
 ```
@@ -330,99 +187,6 @@ Sources:
 - "Java Application Architecture" by Kirk Knoernschild
 
 
-========================================
-
-Section 3: Simple Database Update Example - IoC vs Traditional
-========================================
-
-Traditional Java (Without IoC):
-```java
-class UserDao {
-    private Connection conn;  // Manually managed dependency
-    
-    public UserDao() {
-        try {
-            conn = DriverManager.getConnection("jdbc:mysql://localhost/db");
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-    }
-    
-    public void updateUser(String name, int id) {
-        try (PreparedStatement stmt = conn.prepareStatement(
-            "UPDATE users SET name = ? WHERE id = ?")) {
-            stmt.setString(1, name);
-            stmt.setInt(2, id);
-            stmt.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-    }
-}
-
-// Usage
-UserDao dao = new UserDao();  // Direct instantiation
-dao.updateUser("Alice", 1);   // Direct method call
-```
-
-Spring Boot (With IoC):
-```java
-@Repository
-class UserDao {
-    private final JdbcTemplate jdbc;  // Injected by Spring
-    
-    public UserDao(JdbcTemplate jdbc) {  // Constructor injection
-        this.jdbc = jdbc;
-    }
-    
-    public void updateUser(String name, int id) {
-        jdbc.update("UPDATE users SET name = ? WHERE id = ?", 
-                   name, id);
-    }
-}
-
-// Usage
-@Service
-class UserService {
-    private final UserDao dao;  // IoC container injects dependency
-    
-    public UserService(UserDao dao) {
-        this.dao = dao;
-    }
-    
-    public void updateUser(String name, int id) {
-        dao.updateUser(name, id);
-    }
-}
-```
-
-Rust (Traditional):
-```rust
-struct UserDao {
-    conn: Connection,
-}
-
-impl UserDao {
-    fn new() -> Self {
-        Self {
-            conn: Connection::connect("mysql://localhost/db")
-                .expect("Failed to connect")
-        }
-    }
-    
-    fn update_user(&self, name: &str, id: i32) -> Result<(), Error> {
-        self.conn.execute(
-            "UPDATE users SET name = ? WHERE id = ?",
-            &[&name, &id]
-        )?;
-        Ok(())
-    }
-}
-
-// Usage
-let dao = UserDao::new();
-dao.update_user("Alice", 1)?;
-```
 
 Key Differences:
 ```
