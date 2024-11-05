@@ -79,6 +79,29 @@ Real World Analogy:
 Traditional: Like building your own PC - you pick and connect each part yourself
 IoC: Like buying a laptop - manufacturer handles component integration
 
+More analogies for SDE2 interviews:
+
+1. Restaurant Kitchen:
+Traditional: Home cooking where you manage all ingredients and cooking steps
+IoC: Professional kitchen where sous chefs prepare ingredients for the head chef
+
+2. Modern Factory:
+Traditional: Manual assembly line where workers explicitly coordinate
+IoC: Automated factory where central system orchestrates robots and conveyor belts
+
+3. Military Command:
+Traditional: Direct orders flowing top-down through chain of command
+IoC: Modern warfare with central command delegating based on real-time battlefield data
+
+4. Cloud Infrastructure:
+Traditional: Managing bare metal servers and networking yourself
+IoC: Using Kubernetes where the control plane handles pod lifecycle and networking
+
+5. Database Systems:
+Traditional: Explicitly managing connections, transactions, and resource cleanup
+IoC: Connection pools and transaction managers handling lifecycle automatically
+
+
 
 
 
@@ -305,3 +328,110 @@ Sources:
 - Spring Framework Reference (6.0)
 - "Dependency Injection: Principles, Practices, Patterns" by Steven van Deursen
 - "Java Application Architecture" by Kirk Knoernschild
+
+
+========================================
+
+Section 3: Simple Database Update Example - IoC vs Traditional
+========================================
+
+Traditional Java (Without IoC):
+```java
+class UserDao {
+    private Connection conn;  // Manually managed dependency
+    
+    public UserDao() {
+        try {
+            conn = DriverManager.getConnection("jdbc:mysql://localhost/db");
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    
+    public void updateUser(String name, int id) {
+        try (PreparedStatement stmt = conn.prepareStatement(
+            "UPDATE users SET name = ? WHERE id = ?")) {
+            stmt.setString(1, name);
+            stmt.setInt(2, id);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
+
+// Usage
+UserDao dao = new UserDao();  // Direct instantiation
+dao.updateUser("Alice", 1);   // Direct method call
+```
+
+Spring Boot (With IoC):
+```java
+@Repository
+class UserDao {
+    private final JdbcTemplate jdbc;  // Injected by Spring
+    
+    public UserDao(JdbcTemplate jdbc) {  // Constructor injection
+        this.jdbc = jdbc;
+    }
+    
+    public void updateUser(String name, int id) {
+        jdbc.update("UPDATE users SET name = ? WHERE id = ?", 
+                   name, id);
+    }
+}
+
+// Usage
+@Service
+class UserService {
+    private final UserDao dao;  // IoC container injects dependency
+    
+    public UserService(UserDao dao) {
+        this.dao = dao;
+    }
+    
+    public void updateUser(String name, int id) {
+        dao.updateUser(name, id);
+    }
+}
+```
+
+Rust (Traditional):
+```rust
+struct UserDao {
+    conn: Connection,
+}
+
+impl UserDao {
+    fn new() -> Self {
+        Self {
+            conn: Connection::connect("mysql://localhost/db")
+                .expect("Failed to connect")
+        }
+    }
+    
+    fn update_user(&self, name: &str, id: i32) -> Result<(), Error> {
+        self.conn.execute(
+            "UPDATE users SET name = ? WHERE id = ?",
+            &[&name, &id]
+        )?;
+        Ok(())
+    }
+}
+
+// Usage
+let dao = UserDao::new();
+dao.update_user("Alice", 1)?;
+```
+
+Key Differences:
+```
+┌─────────────┬────────────────────┬────────────────────┐
+│ Aspect      │ Traditional        │ IoC                │
+├─────────────┼────────────────────┼────────────────────┤
+│ Creation    │ Manual             │ Container managed  │
+│ Testing     │ Hard to mock       │ Easy to mock      │
+│ Config      │ Hardcoded          │ Externalized      │
+│ Coupling    │ Tight              │ Loose             │
+└─────────────┴────────────────────┴────────────────────┘
+```
