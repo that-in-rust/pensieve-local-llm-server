@@ -79,7 +79,6 @@ Real World Analogy:
 Traditional: Like building your own PC - you pick and connect each part yourself
 IoC: Like buying a laptop - manufacturer handles component integration
 
-More analogies for SDE2 interviews:
 
 1. Restaurant Kitchen:
 Traditional: Home cooking where people manage all ingredients and cooking steps coordinating with each other
@@ -100,33 +99,6 @@ IoC: Using Kubernetes where the control plane handles pod lifecycle and networki
 5. Database Systems:
 Traditional: Explicitly managing connections, transactions, and resource cleanup
 IoC: Connection pools and transaction managers handling lifecycle automatically
-
-
-Key Points in This Example:
-```
-┌─────────────────┬────────────────────────────┐
-│ Component       │ IoC Container Role         │
-├─────────────────┼────────────────────────────┤
-│ @Repository     │ Data access bean creation  │
-│ @Service       │ Business logic management  │
-│ @RestController │ Web endpoint registration  │
-│ Constructor DI  │ Automatic wire-up         │
-└─────────────────┴────────────────────────────┘
-```
-
-Flow Visualization:
-```
-HTTP Request
-     │
-     ▼
-┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-│ Controller   │───►│   Service    │───►│  Repository  │
-└──────────────┘    └──────────────┘    └──────────────┘
-     ▲                     ▲                   ▲
-     │                     │                   │
-     └─────────────────────┴───────────────────┘
-          IoC Container manages lifecycle
-```
 
 
 
