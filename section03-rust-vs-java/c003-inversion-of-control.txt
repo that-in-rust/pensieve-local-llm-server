@@ -1,0 +1,150 @@
+"In distributed systems, who orchestrates the dance of dependencies? Traditional code clutches its dependencies like a puppet master, but IoC lets the framework conduct the symphony." 
+
+💡 Core Principle: IoC shifts dependency lifecycle management from application code to a container, implementing the Hollywood Principle ("don't call us, we'll call you") through dependency injection.
+🔍 Architectural Impact:
+```
+Traditional Dependency Graph      IoC Container Managed
+┌────────────┐                   ┌─────────────┐
+│Controller  │──creates→         │  Container  │
+├────────────┤          \        ├─────────────┤
+│Service     │──creates→ \       │ Object Pool │←──┐
+├────────────┤            \      ├─────────────┤   │
+│Repository  │──creates→   \     │  Lifecycle  │   │manages
+└────────────┘              \    ├─────────────┤   │
+                            \    │   Scoping   │   │
+                             \   └─────────────┘   │
+                              \        │           │
+                               \       ▼           │
+                                \ ┌────────────┐   │
+                                  │Application │───┘
+                                  └────────────┘
+```
+In a traditional dependency graph, each component directly creates and manages its dependencies. This can lead to tight coupling and make the system harder to maintain. On the other hand, with IoC container management, the container takes care of creating and managing dependencies. This approach promotes loose coupling, making it easier to modify or replace components without affecting the entire system.
+
+
+
+Advanced Spring Implementation Pattern:
+```java
+@Configuration
+public class ApplicationContext {
+    // Lifecycle Management Phase
+    @Bean
+    @Scope("singleton")  // ── Container manages object lifecycle
+    //  |       |         //  |       |
+    //  |       |         //  |       Scope type (singleton)
+    //  |       Annotation keyword
+    public TransactionManager txManager(
+    //  |       |          |         |
+    //  |       |          |         Method name
+    //  |       |          Parameter list
+    //  |       Method return type
+    //  Method declaration keyword
+        @Qualifier("primary") DataSource dataSource,  // ── Qualified injection
+        //  |       |         |         |
+        //  |       |         |         Parameter name
+        //  |       |         Parameter type
+        //  |       Qualifier value
+        //  Annotation keyword
+        @Value("${tx.timeout}") Duration timeout     // ── External configuration
+        //  |       |         |         |
+        //  |       |         |         Parameter name
+        //  |       |         Parameter type
+        //  |       Value expression
+        //  Annotation keyword
+    ) {
+        return TransactionManager.builder()
+            .dataSource(dataSource)
+            .timeout(timeout)
+            .build();
+        //  |       |         |         |
+        //  |       |         |         Build method
+        //  |       |         Timeout configuration
+        //  |       Data source configuration
+        //  Builder pattern
+    }
+}
+
+// Domain Logic Phase
+@Service
+@Transactional  // ←── AOP through IoC container
+public class OrderService {
+    private final OrderRepository repository;
+    private final EventPublisher publisher;
+    
+    // Constructor injection enforces immutability
+    public OrderService(
+        OrderRepository repository,
+        EventPublisher publisher
+    ) {
+        this.repository = repository;
+        this.publisher = publisher;
+    }
+    
+    public Order process(OrderRequest request) {
+        // Business logic remains pure, infrastructure concerns handled by container
+        return repository.findById(request.getId())
+            .map(this::enrichOrder)
+            .map(repository::save)
+            .map(order -> {
+                publisher.publish(new OrderProcessedEvent(order));
+                return order;
+            })
+            .orElseThrow(() -> new OrderNotFoundException(request.getId()));
+    }
+}
+```
+
+Architectural Patterns Matrix:
+```
+┌────────────────┬───────────────────┬────────────────────┐
+│ Pattern        │ Implementation    │ Container Role     │
+├────────────────┼───────────────────┼────────────────────┤
+│ Constructor DI │ Final fields      │ Object Creation    │
+│ Property DI    │ Setter injection  │ Late Binding      │
+│ Method DI      │ @Lookup methods   │ Prototype Scoping │
+│ Interface DI   │ Aware interfaces  │ Container Access  │
+└────────────────┴───────────────────┴────────────────────┘
+```
+
+Advanced IoC Container Responsibilities:
+```
+Container Lifecycle
+     │
+     ├── Bean Definition Scanning
+     │   └── Component scanning
+     │       └── Configuration parsing
+     │
+     ├── Dependency Resolution
+     │   ├── Circular dependency detection
+     │   └── Proxy creation for AOP
+     │
+     ├── Instance Management
+     │   ├── Scope handling
+     │   │   ├── Singleton
+     │   │   ├── Prototype
+     │   │   └── Request/Session
+     │   └── Lifecycle callbacks
+     │
+     └── Context Management
+         ├── Event propagation
+         └── Resource management
+```
+
+🔬 Technical Deep-dive:
+1. Proxy-based AOP enables cross-cutting concerns
+2. Circular dependency resolution through proxy objects
+3. Lazy initialization for performance optimization
+4. Scope-based bean lifecycle management
+5. Event-driven architecture support
+
+Key Implementation Considerations:
+- Favor constructor injection for immutability
+- Use qualifiers for type disambiguation
+- Leverage factory patterns for complex object creation
+- Implement lifecycle callbacks for resource management
+- Apply proper scoping for state management
+
+Sources:
+- Spring Framework Reference (6.0)
+- "Dependency Injection: Principles, Practices, Patterns" by Steven van Deursen
+- "Java Application Architecture" by Kirk Knoernschild

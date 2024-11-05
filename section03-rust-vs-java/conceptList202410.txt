@@ -1,4 +1,12 @@
-
+Default questions to ask for each concept:
+    - What is this concept in ELI15
+    - Give a simple runnable example of this concept in Java
+    - Why was this concept needed in Java when this was designed as a language/framework feature
+    - Do we have a similar concept in Rust
+    - If Yes, then how is it different from Java concept
+    - Give 1 simple runnable example of this concept in Rust
+    - If no, then why did Rust not choose to implement this concept
+    - What functional need does this concept fulfill in Java, and since it is not there in Rust how does Rust achieve the same functionality
 
 
 Unclassified, Unprioritized list of concepts:
@@ -9,3 +17,14 @@ Unclassified, Unprioritized list of concepts:
 [ ] What is the difference between Java and Kotlin?
 [ ] What is a DTO in Java? What is the parallel in Rust?
 [ ] What are the basic componenets of a VS Code extension?
+[ ] What is inversion of control in Java? What is the parallel in Rust?
+[ ] What are annotations in Java? What is the parallel in Rust?
+[ ] What is a Configuration in Java Springboot? What is the parallel in Rust?
+[ ] What is a Bean in Java Springboot? What is the parallel in Rust?
+[ ] What is a Scope in Java Springboot? What is the parallel in Rust?
+[ ] What is @Scope["singleton"] in Java Springboot? What is the parallel in Rust?
+[ ] What is @Qualifier in Java Springboot? What is the parallel in Rust?
+[ ] What is @Value in Java Springboot? What is the parallel in Rust?
+
+
+====
