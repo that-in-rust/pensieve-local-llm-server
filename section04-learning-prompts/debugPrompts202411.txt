@@ -7,3 +7,12 @@ fix the bugs 1 by 1 use @ref06currentErrorLog.txt  to keep a track of what is do
 
 
 Is @src  updated as per @ref03archL2.txt  what is missing what is excess what is wrong what is correct - lease expand in  @ref06currentErrorLog.txt  TO KEEEP A TRACK OF WHAT IS DONE AND WHAT IS Not
+
+FIX MISSING stuff and required updates ASAP - DO NOT ASK JUST UPDATE IN @ref06currentErrorLog.txt 
+
+FIRST IDENTIFY THE DIFFERENCES IN  @ref03archL2.txt AND THEN CHANGE  AS PER NEW PRD @ref01prd.txt
+
+NOW CHANGE  WITH MINIMAL CHANGES TO WHAT IS ALREADY RELEVANT - DO NOT DELETE UNNECESSARY STUFF
+
+
+ONLY CHANGE VERY LIMITED PARTS OF @ref03archL2.txt  AS PER @ref02archL1.txt  - BE VERY SLOW - CHECK EACH THING AND THEN CHANGE MINIMAL PARTS SO LEARNINGS ARE NOT LOST
