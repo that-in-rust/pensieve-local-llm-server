@@ -1,0 +1,6 @@
+Is @src  updated as per @ref03archL2.txt  what is missing what is excess what is wrong what is correct - lease expand in  @ref06currentErrorLog.txt  TO KEEEP A TRACK OF WHAT IS DONE AND WHAT IS Not
+
+
+Explain me the bugs & warnings 1 by 1 use @ref06currentErrorLog.txt  to keep a track of what is done and what is not
+
+fix the bugs 1 by 1 use @ref06currentErrorLog.txt  to keep a track of what is done and what is not
