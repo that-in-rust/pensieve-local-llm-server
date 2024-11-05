@@ -49,22 +49,46 @@ Testing Support
 Spring Reactive Programming (WebFlux)
 
 
-
 Java Basics and Syntax
 Variables, Data Types, and Operators: Learn about primitive types, reference types, and common operators.
 Control Flow: Master conditional statements (if, switch) and loops (for, while, do-while).
 Methods and Functions: Understand method syntax, return types, parameters, and overloading.
 
-Object-Oriented Programming (OOP)
+Rust Basics and Syntax
+Variables and Types: Learn about type inference, mutability, primitive types, and compound types.
+Control Flow: Master if/else expressions, match expressions, loops (loop, while, for).
+Functions: Understand function syntax, return values, parameters, and closures.
+
+
+Java Object-Oriented Programming (OOP)
 Classes and Objects: Understand how to create classes and instantiate objects.
 Inheritance: Learn about extending classes and the super keyword.
 Polymorphism: Familiarize yourself with method overriding and interfaces.
 Encapsulation: Use access modifiers (public, private, protected) and getter/setter methods.
 Abstraction: Understand abstract classes and interfaces and when to use each.
 
-Data Structures and Collections Framework
+Rust Type System and Traits
+Structs and Enums: Learn about custom data types and pattern matching.
+Traits: Understand trait bounds, trait objects, and default implementations.
+Generics: Use generic type parameters and associated types.
+Ownership: Master borrowing rules, lifetimes, and the borrow checker.
+Modules: Use visibility rules and the module system for code organization.
+
+
+Java Data Structures and Collections Framework
 Arrays: Basics of arrays and multidimensional arrays.
 Java Collections Framework: Learn about ArrayList, LinkedList, HashMap, HashSet, Queue, Stack, and TreeMap.
 Generics: Type-safe handling of collections with generics (List<String> vs. List<Object>).
 
+Rust Collections and Data Structures
+Arrays and Vectors: Learn about fixed-size arrays and dynamic Vec<T>.
+Standard Collections: Master HashMap, HashSet, BTreeMap, VecDeque.
+Custom Collections: Implement collections with generics and traits.
+
+
+========================================
+Log update
+========================================
+ - 2024-11-05
+    we are first going to learn language & framework basics in Java & Rust because without this we are not able to relate to the abstract concepts
 
