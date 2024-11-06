@@ -16,3 +16,6 @@ NOW CHANGE  WITH MINIMAL CHANGES TO WHAT IS ALREADY RELEVANT - DO NOT DELETE UNN
 
 
 ONLY CHANGE VERY LIMITED PARTS OF @ref03archL2.txt  AS PER @ref02archL1.txt  - BE VERY SLOW - CHECK EACH THING AND THEN CHANGE MINIMAL PARTS SO LEARNINGS ARE NOT LOST
+
+
+find . \( -name "*.rs" -o -name "*.txt" -o -name "*.toml" \) -type f -not -name "zz_all_files_v2.txt" -exec sh -c 'echo -e "\n\n=== $1 ===\n"; cat "$1"' sh {} \; > zz_all_files_v2.txt
