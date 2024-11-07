@@ -386,13 +386,73 @@ Key Differences:
 
     // Custom Types
     let point = Point {x: 1, y: 2};   // Stack-allocated struct
-    let choice = Some(42);            // Enum variant
+    // Option<T> examples with annotations
+
+    let choice = Some(42);            // Option enum variant containing i32
+    //  |       |        |
+    //  |       |        Value wrapped in Some
+    //  |       Some variant of Option  
+    //  Variable binding
+    // In Java we'd write: Integer choice = 42;
+    // 'let' is like Java's final - creates an immutable variable
+    // Some() is like Optional.of() in Java - wraps a value
+    // Option is Rust's way to handle null - no null pointer exceptions!
+
+    let empty: Option<i32> = None;    // Option with no value
+    //  |     |           |
+    //  |     |           None variant
+    //  |     Type annotation (required when None used directly)
+    //  Variable binding
+    // In Java: Integer empty = null;
+    // Option<i32> is like Optional<Integer> in Java
+    // None is like Optional.empty() - explicitly shows there's no value
+    // Type annotation needed because None could be Option of any type
+    
+    // Pattern matching on Option
+    match choice {
+        Some(n) => println!("Got value: {}", n),
+        //   |      |
+        //   |      Expression if Some matched
+        //   Binds inner value to n
+        None => println!("No value"),
+        //      |
+        //      Expression if None matched
+    }
+    // match is like switch but more powerful
+    // In Java we'd write:
+    // if(choice.isPresent()) {
+    //   System.out.println("Got value: " + choice.get());
+    // } else {
+    //   System.out.println("No value");
+    // }
+
+    // Methods on Option
+    let doubled = choice.map(|x| x * 2);  // Some(84)
+    //           |     |    |
+    //           |     |    Closure that transforms value
+    //           |     Applies function if Some
+    //           Original Option
+    // |x| is Rust's lambda syntax - like x -> x * 2 in Java
+    // map transforms the value inside Some, does nothing for None
+    // In Java: choice.map(x -> x * 2)
+
+    let default = empty.unwrap_or(0);     // 0 (safe default)
+    //           |     |         |
+    //           |     |         Default if None
+    //           |     Extracts value or uses default
+    //           Option that might be None
+    // Like empty.orElse(0) in Java
+    // unwrap_or safely handles the None case with a default
+    // No null checks needed!
     
     // References/Slices (Fat pointers on stack)
     let slice = &arr[0..2];           // Points to array segment
     //          ▲    ▲
     //          │    Range syntax
     //          Reference
+    // & is like getting a reference in Java but more controlled
+    // 0..2 means index 0 to 2 (exclusive) - like Arrays.copyOfRange(arr,0,2)
+    // Slices borrow data - don't copy like Java does
     ```
 
     Impact:
