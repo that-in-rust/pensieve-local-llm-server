@@ -28,3 +28,5 @@ Unclassified, Unprioritized list of concepts:
 
 
 ====
+
+[] Append to this are there any other ways apart from Stack and heap - and which languages would use it  - I always see only Stack Heap in Rust

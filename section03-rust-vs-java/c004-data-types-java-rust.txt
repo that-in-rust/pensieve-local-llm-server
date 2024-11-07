@@ -48,7 +48,29 @@ Rust Data Types Overview:
 
 Memory Storage Differences:
 Q: Can you explain Java's memory model?
-A: Java's memory model is divided into two main areas - Stack and Heap.
+A: Java's memory model is divided into two main areas - Stack and Heap. Other memory segments exist in different languages:
+
+1. Data Segment (Static/Global)
+   - Used in C/C++ for static/global variables
+   - Fixed size, read-only or read-write sections
+   - FORTRAN common blocks use this
+
+2. Text/Code Segment
+   - Stores program instructions
+   - Read-only, shared between processes
+   - Common in C/C++, Assembly
+
+3. Register Memory
+   - Ultra-fast CPU registers
+   - Used heavily in Assembly
+   - Some C compilers use register keyword
+
+4. Memory-mapped I/O
+   - Maps hardware to memory addresses
+   - Used in embedded systems
+   - Common in C for microcontrollers
+
+Rust primarily uses Stack/Heap like Java, but allows unsafe code to access raw memory addresses when needed.
 
 Q: What's stored in the Stack memory?
 A: The Stack memory contains:

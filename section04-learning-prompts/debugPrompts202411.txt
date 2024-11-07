@@ -25,3 +25,5 @@ Make this more detailed researching @Web  from POV of SDE 2 interview questions
 
 
 Expand on these concepts conversationally as a QnA for a SDE 2 interview
+
+Can you give Java Rust examples - if this exists for them - search @Web 
