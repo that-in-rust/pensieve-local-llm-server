@@ -1,0 +1,144 @@
+Q1: Give me a comprehensive list of all the data types in Java
+Q2: How are these data types stored in memory?
+Q3: How is this different from Rust? Give all parallels and differences
+
+
+
+Java Data Types Overview:
+
+1. Primitive Data Types
+   ├── Numeric Types
+   │   ├── Integer Types
+   │   │   ├── byte  (8-bit)  [-128 to 127]
+   │   │   ├── short (16-bit) [-32,768 to 32,767]
+   │   │   ├── int   (32-bit) [-2^31 to 2^31-1]
+   │   │   └── long  (64-bit) [-2^63 to 2^63-1]
+   │   │
+   │   └── Floating-Point Types
+   │       ├── float  (32-bit) [~3.4e-038 to 3.4e+038]
+   │       └── double (64-bit) [~1.7e-308 to 1.7e+308]
+   │
+   ├── char (16-bit Unicode) ['\u0000' to '\uffff']
+   └── boolean (true/false)
+
+Rust Data Types Overview:
+
+1. Scalar Types
+   ├── Integer Types
+   │   ├── Signed
+   │   │   ├── i8   (8-bit)  [-128 to 127]
+   │   │   ├── i16  (16-bit) [-32,768 to 32,767]
+   │   │   ├── i32  (32-bit) [-2^31 to 2^31-1]
+   │   │   ├── i64  (64-bit) [-2^63 to 2^63-1]
+   │   │   └── i128 (128-bit)[-2^127 to 2^127-1]
+   │   │
+   │   └── Unsigned
+   │       ├── u8   (8-bit)  [0 to 255]
+   │       ├── u16  (16-bit) [0 to 65,535]
+   │       ├── u32  (32-bit) [0 to 2^32-1]
+   │       ├── u64  (64-bit) [0 to 2^64-1]
+   │       └── u128 (128-bit)[0 to 2^128-1]
+   │
+   ├── Floating-Point Types
+   │   ├── f32 (32-bit IEEE-754)
+   │   └── f64 (64-bit IEEE-754)
+   │
+   ├── char (32-bit Unicode) [0x0000 to 0x10FFFF]
+   └── bool (true/false)
+
+Memory Storage Differences:
+Q: Can you explain Java's memory model?
+A: Java's memory model is divided into two main areas - Stack and Heap.
+
+Q: What's stored in the Stack memory?
+A: The Stack memory contains:
+- Primitive values (like int, boolean) stored directly
+- References/pointers to objects on the heap
+- Method frames with local variables and parameters
+Each thread gets its own stack, making it thread-safe
+Memory is automatically managed as methods are called/returned
+
+Q: What about the Heap memory?
+A: The Heap is where:
+- All objects live (including arrays)
+- String pool for string interning
+- Static variables are stored
+- Memory is shared between all threads
+- Garbage collection happens to clean unused objects
+
+Q: How does garbage collection work with this model?
+A: The GC tracks object references from Stack -> Heap. When an object has no more references pointing to it from the Stack or other live Heap objects, it becomes eligible for garbage collection.
+
+Q: What are some common memory issues to watch for?
+A: Key things to consider:
+- Memory leaks from holding references longer than needed
+- Stack overflow from deep recursion
+- Heap fragmentation from lots of object creation/deletion
+- Thread synchronization when sharing heap objects
+
+Rust Memory Model:
+├── Stack Memory (Default)
+│   ├── Fixed-size types
+│   ├── Primitive types
+│   ├── Arrays with known size
+│   └── Struct instances
+│
+└── Heap Memory (When needed)
+    ├── Box<T> - explicit heap allocation
+    ├── Vec<T> - dynamic arrays
+    ├── String - dynamic text
+    ├── Dynamic dispatch objects
+    └── Types with unknown size
+
+Key Differences:
+├── Java GC vs Rust ownership
+├── Java implicit vs Rust explicit heap allocation
+├── Java reference counting vs Rust borrow checking
+└── Java shared memory vs Rust controlled sharing
+
+Key Differences:
+- Rust has no implicit type conversion
+- Rust integers can be unsigned
+- Rust chars are 32-bit vs Java's 16-bit
+- Rust has 128-bit integers
+- Rust has no null equivalent
+- All Rust types have a known size at compile time
+
+2. Reference Data Types
+   ├── Classes
+   │   ├── String
+   │   ├── Arrays
+   │   └── User-defined classes
+   │
+   ├── Interfaces
+   │
+   └── Collection Types
+       ├── List
+       │   ├── ArrayList
+       │   ├── LinkedList
+       │   └── Vector
+       │
+       ├── Set
+       │   ├── HashSet
+       │   ├── LinkedHashSet
+       │   └── TreeSet
+       │
+       ├── Queue
+       │   ├── PriorityQueue
+       │   └── Deque
+       │
+       └── Map
+           ├── HashMap
+           ├── LinkedHashMap
+           ├── TreeMap
+           └── Hashtable
+
+3. Special Types
+   ├── null (represents absence of value)
+   └── void (represents no type/return value)
+
+Key Characteristics:
+- Primitive types are stored directly in stack memory
+- Reference types store object references in stack, actual objects in heap
+- Primitive types have corresponding wrapper classes (Integer, Double, etc.)
+- Arrays are fixed-size but can hold both primitive and reference types
