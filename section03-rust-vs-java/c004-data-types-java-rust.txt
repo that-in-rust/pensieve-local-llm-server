@@ -50,17 +50,8 @@ Memory Storage Differences:
 Q: Can you explain Java's memory model?
 A: Java's memory model is divided into two main areas - Stack and Heap. Other memory segments exist in different languages:
 
-1. Data Segment (Static/Global)
-   - Java: static fields stored in special area of heap
-   - Rust: static/const items stored in data segment
-   - Java Example:
-     public class Example {
-         static int counter = 0; // Stored in heap
-         static final int MAX = 100; // Stored in data segment
-     }
-   - Rust Example:
-     static COUNTER: AtomicI32 = AtomicI32::new(0); // Data segment
-     const MAX: i32 = 100; // Embedded in binary
+
+
 
 2. Text/Code Segment
    - Stores program instructions
@@ -79,7 +70,7 @@ A: Java's memory model is divided into two main areas - Stack and Heap. Other me
 
 Rust primarily uses Stack/Heap like Java, but allows unsafe code to access raw memory addresses when needed.
 
-Q: What's stored in the Stack memory?
+Q: What's stored in the Stack memory IN Java?
 A: The Stack memory contains:
 - Primitive values (like int, boolean) stored directly
 - References/pointers to objects on the heap
@@ -87,7 +78,7 @@ A: The Stack memory contains:
 Each thread gets its own stack, making it thread-safe
 Memory is automatically managed as methods are called/returned
 
-Q: What about the Heap memory?
+Q: What about the Heap memory in Java?
 A: The Heap is where:
 - All objects live (including arrays)
 - String pool for string interning
@@ -95,10 +86,10 @@ A: The Heap is where:
 - Memory is shared between all threads
 - Garbage collection happens to clean unused objects
 
-Q: How does garbage collection work with this model?
+Q: How does garbage collection work with this model in Java?
 A: The GC tracks object references from Stack -> Heap. When an object has no more references pointing to it from the Stack or other live Heap objects, it becomes eligible for garbage collection.
 
-Q: What are some common memory issues to watch for?
+Q: What are some common memory issues to watch for in Java?
 A: Key things to consider:
 - Memory leaks from holding references longer than needed
 - Stack overflow from deep recursion
@@ -112,6 +103,19 @@ Rust Memory Model:
 │   ├── Arrays with known size
 │   └── Struct instances
 │
+│   Rust's focus on compile-time memory allocation:
+│   ├── Pros:
+│   │   ├── Zero runtime overhead for memory management
+│   │   ├── No unexpected allocations/deallocations
+│   │   ├── Better performance predictability
+│   │   └── Easier to reason about memory usage
+│   │
+│   └── Cons:
+│       ├── Less flexibility than Java's runtime allocation
+│       ├── More upfront design complexity
+│       ├── Dynamic sizing requires explicit heap types
+│       └── Steeper learning curve for developers
+│
 └── Heap Memory (When needed)
     ├── Box<T> - explicit heap allocation
     ├── Vec<T> - dynamic arrays
@@ -120,17 +124,161 @@ Rust Memory Model:
     └── Types with unknown size
 
 Key Differences:
-├── Java GC vs Rust ownership
+├── Java GC vs Rust ownership (RAII model of C++)
 ├── Java implicit vs Rust explicit heap allocation
+│   │
+    Java Example:
+    ```java
+    // Implicit heap allocation - Java handles it automatically
+    String name = "Alice";  // Allocated on heap
+    List<Integer> nums = new ArrayList<>();  // Allocated on heap
+    ```
+
+    Rust Example:  
+    ```rust
+    // Explicit heap allocation using Box, Vec, String
+    // String - For text that needs to grow/shrink
+    // Java: String str = "Alice" (implicitly heap allocated)
+    // Rust: For fixed-size strings, use &str or [u8; N] array
+    let fixed_str: &str = "Alice";        // String slice (borrowed reference)
+    //  |          |      |
+    //  |          |      String literal (stored in read-only memory)
+    //  |          Type annotation: string slice reference
+    //  Variable binding
+
+    // This is quite different from Java's String model:
+    // 1. In Java, String is always heap allocated, even literals
+    //    get interned into a string pool on heap
+    // 2. Java String is mutable internally but appears immutable
+    //    via its API. Rust &str is truly immutable
+    // 3. Java has no distinction between owned vs borrowed strings
+    //    while Rust separates:
+    //    - &str: borrowed view into string data (like a window)
+    //         Memory:  [H][e][l][l][o]  ← String data
+    //                   ↑
+    //         &str ────┘ (just looks at data) - This is called a "fat pointer" or "wide pointer"
+    //         because it contains both the address and length. C++ has std::string_view (C++17)
+    //         which is similar. Java has no direct equivalent but CharSequence interface provides
+    //         some similar functionality. Go has string slices that work similarly.
+    //                    
+    //         &str is a primitive type (like &[T]) that contains:
+    //         (&[T] is Rust's way of saying "a borrowed view into an array of type T"
+    //         where T could be any type like numbers, characters etc.
+    //         Think of it like a pair of binoculars - you can look at the array
+    //         but can't modify it. The & means "borrowing/viewing" and [T] means
+    //         "array of type T")
+    //         ┌─────┬─────┐
+    //         │ ptr │ len │  Two words on stack
+    //         └──┬──┴─────┘
+    //            │    
+    //            └─→ Points to data (which could be in various places)
+    //                - String literals (&'static str) → Read-only data segment
+    //                - Slices of String → Heap
+    //                - Stack string arrays → Stack
+    //         
+    //         Think of &str like a library card:
+    //         - The card itself (ptr+len) is cheap and lives on stack
+    //         - It lets you VIEW but not modify the actual book
+    //         - The book (string data) can be in read-only memory (for literals),
+    //           on the heap (for String slices), or on the stack (for array slices)
+    //         - You must return the card (satisfy the borrow checker)
+    //           before the book (data) can be changed/moved/dropped
+    //
+    //    - String: owned heap string that can be modified
+    //         Memory:  ┌─────┬─────┬─────┐
+    //         Stack:   │ ptr │ len │ cap │ String struct
+    //                  └──┬──┴─────┴─────┘
+    //                     │
+    //                     ▼ 
+    //         Heap:   [H][e][l][l][o]  (owns and can modify data)
+    // 4. Java strings use UTF-16 encoding internally
+    //    Rust uses UTF-8 which is more memory efficient
+    //    for ASCII-heavy text
+    //
+    //    This design choice stems from historical context:
+    //    - Java (1995) chose UTF-16 when Unicode was expected
+    //      to fit in 16 bits. When Unicode expanded beyond
+    //      that, Java had to use surrogate pairs, making the
+    //      encoding less efficient
+    //    - Rust (2010) chose UTF-8 because by then it was clear
+    //      that variable-width encoding was better for web/systems
+    //      programming where ASCII dominates and Unicode support
+    //      is still needed
+
+    let fixed_arr: [u8; 5] = *b"Alice";   // Fixed-size byte array
+    //  |          |   |    | |
+    //  |          |   |    | Byte string literal
+    //  |          |   |    Dereference operator
+    //  |          |   Array size
+    //  |          Array type (8-bit unsigned integers)
+    //  Variable binding
+
+    let name = String::from("Alice");  // Heap-allocated String
+    //  |     |        |
+    //  |     |        Static method to create String from literal
+    //  |     Type constructor
+    //  Variable binding
+    
+    // Vec - Dynamic array that can grow/shrink
+    // Java: ArrayList<Integer> list = new ArrayList<>()
+    // Rust: Must be explicit about heap usage
+    let nums: Vec<i32> = Vec::new();   // Heap allocated, growable array
+    
+    // Box - Single value on heap, fixed size
+    // Java: Integer num = new Integer(42) (pre Java 5)
+    // Rust: Useful when you need:
+    // 1. A value with unknown size at compile time
+    // 2. Large data you don't want on stack
+    // 3. To transfer ownership of data
+    let boxed = Box::new(42);          // Single heap allocated integer
+
+    // Stack allocations
+    // Primitive Types (Fixed size, stored on stack)
+    let x: i32 = 42;                  // 32-bit integer
+    let f: f64 = 3.14;                // 64-bit float
+    let b: bool = true;               // Boolean
+    let c: char = 'A';                // 32-bit Unicode character
+
+    // Fixed-size Arrays (Size known at compile time)
+    let arr: [i32; 4] = [1,2,3,4];    // [type; size]
+    //     ▲      ▲      ▲
+    //     │      │      Values
+    //     │      Array size
+    //     Element type
+
+    // Tuples (Fixed size, mixed types)
+    let tuple = (1, true, 3.14);      // Grouped values
+    //          ▲  ▲     ▲
+    //          i32 bool f64
+    let (x,y,z) = tuple;              // Destructuring
+
+    // Custom Types
+    let point = Point {x: 1, y: 2};   // Stack-allocated struct
+    let choice = Some(42);            // Enum variant
+    
+    // References/Slices (Fat pointers on stack)
+    let slice = &arr[0..2];           // Points to array segment
+    //          ▲    ▲
+    //          │    Range syntax
+    //          Reference
+    ```
+
+    Impact:
+│   │   Java:                      Rust:
+│   │   ┌─────────────┐           ┌─────────────┐
+│   │   │ Easy to use │           │ More control│
+│   │   │ Less code   │ ←vs→      │ Predictable │
+│   │   │ Hidden cost │           │ Explicit    │
+│   │   └─────────────┘           └─────────────┘
 ├── Java reference counting vs Rust borrow checking
 └── Java shared memory vs Rust controlled sharing
 
 Key Differences:
-- Rust has no implicit type conversion
+- Rust has no implicit type conversion, hence type safety is higher
 - Rust integers can be unsigned
 - Rust chars are 32-bit vs Java's 16-bit
 - Rust has 128-bit integers
-- Rust has no null equivalent
+- Rust has no null equivalent, using Option<T> instead. This was a deliberate design choice to prevent null pointer exceptions that plague Java. Option forces explicit handling of missing values at compile time, leading to more robust code but requiring more upfront thought about error cases. This impacts the ecosystem by making APIs more explicit about which values can be missing
 - All Rust types have a known size at compile time
 
 2. Reference Data Types
@@ -171,3 +319,137 @@ Key Characteristics:
 - Reference types store object references in stack, actual objects in heap
 - Primitive types have corresponding wrapper classes (Integer, Double, etc.)
 - Arrays are fixed-size but can hold both primitive and reference types
+
+
+
+========================================
+Data Segment
+========================================
+
+1. Data Segment (Static/Global)
+   - Java: static fields stored in special area of heap
+   - Rust: static/const items stored in data segment
+   - Java Example:
+     public class Example {
+         static int counter = 0; // Stored in heap
+         static final int MAX = 100; // Stored in data segment
+     }
+   - Rust Example:
+     static COUNTER: AtomicI32 = AtomicI32::new(0); // Data segment
+     const MAX: i32 = 100; // Embedded in binary
+
+Memory Models Compared:
+
+Java vs Rust Memory Layout:
+┌─────────────────────┐      ┌─────────────────────┐
+│       Java          │      │        Rust         │
+├─────────────────────┤      ├─────────────────────┤
+│    Stack Memory     │      │    Stack Memory     │
+│  ┌───────────────┐  │      │  ┌───────────────┐  │
+│  │ Method Frames │  │      │  │ Stack Frames  │  │
+│  │ Local Vars    │  │      │  │ Local Vars    │  │
+│  │ Primitives    │  │      │  │ Fixed-size    │  │
+│  │ References ───┼──┼─────▶│  │ Values        │  │
+│  └───────────────┘  │      │  └───────────────┘  │
+│                     │      │                     │
+│    Heap Memory      │      │    Heap Memory      │
+│  ┌───────────────┐  │      │  ┌───────────────┐  │
+│  │   Objects     │  │      │  │ Box<T>        │  │
+│  │   Arrays      │  │      │  │ Vec<T>        │  │
+│  │   Strings     │  │      │  │ String        │  │
+│  └───────────────┘  │      │  └───────────────┘  │
+│                     │      │                     │
+│   Data Segment      │      │   Data Segment      │
+│  ┌───────────────┐  │      │  ┌───────────────┐  │
+│  │ static fields │  │      │  │ static items  │  │
+│  │ class data    │  │      │  │ const values  │  │
+│  └───────────────┘  │      │  └───────────────┘  │
+└─────────────────────┘      └─────────────────────┘
+
+Key Differences:
+1. Stack Memory:
+   Java: Only primitives & references    Rust: Most data by default
+   Java: GC manages cleanup             Rust: Deterministic cleanup
+   
+2. Heap Memory:  
+   Java: All objects                    Rust: Only when needed
+   Java: GC managed                     Rust: Ownership based
+   
+3. Data Segment:
+
+    Memory Layout Visualization:
+    ┌─────────────────────────────────┐
+    │          Data Segment           │
+    │                                 │
+    │    Read-only Data (.rodata)     │
+    │  ┌─────────────────────────┐    │
+    │  │ String literals         │    │
+    │  │ Const values            │    │
+    │  └─────────────────────────┘    │
+    │                                 │
+    │    Initialized Data (.data)     │
+    │  ┌─────────────────────────┐    │
+    │  │ Static variables        │    │
+    │  │ Global variables        │    │
+    │  └─────────────────────────┘    │
+    │                                 │
+    │  Uninitialized Data (.bss)      │
+    │  ┌─────────────────────────┐    │
+    │  │ Static vars = 0/null    │    │
+    │  │ Global vars = 0/null    │    │
+    │  └─────────────────────────┘    │
+    └─────────────────────────────────┘
+
+    Java:                             Rust:
+    - Class metadata                  - Static items
+    - Static final fields             - Const values  
+    - JVM manages at runtime          - Fixed at compile time
+    - Garbage collected               - Never changes during runtime
+
+4. Data Segment Advantages:
+   Java:
+   - Stores class metadata in read-only memory
+   - String literals shared between threads
+   - Static final fields optimized by JVM
+   - No GC overhead for constants
+   
+   Rust:
+   - Const values baked into binary
+   - Static items have zero runtime cost
+   - Thread-safe by default
+   - Predictable memory usage
+
+5. Data Segment Disadvantages:
+   Java:
+   - Fixed size at startup
+   - Increases binary size (packed into executable, unlike stack/heap which are runtime allocations)
+   - Class loading overhead
+   - Limited to compile-time constants
+   
+   Rust:
+   - Values must be known at compile time
+   - No runtime modification
+   - Increases binary size
+   - Global state can be unsafe
+
+Smart Use Cases (SDE2 Level):
+1. String Interning
+   - Store frequently used strings in .rodata
+   - Zero copy between threads
+   - Faster string comparisons
+   
+2. Lookup Tables
+   - Static arrays of constants
+   - Zero initialization cost
+   - Cache-friendly access patterns
+   
+3. Configuration Constants
+   - Compile-time validation
+   - No runtime parsing overhead
+   - Guaranteed immutability
+
+4. Memory-Mapped Files
+   - Map file contents to .data
+   - Zero-copy I/O operations
+   - Share between processes
+

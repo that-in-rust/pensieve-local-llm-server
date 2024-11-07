@@ -30,3 +30,12 @@ Unclassified, Unprioritized list of concepts:
 ====
 
 [] Append to this are there any other ways apart from Stack and heap - and which languages would use it  - I always see only Stack Heap in Rust
+
+[] Unable to visualize a mental model for this unlike Heap or Stack which - can you draw all 3 in style of @visualASCII202410.txt 
+
+[] How is Data Segment different than Heap or Stack - what are the Pros Cons of using it and not using it - tell specially smart use cases in context of Senior Engineering interviews which can make me sound impressive - use @Web  if needed 
+
+[] Append - does this mean Data Segment is packed in binary - as opposed to stack heap which are runtime allocations?
+
+[] How is this different from Java and how does it impact the ecosystem - what was the reason for language design
+
