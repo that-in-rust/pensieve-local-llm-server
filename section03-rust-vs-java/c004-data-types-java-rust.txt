@@ -51,9 +51,16 @@ Q: Can you explain Java's memory model?
 A: Java's memory model is divided into two main areas - Stack and Heap. Other memory segments exist in different languages:
 
 1. Data Segment (Static/Global)
-   - Used in C/C++ for static/global variables
-   - Fixed size, read-only or read-write sections
-   - FORTRAN common blocks use this
+   - Java: static fields stored in special area of heap
+   - Rust: static/const items stored in data segment
+   - Java Example:
+     public class Example {
+         static int counter = 0; // Stored in heap
+         static final int MAX = 100; // Stored in data segment
+     }
+   - Rust Example:
+     static COUNTER: AtomicI32 = AtomicI32::new(0); // Data segment
+     const MAX: i32 = 100; // Embedded in binary
 
 2. Text/Code Segment
    - Stores program instructions
