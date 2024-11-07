@@ -405,9 +405,35 @@ Key Differences:
     // Option<T> is an enum with 2 variants:
     //   Some(T) - holds a value of type T
     //   None    - represents absence of value
+    //   
+    //   Some and None are enum variants:
+    //   enum Option<T> {
+    //       Some(T),  // Contains value of type T
+    //       None      // Contains no value
+    //   }
+    //   
+    //   Some/None are used everywhere in Rust standard library:
+    //   - HashMap.get() returns Option<&V>
+    //   - Iterator.next() returns Option<T>
+    //   - String.chars().nth(i) returns Option<char>
+    //   
+    //   Benefits over null:
+    //   1. Forces explicit handling - must check Some/None
+    //   2. Type system tracks nullable values
+    //   3. No implicit null propagation
+    //   4. No runtime null pointer exceptions
+    //
+    //   Common patterns:
+    //   let x = Some(5);        // Wrap value
+    //   let y = x.unwrap();     // Extract value (panics on None) 
+    //   if let Some(n) = x {...}// Pattern match
+    //   x.map(|n| n * 2)        // Transform inner value
+    // Similar to Excel dropdown values that can only be one of predefined choices,
+    // Option can only be Some(value) or None - no other possibilities allowed
+
     // This forces explicit handling of both cases at compile time
 
-    let empty: Option<i32> = None;    // Option with no value
+    let empty1: Option<i32> = None;    // Option with no value
     //  |     |           |
     //  |     |           None variant
     //  |     Type annotation (required when None used directly)
@@ -418,7 +444,7 @@ Key Differences:
     // Type annotation needed because None could be Option of any type
     
     // Pattern matching on Option
-    match choice {
+    match choice1 {
         Some(n) => println!("Got value: {}", n),
         //   |      |
         //   |      Expression if Some matched
