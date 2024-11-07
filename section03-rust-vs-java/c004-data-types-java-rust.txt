@@ -396,7 +396,16 @@ Key Differences:
     // In Java we'd write: Integer choice = 42;
     // 'let' is like Java's final - creates an immutable variable
     // Some() is like Optional.of() in Java - wraps a value
+
+
     // Option is Rust's way to handle null - no null pointer exceptions!
+    // Mentally visualize Option as a box that either:
+    // 1. Contains a value (Some) - like a box with something in it
+    // 2. Is empty (None) - like an empty box
+    // Option<T> is an enum with 2 variants:
+    //   Some(T) - holds a value of type T
+    //   None    - represents absence of value
+    // This forces explicit handling of both cases at compile time
 
     let empty: Option<i32> = None;    // Option with no value
     //  |     |           |
