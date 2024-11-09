@@ -15,11 +15,18 @@ Stream A: Java backend roadmap
     - What functional need does this concept fulfill in Java, and since it is not there in Rust how does Rust achieve the same functionality
 
 
-Stream B: Tokio learning
+Stream B1: Tokio learning
 - Everyday spend 20 minutes reading documentation & code of tokio & document each thing as a way to learn Rust programming via serendipity algorithm
     - Read the doc or code for 20 minutes
     - Document the key insights using cursor
     - Write 1 simple runnable example of this concept in Rust
+
+Stream B2: Axum learning
+- Everyday spend 20 minutes reading documentation & code of axum & document each thing as a way to learn Rust programming via serendipity algorithm
+    - Read the doc or code for 20 minutes
+    - Document the key insights using cursor
+    - Write 1 simple runnable example of this concept in Rust
+
 
 Stream C: Serendipity projects learning
 - Make notes on each project you learn with cursor, which you build on your own
