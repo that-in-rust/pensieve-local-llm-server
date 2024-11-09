@@ -25,6 +25,10 @@ Stream C: Serendipity projects learning
 - Make notes on each project you learn with cursor, which you build on your own
     - ideas from self-experimentation
     - ideas from https://www.jointakeoff.com/dashboard/courses 
+    - actively create 3 versions of Standard Operating Procedure for LLM assisted programming
+        - pre-PRD work on domain knowledge
+        - how to ensure LLM is logical enough by asking it to reason its architecture suggestions
+        - how to ensure LLM is logical enough by asking it to reason its code suggestions
 
     
 
