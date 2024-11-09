@@ -29,7 +29,7 @@ Stream C: Serendipity projects learning
         - pre-PRD work on domain knowledge
         - how to ensure LLM is logical enough by asking it to reason its architecture suggestions
         - how to ensure LLM is logical enough by asking it to reason its code suggestions
-
+        - how to push the LLM to simulate how their suggestions will play out in actual code
     
 
 ==========
