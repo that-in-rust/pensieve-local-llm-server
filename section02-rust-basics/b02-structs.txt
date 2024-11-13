@@ -115,34 +115,98 @@ fn main() {
 }
 ```
 
-#### 2. Tuple Structs
-
-Tuple structs are similar to regular structs but don't have named fields. They're useful when you want to give the whole tuple a name and make the code more readable.
-
-```rust
-struct Color(u8, u8, u8);
-struct Point(f32, f32, f32);
-
-fn main() {
-    let black = Color(0, 0, 0);
-    let origin = Point(0.0, 0.0, 0.0);
-
-    println!("Black color RGB: ({}, {}, {})", black.0, black.1, black.2);
-    println!("Origin point coordinates: ({}, {}, {})", origin.0, origin.1, origin.2);
-}
-```
+    // Start of Selection
+    #### 2. Tuple Structs
+    
+    Tuple structs are similar to regular structs but don't have named fields. They're useful when you want to give the whole tuple a name and make the code more readable.
+    
+    ```rust
+    struct Color(u8, u8, u8);
+    struct Point(f32, f32, f32);
+    
+    fn main() {
+        let black = Color(0, 0, 0);
+        let origin = Point(0.0, 0.0, 0.0);
+    
+        println!("Black color RGB: ({}, {}, {})", black.0, black.1, black.2);
+        println!("Origin point coordinates: ({}, {}, {})", origin.0, origin.1, origin.2);
+    }
+    ```
+    
+    #### Why Use Tuple Structs Over Native Tuples
+    
+    While Rust's native tuples are simple, tuple structs offer several benefits:
+    
+    - **Type Safety**: Tuple structs create distinct types, preventing accidental mix-ups between different tuples.
+    - **Enhanced Readability**: Naming the tuple struct clarifies its purpose, making the code easier to understand.
+    - **Trait Implementations**: You can implement traits specifically for your tuple structs, enabling custom behaviors.
+    
+    **Pros:**
+    - **Clarity**: Named tuple structs make it clear what the tuple represents.
+    - **Maintainability**: Easier to manage and refactor code with well-named types.
+    
+    **Cons:**
+    - **Less Descriptive**: Without named fields, it's not always obvious what each element represents.
+    - **Slight Overhead**: Adds an extra layer compared to using plain tuples, which might be unnecessary for simple cases.
+    
+    Overall, tuple structs strike a balance between the simplicity of tuples and the type safety of traditional structs, making them useful for specific scenarios where clarity and type distinction are needed.
 
 #### 3. Unit Structs
 
 Unit structs don't have any fields. They're useful when you need to implement a trait on some type but don't need to store any data.
 
+
+They are often used as markers or to represent unique types without any associated data.
+Use cases include implementing marker traits, type differentiation in generic programming, or signaling specific behaviors in APIs.
+
+ // Start of Selection
+ELI15 Explanation:
+Think of unit structs like empty boxes that help you organize your code. Even though they don't hold anything inside, they act as labels that the computer can recognize and use to make decisions or perform specific actions.
+
+For example, using a unit struct to implement a marker trait:
+
+
 ```rust
+// Start of Selection
 struct Marker;
 
-fn main() {
-    let _marker = Marker;
+trait Action {
+    fn execute(&self);
 }
+
+impl Action for Marker {
+    fn execute(&self) {
+        println!("Action executed by Marker.");
+    }
+}
+
+fn perform_action(action: &dyn Action) {
+    //  |           |      |    |
+    //  |           |      |    Trait name
+    //  |           |      'dyn' keyword for dynamic dispatch
+    //  |           Parameter name
+    //  Function name
+    action.execute();
+    // |     |
+    // |     Method call on trait object
+    // Trait object reference
+}
+
+fn main() {
+    let marker = Marker;
+    perform_action(&marker);
+}
+
+/*
+This example uses a unit struct called `Marker`, which doesn't hold any data but serves as a unique type. 
+- We implement the `Action` trait for `Marker`, defining what happens when `execute` is called—it simply prints a message. 
+- The `perform_action` function is designed to take any object that implements the `Action` trait and calls its `execute` method. 
+- In the `main` function, we create an instance of `Marker` and pass it to `perform_action`, which triggers the execution and prints "Action executed by Marker.
+- Without the `Marker` unit struct, you'd need to use something like a `bool` or an enum to signify different actions, which can make the code less clear and more error-prone. The unit struct provides a clear, type-safe way to represent distinct actions without unnecessary data.
+
+*/
 ```
+
 
 #### 4. Structs with Associated Methods
 
