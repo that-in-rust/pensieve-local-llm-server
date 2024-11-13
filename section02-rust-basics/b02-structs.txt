@@ -200,7 +200,10 @@ fn main() {
 /*
 This example uses a unit struct called `Marker`, which doesn't hold any data but serves as a unique type. 
 - We implement the `Action` trait for `Marker`, defining what happens when `execute` is called—it simply prints a message. 
-- The `perform_action` function is designed to take any object that implements the `Action` trait and calls its `execute` method. 
+- The `perform_action` function uses `&dyn Action` to enable dynamic dispatch - without `dyn`, Rust would try to create a separate function for each concrete type that implements `Action` at compile time (static dispatch). With `dyn`, we can pass any type implementing `Action` at runtime through a trait object, though this has a small performance cost. The `&` is needed because trait objects must be behind a pointer. This pointer requirement exists because:
+  1. Different types implementing the trait can have different sizes, but Rust needs to know the exact size at compile time
+  2. The pointer provides a fixed-size way to reference the varying-sized implementations
+  3. The pointer contains both the data pointer and a virtual method table (vtable) pointer needed for dynamic dispatch
 - In the `main` function, we create an instance of `Marker` and pass it to `perform_action`, which triggers the execution and prints "Action executed by Marker.
 - Without the `Marker` unit struct, you'd need to use something like a `bool` or an enum to signify different actions, which can make the code less clear and more error-prone. The unit struct provides a clear, type-safe way to represent distinct actions without unnecessary data.
 
