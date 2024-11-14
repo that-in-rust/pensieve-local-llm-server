@@ -1,0 +1,106 @@
+ // Start of Selection
+### 🏔️ Understanding Branching with If-Else in Rust: A Pyramid Approach
+
+#### 1. **Base Level: Simple If-Else Statements**
+*Conditionally execute code based on boolean expressions, forming the fundamental control flow mechanism in Rust.*
+
+```rust
+fn main() {
+    let number = 7;
+
+    if number < 5 {
+        println!("Condition is true!");
+    } else {
+        println!("Condition is false!");
+    }
+}
+```
+
+- **If Statement**: Executes a block of code if the condition is true.
+- **Else Statement**: Executes a block of code if the condition is false.
+
+#### 2. **Middle Level: Else If for Multiple Conditions**
+*Handle multiple conditions sequentially, allowing for more granular control over program flow.*
+
+```rust
+fn main() {
+    let number = 10;
+
+    if (number < 5) {
+        println!("Number is less than 5");
+    } else if (number == 5) {
+        println!("Number is equal to 5");
+    } else {
+        println!("Number is greater than 5");
+    }
+}
+```
+
+- **Else If**: Adds additional conditions to check if the previous `if` condition is false.
+- **Sequence**: Conditions are evaluated in the order they appear.
+
+#### 3. **Top Level: If-Else as Expressions and Pattern Matching**
+*Leverage Rust's `if` expressions to return values and integrate with pattern matching for more expressive control flow.*
+
+```rust
+fn main() {
+    let number = 6;
+
+    let result = if number % 2 == 0 {
+        "even"
+    } else {
+        "odd"
+    };
+
+    println!("Number is {}", result);
+
+    // Example of nested if
+    let nested_result = if (number > 0) {
+        if (number % 2 == 0) {
+            "Positive and even"
+        } else {
+            "Positive and odd"
+        }
+    } else {
+        "Non-positive"
+    };
+
+    println!("Nested Result: {}", nested_result);
+}
+```
+
+- **Expressions**: The `if` statement can return a value, enabling the assignment to variables.
+- **Integration with Pattern Matching**: Combines with `match` statements for comprehensive control structures.
+
+### 📊 Branching with If-Else Pyramid Summary
+```
+🏔️ Top Level: If-Else as Expressions and Pattern Matching
+    └─ Enables returning values and integrating with powerful pattern matching
+
+🌄 Middle Level: Else If for Multiple Conditions
+    └─ Allows checking multiple conditions in sequence
+
+🌱 Base Level: Simple If-Else Statements
+    └─ Provides basic conditional execution
+```
+
+### Pros and Cons of Rust If-Else vs Java
+
+#### Pros of Rust If-Else:
+- **Immutable Variables**: Encourages safer conditional logic by default immutability.
+- **Expression-Oriented**: `if` can return values, reducing the need for separate statements.
+- **Pattern Matching Integration**: Seamlessly works with `match` for complex control flows.
+
+#### Cons of Rust If-Else:
+- **Syntax Verbosity**: More syntax required for expression-based conditions.
+- **Learning Curve**: Understanding expression-oriented flow may be challenging for beginners.
+
+#### Comparison to Java If-Else:
+- **Similarities**:
+  - Both use `if`, `else if`, and `else` constructs to manage conditional logic.
+  - Allow similar control flow structures for decision making.
+- **Differences**:
+  - **Expression vs Statement**: Rust's `if` can return values, integrating with expressions, while Java's `if` is strictly a statement.
+  - **Immutability**: Rust enforces immutability by default, influencing how variables are used within conditions.
+  - **Pattern Matching**: Rust's `if` integrates with `match` and other pattern matching features, offering more expressive control structures.
+```

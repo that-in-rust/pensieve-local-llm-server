@@ -120,7 +120,7 @@ fn main() {
 #### Pros of Rust Integers:
 - **Explicit Sizing**: Clear control over integer sizes (`i32`, `u64`, etc.).
 - **Performance**: Rust's abstractions don't add runtime overhead, ensuring efficient computation.
-- **Safety**: Prevents overflow by default in debug mode, promoting safer code.
+- **Safety**: Rust takes safety very seriously, especially when it comes to integers. By default, in debug mode, Rust will check for overflow and panic if it happens. This means if you accidentally try to store a number that's too big for the integer type, Rust will catch it and stop the program, preventing potential bugs and unexpected behavior. This is a great feature because it helps you catch mistakes early in the development process, making your code more reliable and robust.
 - **Traits Integration**: Ability to extend functionality through traits.
 
 #### Cons of Rust Integers:
