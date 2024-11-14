@@ -91,6 +91,23 @@ This pyramid approach helps in grasping the concept of structs in Rust, starting
 
 Rust offers several idiomatic patterns for using structs effectively. Below are comprehensive patterns along with examples to illustrate each use case.
 
+### Idiomatic Patterns for Structs in Rust
+
+Rust offers several idiomatic patterns for using structs effectively. Below are comprehensive patterns along with examples to illustrate each use case.
+
+- **Basic Structs**: Define custom data types with named fields.
+- **Tuple Structs**: Similar to regular structs but with unnamed fields, useful for creating distinct types and enhancing readability.
+- **Unit-Like Structs**: Structs without any fields, often used for implementing traits without data.
+- **Struct Update Syntax**: Create new instances from existing ones with updated values.
+- **Method Syntax**: Implement methods for structs using `impl` blocks.
+- **Associated Functions**: Functions associated with a struct, often used as constructors.
+- **Traits with Structs**: Implement traits for structs to define shared behavior and enable polymorphism.
+- **Derive Macros**: Automatically implement common traits like `Debug`, `Clone`, etc., for structs.
+- **Newtype Pattern**: Create a new type from an existing one to add type safety and implement specific traits.
+
+These patterns help in writing idiomatic and efficient Rust code, leveraging the full power of structs and traits.
+
+
 #### 1. Basic Structs
 
 Structs are used to create custom data types that group related data together.
@@ -209,6 +226,12 @@ This example uses a unit struct called `Marker`, which doesn't hold any data but
 
 */
 ```
+
+Unit structs in Rust are essentially empty structs that don't hold any data. They are often used for their type information rather than for storing values. This can be particularly useful in scenarios where you need to implement traits or define behavior without associating any data with the type.
+
+In the context of typestates, unit structs can represent different states of an object. By defining these states as unit structs, you can leverage Rust's type system to enforce state transitions at compile time, ensuring that your code adheres to the defined state machine protocol. This approach helps prevent illegal state transitions and makes your code more robust and easier to reason about.
+
+For example, in a traffic light system, you might have unit structs for each state (Red, Yellow, Green). These unit structs can then be used to define the valid transitions between states, ensuring that the traffic light can only move from one valid state to another. This use of unit structs helps encapsulate the state logic and provides a clear, type-safe way to manage state transitions.
 
 
 #### 4. Structs with Associated Methods
