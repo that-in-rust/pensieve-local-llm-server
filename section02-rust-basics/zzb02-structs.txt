@@ -47,26 +47,45 @@ fn main() {
 
 ```rust
 trait Magic {
-    fn cast(&self);
-}
+    fn cast(&self);  // ┌─ Trait method signature
+}                    // └─ Trait definition
 
 struct Sorcerer {
-    name: String,  // 🧙‍♂️ Sorcerer's Name
-    age: u32,      // 🎂 Sorcerer's Age
-}
+    name: String,  // ┐ 
+    age: u32,      // ┴─ Struct fields with types
+}                  //    (String for text, u32 for age)
 
 impl Magic for Sorcerer {
+//   |    |   |
+//   |    |   Type implementing the trait
+//   |    Trait being implemented
+//   Implementation block
     fn cast(&self) {
+// |   |    |
+// |   |    Reference to instance (self)
+// |   Method name
+// Function declaration
         println!("{} casts a powerful spell!", self.name);
+//       |                            |    |
+//       |                            |    Field access
+//       |                            Instance reference
+//       Format string with placeholder
     }
 }
 
 fn main() {
     let druid = Sorcerer {
-        name: String::from("Druidia"),
-        age: 300,
+//  |     |    |
+//  |     |    Struct name
+//  |     Variable name
+//  Variable declaration
+        name: String::from("Druidia"),  // ┐
+        age: 300,                       // ┴─ Field initialization
     };
-    druid.cast();
+    druid.cast();  // Call trait method on instance
+//    |    |
+//    |    Method name
+//    Instance name
 }
 ```
 

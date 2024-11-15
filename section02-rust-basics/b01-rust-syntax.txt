@@ -9,10 +9,9 @@ https://rust-exercises.com/100-exercises/03_ticket_v1/01_struct.html
 b02-rust-integers.txt
 b03-rust-variables.txt
 b04-rust-branching-if-else.txt
-
 b05-rust-panics.txt
-
 b06-rust-factorial.txt
+
 b07-rust-loops-while.txt
 b08-rust-loops-for.txt
 b09-rust-overflow-and-underflow.txt
