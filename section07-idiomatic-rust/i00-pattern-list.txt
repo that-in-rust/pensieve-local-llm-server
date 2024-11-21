@@ -394,134 +394,197 @@ Here's a comprehensive list of idiomatic Rust patterns commonly found in top ope
 30.9. Type-level proofs
 30.10. Type inference helpers
 
-31. ASYNC CHANNEL PATTERNS
-------------------------
-31.1. Multi-producer channels
-31.2. Bounded channel implementation
-31.3. Priority channels
-31.4. Channel selection
-31.5. Channel composition
-31.6. Channel broadcasting
-31.7. Channel filtering
-31.8. Channel transformation
-31.9. Channel monitoring
-31.10. Channel cleanup
+31. OPTION AND NULL SAFETY PATTERNS
+--------------------------------
+31.1. Combinators Over Matching
+     - Use .map() when transforming Some values
+     - Use .and_then() for chaining Option-returning operations
+     - Use .or_else() for fallback computations
+     - Use .unwrap_or_else() for lazy default values
 
-32. UNSAFE CODE PATTERNS
+31.2. Collection Operations
+     - Use .filter_map() instead of filter().map()
+     - Use .and_then() for flattening nested Options
+     - Use .zip() to combine two Options
+
+31.3. Early Returns and Guards
+     - Return None early in functions
+     - Use if let Some(x) for single-case matching
+     - Chain .ok_or()/.ok_or_else() when converting to Result
+
+31.4. Default Values
+     - Use .unwrap_or(default) for simple defaults
+     - Use .unwrap_or_else(|| expensive_computation()) for lazy defaults
+     - Use .unwrap_or_default() for types implementing Default
+
+31.5. Pattern Matching Best Practices
+     - Match on multiple Options using tuple patterns
+     - Use @ bindings to reference matched values
+     - Prefer if let over match for single patterns
+
+31.6. Option Construction
+     - Use Some(val) explicitly for clarity
+     - Use None::<Type> when type inference fails
+     - Convert from nullable types using .map(|x| Some(x))
+
+31.7. Composition Patterns
+     - Chain .as_ref() for borrowing Option contents
+     - Use .as_mut() for mutable borrowing
+     - Combine with Result using .ok() and .transpose()
+
+31.8. When to Use Each Pattern:
+     ┌────────────────────┬──────────────────────────────────────┐
+     │ Pattern            │ When to Use                          │
+     ├────────────────────┼──────────────────────────────────────┤
+     │ .map()             │ Transform Some value without nesting  │
+     │ .and_then()        │ Chain operations that return Option   │
+     │ .filter()          │ Conditionally keep Some values       │
+     │ .or()/.or_else()   │ Provide fallback Options            │
+     │ if let Some()      │ Single-case pattern matching        │
+     │ match              │ Multiple cases or complex logic      │
+     │ .unwrap_or()       │ Simple default values               │
+     │ .unwrap_or_else()  │ Expensive default computations      │
+     └────────────────────┴──────────────────────────────────────┘
+
+31.9. Anti-patterns to Avoid
+     - Avoid .unwrap() in production code
+     - Don't use .expect() unless truly impossible
+     - Avoid nested match statements on Options
+     - Don't use if x.is_some() { x.unwrap() }
+
+31.10. Testing Patterns
+     - Use assert_eq!(Some(expected), result)
+     - Test None cases explicitly
+     - Use Option::as_ref() in assertions
+
+32. ASYNC CHANNEL PATTERNS
+------------------------
+32.1. Multi-producer channels
+32.2. Bounded channel implementation
+32.3. Priority channels
+32.4. Channel selection
+32.5. Channel composition
+32.6. Channel broadcasting
+32.7. Channel filtering
+32.8. Channel transformation
+32.9. Channel monitoring
+32.10. Channel cleanup
+
+33. UNSAFE CODE PATTERNS
 ----------------------
-32.1. Safe abstraction boundaries
-32.2. Pointer manipulation
-32.3. Raw memory management
-32.4. FFI boundary safety
-32.5. Undefined behavior prevention
-32.6. Memory mapping safety
-32.7. Platform-specific unsafe
-32.8. Atomic operation safety
-32.9. Exception safety
-32.10. Invariant maintenance
+33.1. Safe abstraction boundaries
+33.2. Pointer manipulation
+33.3. Raw memory management
+33.4. FFI boundary safety
+33.5. Undefined behavior prevention
+33.6. Memory mapping safety
+33.7. Platform-specific unsafe
+33.8. Atomic operation safety
+33.9. Exception safety
+33.10. Invariant maintenance
 
-33. ASYNC EXECUTOR PATTERNS
+34. ASYNC EXECUTOR PATTERNS
 -------------------------
-33.1. Task spawning
-33.2. Executor shutdown
-33.3. Task prioritization
-33.4. Resource limits
-33.5. Executor metrics
-33.6. Task grouping
-33.7. Executor composition
-33.8. Thread pool management
-33.9. Work stealing
-33.10. Task locality
+34.1. Task spawning
+34.2. Executor shutdown
+34.3. Task prioritization
+34.4. Resource limits
+34.5. Executor metrics
+34.6. Task grouping
+34.7. Executor composition
+34.8. Thread pool management
+34.9. Work stealing
+34.10. Task locality
 
-34. ADVANCED TRAIT PATTERNS
+35. ADVANCED TRAIT PATTERNS
 -------------------------
-34.1. Trait specialization
-34.2. Trait aliases
-34.3. Trait composition
-34.4. Negative trait bounds
-34.5. Conditional trait impl
-34.6. Trait object safety
-34.7. Associated type defaults
-34.8. Trait upcasting
-34.9. Trait downcasting
-34.10. Trait coherence
+35.1. Trait specialization
+35.2. Trait aliases
+35.3. Trait composition
+35.4. Negative trait bounds
+35.5. Conditional trait impl
+35.6. Trait object safety
+35.7. Associated type defaults
+35.8. Trait upcasting
+35.9. Trait downcasting
+35.10. Trait coherence
 
-35. ASYNC NETWORKING PATTERNS
+36. ASYNC NETWORKING PATTERNS
 ---------------------------
-35.1. Protocol implementation
-35.2. Connection management
-35.3. TLS integration
-35.4. Proxy patterns
-35.5. Network timeouts
-35.6. Connection pooling
-35.7. Protocol negotiation
-35.8. Network error handling
-35.9. Keep-alive management
-35.10. Connection backoff
+36.1. Protocol implementation
+36.2. Connection management
+36.3. TLS integration
+36.4. Proxy patterns
+36.5. Network timeouts
+36.6. Connection pooling
+36.7. Protocol negotiation
+36.8. Network error handling
+36.9. Keep-alive management
+36.10. Connection backoff
 
-36. COMPILE-TIME VALIDATION
+37. COMPILE-TIME VALIDATION
 -------------------------
-36.1. Type-level constraints
-36.2. Const evaluation
-36.3. Static assertions
-36.4. Build-time checks
-36.5. Compile-time verification
-36.6. Type system proofs
-36.7. Const generics validation
-36.8. Macro-time validation
-36.9. Link-time optimization
-36.10. Dead code detection
+37.1. Type-level constraints
+37.2. Const evaluation
+37.3. Static assertions
+37.4. Build-time checks
+37.5. Compile-time verification
+37.6. Type system proofs
+37.7. Const generics validation
+37.8. Macro-time validation
+37.9. Link-time optimization
+37.10. Dead code detection
 
-37. ASYNC STATE MANAGEMENT
+38. ASYNC STATE MANAGEMENT
 ------------------------
-37.1. State machine implementation
-37.2. Shared state access
-37.3. State synchronization
-37.4. State transition validation
-37.5. State persistence
-37.6. State recovery
-37.7. State snapshot
-37.8. State migration
-37.9. State replication
-37.10. State consistency
+38.1. State machine implementation
+38.2. Shared state access
+38.3. State synchronization
+38.4. State transition validation
+38.5. State persistence
+38.6. State recovery
+38.7. State snapshot
+38.8. State migration
+38.9. State replication
+38.10. State consistency
 
-38. ADVANCED MEMORY PATTERNS
+39. ADVANCED MEMORY PATTERNS
 --------------------------
-38.1. Custom allocator implementation
-38.2. Memory pool management
-38.3. Garbage collection
-38.4. Reference counting
-38.5. Memory fence patterns
-38.6. Cache line optimization
-38.7. Memory prefetching
-38.8. Stack vs heap decisions
-38.9. Memory compaction
-38.10. Memory defragmentation
+39.1. Custom allocator implementation
+39.2. Memory pool management
+39.3. Garbage collection
+39.4. Reference counting
+39.5. Memory fence patterns
+39.6. Cache line optimization
+39.7. Memory prefetching
+39.8. Stack vs heap decisions
+39.9. Memory compaction
+39.10. Memory defragmentation
 
-39. ASYNC TESTING PATTERNS
+40. ASYNC TESTING PATTERNS
 ------------------------
-39.1. Async test harness
-39.2. Mock async services
-39.3. Async assertions
-39.4. Time manipulation
-39.5. Race condition testing
-39.6. Async property testing
-39.7. Network simulation
-39.8. Async benchmarking
-39.9. Fault injection
-39.10. Concurrency testing
+40.1. Async test harness
+40.2. Mock async services
+40.3. Async assertions
+40.4. Time manipulation
+40.5. Race condition testing
+40.6. Async property testing
+40.7. Network simulation
+40.8. Async benchmarking
+40.9. Fault injection
+40.10. Concurrency testing
 
-40. LIBRARY API DESIGN
+41. LIBRARY API DESIGN
 --------------------
-40.1. Versioning strategies
-40.2. Breaking change management
-40.3. API stability guarantees
-40.4. Feature flagging
-40.5. Documentation generation
-40.6. Error type design
-40.7. Type system ergonomics
-40.8. Builder pattern design
-40.9. Extension trait design
-40.10. Conditional compilation
+41.1. Versioning strategies
+41.2. Breaking change management
+41.3. API stability guarantees
+41.4. Feature flagging
+41.5. Documentation generation
+41.6. Error type design
+41.7. Type system ergonomics
+41.8. Builder pattern design
+41.9. Extension trait design
+41.10. Conditional compilation
 
 Each of these patterns represents advanced techniques commonly used in building production-grade async Rust libraries like Tokio and Axum. They focus on performance, safety, and maintainability while providing powerful abstractions for users.
