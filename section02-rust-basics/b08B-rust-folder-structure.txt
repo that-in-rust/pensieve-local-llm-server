@@ -128,3 +128,134 @@ cli.rs web.rs db.rs  custom_types.rs
 - Use #[path = "..."] attribute to include shared test code
 - Example: #[path = "../../shared_functionality/tests/common/test_utils.rs"] mod test_utils;
 
+# Rust Project Structure - A Visual Guide 🦀
+
+"Hey, imagine your Rust project as a well-organized kitchen - you have your recipes (libraries), your cooking tools (binaries), and everything has its perfect place. Let me show you how Rust keeps everything tidy!"
+
+## 1. Basic Library Project Structure
+```
+my-rust-lib/
+│
+├── 📁 src/               The heart of your code
+│   ├── 📄 lib.rs        Your library's main door
+│   ├── 📁 models/       Group related features
+│   │   ├── 📄 user.rs
+│   │   └── 📄 mod.rs    Tells Rust about submodules
+│   └── 📁 utils/
+│       └── 📄 mod.rs
+│
+├── 📁 tests/            Keep your tests separate
+│   └── 📄 integration_tests.rs
+│
+├── 📄 Cargo.toml        Your project's recipe book
+└── 📄 README.md         Tell others about your creation
+```
+
+## 2. Binary (Executable) Project
+```
+my-rust-app/
+│
+├── 📁 src/
+│   ├── 📄 main.rs       Your app's entry point
+│   ├── 📁 cli/          Command-line interface stuff
+│   │   └── 📄 mod.rs
+│   └── 📁 config/
+│       └── 📄 mod.rs
+│
+├── 📁 examples/         Show how to use your app
+│   └── 📄 basic.rs
+│
+└── 📄 Cargo.toml
+```
+
+## 3. Workspace (Multiple Projects)
+```
+rust-workspace/
+│
+├── 📁 common-lib/       Shared code
+│   ├── 📁 src/
+│   │   └── 📄 lib.rs
+│   └── 📄 Cargo.toml
+│
+├── 📁 web-api/         One of your apps
+│   ├── 📁 src/
+│   │   └── 📄 main.rs
+│   └── 📄 Cargo.toml
+│
+├── 📁 cli-tool/        Another app
+│   ├── 📁 src/
+│   │   └── 📄 main.rs
+│   └── 📄 Cargo.toml
+│
+└── 📄 Cargo.toml       Workspace manager
+```
+
+## 4. Full-Featured Application
+```
+awesome-rust-app/
+│
+├── 📁 src/
+│   ├── 📄 main.rs                  # Binary entry
+│   ├── 📄 lib.rs                   # Library entry
+│   │
+│   ├── 📁 api/                     # API layer
+│   │   ├── 📄 handlers.rs
+│   │   └── 📄 mod.rs
+│   │
+│   ├── 📁 models/                  # Data structures
+│   │   ├── 📄 user.rs
+│   │   └── 📄 mod.rs
+│   │
+│   └── 📁 db/                      # Database layer
+│       ├── 📄 schema.rs
+│       └── 📄 mod.rs
+│
+├── 📁 tests/
+│   ├── 📄 api_tests.rs
+│   └── 📄 db_tests.rs
+│
+├── 📁 docs/                        # Documentation
+│   └── 📄 api.md
+│
+├── 📁 scripts/                     # Helper scripts
+│   └── 📄 seed_db.rs
+│
+├── 📄 Cargo.toml
+└── 📄 README.md
+```
+
+## Key Points to Remember:
+
+```
+📦 Project Organization
+┌─────────────────────┐
+│ lib.rs    → Library │
+│ main.rs   → Binary  │
+│ mod.rs    → Modules │
+└─────────────────────┘
+
+🎯 Common Patterns
+┌─────────────────────────────┐
+│ src/      → Source code     │
+│ tests/    → Tests          │
+│ examples/ → Example code    │
+│ benches/  → Benchmarks     │
+└─────────────────────────────┘
+
+🔧 Special Files
+┌──────────────────────────────────┐
+│ Cargo.toml → Dependencies & Meta │
+│ README.md  → Documentation       │
+│ .gitignore → Git exclusions     │
+└──────────────────────────────────┘
+```
+
+## Pro Tips:
+
+1. Keep `src/lib.rs` clean and use it as a facade
+2. One module = one file/directory
+3. Use `mod.rs` for module trees
+4. Keep tests close to code
+5. Separate binary and library logic
+
+Remember: "A place for everything, and everything in its place!" 🦀✨
