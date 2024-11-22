@@ -1,0 +1,130 @@
+                   🦀 Rust Project Structure 🦀
+                            
+                        my_rust_project/
+                              │
+           ┌─────────────┬────┴────┬─────────────┐
+           │             │         │             │
+         src/          tests/    Cargo.toml    README.md
+           │             │
+    ┌──────┴──────┐      └── integration_tests.rs
+    │             │
+  main.rs       lib.rs
+    │             │
+    │        ┌────┴────┐
+    │        │         │
+  bin/     modules/  types/
+    │        │         │
+  ┌──┴──┐  ┌──┴──┐   ┌─┴─┐
+  │     │  │     │   │   │
+cli.rs web.rs db.rs  custom_types.rs
+
+📦 Cargo.toml (Project Manifest)
+   └─ [package]
+      name = "my_rust_project"
+      version = "0.1.0"
+   └─ [dependencies]
+      serde = "1.0"
+
+📂 src/ (Source Code)
+   └─ 📄 main.rs (Binary Entrypoint)
+   └─ 📄 lib.rs (Library Root)
+   └─ 📂 bin/ (Multiple Binaries)
+      └─ 📄 cli.rs
+      └─ 📄 web.rs
+   └─ 📂 modules/ (Code Organization)
+      └─ 📄 db.rs
+   └─ 📂 types/ (Custom Types)
+      └─ 📄 custom_types.rs
+
+📂 tests/ (Integration Tests)
+   └─ 📄 integration_tests.rs
+
+📄 README.md (Project Documentation)
+
+💡 Insights:
+- 🏗️ Modular structure promotes code organization
+- 🔧 Cargo.toml manages dependencies and project metadata
+- 🧪 Separate test directory for integration tests
+- 📚 lib.rs for libraries, main.rs for binaries
+- 🔀 Multiple binaries possible in bin/ directory
+
+🔍 Design Choices:
+- 📦 Single package, multiple targets (lib + bin)
+- 🗂️ Modules for logical code separation
+- 🧩 Custom types in separate directory for reusability
+
+📦 shared_functionality/
+   ├── 📂 src/
+   │   └── 📄 lib.rs
+   ├── 📄 Cargo.toml
+   └── 📄 README.md
+
+📦 project_a/
+   ├── 📂 src/
+   │   ├── 📄 main.rs
+   │   └── 📂 modules/
+   │       └── 📄 specific_a.rs
+   ├── 📄 Cargo.toml
+   └── 📄 README.md
+
+📦 project_b/
+   ├── 📂 src/
+   │   ├── 📄 main.rs
+   │   └── 📂 modules/
+   │       └── 📄 specific_b.rs
+   ├── 📄 Cargo.toml
+   └── 📄 README.md
+
+📦 workspace_root/
+   ├── 📄 Cargo.toml
+   └── 📄 README.md
+
+💡 Insights:
+- 🏗️ Workspace structure allows sharing of dependencies
+- 🔗 Projects can depend on shared_functionality crate
+- 🛠️ Each project maintains its own specific modules
+
+🔍 Design Choices:
+- 📦 Separate crates for shared and specific functionality
+- 🗂️ Workspace root manages all projects together
+- 🔄 Easy to add more projects sharing the common code
+
+📦 workspace_root/
+   ├── 📂 shared_functionality/
+   │   ├── 📂 src/
+   │   │   └── 📄 lib.rs
+   │   ├── 📂 tests/
+   │   │   ├── 📄 integration_tests.rs
+   │   │   └── 📄 common/
+   │   │       └── 📄 test_utils.rs
+   │   └── 📄 Cargo.toml
+   │
+   ├── 📂 project_a/
+   │   ├── 📂 src/
+   │   │   ├── 📄 main.rs
+   │   │   └── 📂 modules/
+   │   │       └── 📄 specific_a.rs
+   │   ├── 📂 tests/
+   │   │   └── 📄 integration_tests.rs
+   │   └── 📄 Cargo.toml
+   │
+   ├── 📂 project_b/
+   │   ├── 📂 src/
+   │   │   ├── 📄 main.rs
+   │   │   └── 📂 modules/
+   │   │       └── 📄 specific_b.rs
+   │   ├── 📂 tests/
+   │   │   └── 📄 integration_tests.rs
+   │   └── 📄 Cargo.toml
+   │
+   └── 📄 Cargo.toml
+
+💡 Test Structure:
+- Unit tests: Inside source files (src/)
+- Integration tests: In tests/ directory
+- Shared test utilities: In shared_functionality/tests/common/
+
+🔗 Test Code Sharing:
+- Use #[path = "..."] attribute to include shared test code
+- Example: #[path = "../../shared_functionality/tests/common/test_utils.rs"] mod test_utils;
+

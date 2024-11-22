@@ -1,0 +1,3 @@
+Update @hello_world.rs  - with a layman explanation of what this code does in the style of @visualASCII202410.txt  without removing or changing what is written here just append
+
+Update @b08B-rust-folder-structure.txt with a 300 IQ visual explanation of how Rust projects are structured in terms of folder - files - what is the most idiomatic way for different kinds of needs - say libraries or binaries or any other way to analyze this . Be as visual as possible in the style of @visualASCII202410.txt 

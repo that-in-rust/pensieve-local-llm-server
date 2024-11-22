@@ -13,6 +13,10 @@ b05-rust-panics.txt
 b06-rust-factorial.txt
 b07-rust-loops-while.txt
 b08-rust-some-option.txt
+b08A-rust-box.txt
+b08B-rust-folder-structure.txt
+
+
 
 b09-rust-overflow-and-underflow.txt
 b10-rust-saturating-arithmetic.txt
