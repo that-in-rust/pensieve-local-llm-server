@@ -128,6 +128,14 @@ cli.rs web.rs db.rs  custom_types.rs
 - Use #[path = "..."] attribute to include shared test code
 - Example: #[path = "../../shared_functionality/tests/common/test_utils.rs"] mod test_utils;
 
+
+
+
+
+
+
+
+
 # Rust Project Structure - A Visual Guide 🦀
 
 "Hey, imagine your Rust project as a well-organized kitchen - you have your recipes (libraries), your cooking tools (binaries), and everything has its perfect place. Let me show you how Rust keeps everything tidy!"
