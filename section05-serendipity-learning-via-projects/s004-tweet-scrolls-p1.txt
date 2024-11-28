@@ -1,8 +1,0 @@
-https://github.com/that-in-rust/tweet-scrolls.git
-
-
-/home/amuldotexe/Downloads/tweets20240826.js
-
-Next steps
-- explain all the code in the style of @visualASCII202410.txt - while making notes here in using ```rust ```
-
