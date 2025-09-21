@@ -1,0 +1,44 @@
+# Repository Snapshot - 2025-09-21 16:20:14 IST
+
+## Summary Statistics
+- **Total Files**: 32
+- **Total Lines**: 5,064
+- **Total Words**: 18,958
+- **Snapshot Time**: 2025-09-21 16:20:14 IST
+
+## File Inventory
+
+| File Path | Lines | Words | Size |
+|-----------|-------|-------|------|
+| .cursorignore | 133 | 195 | 1.7K |
+| .kiro/file-snapshots/change-log.md | 1513 | 4384 | 33K |
+| .kiro/file-snapshots/current-snapshot.md | 44 | 385 | 2.7K |
+| .kiro/file-snapshots/previous-snapshot.md | 44 | 385 | 2.7K |
+| .kiro/hooks/source-docs-sync.kiro.hook | [binary] | [binary] | 1.8K |
+| .kiro/hooks/unified-progress-tracker.kiro.hook | [binary] | [binary] | 549 |
+| .kiro/options/architecture-backlog.md | 2638 | 12791 | 104K |
+| .kiro/options/backlog.md | 339 | 2385 | 19K |
+| .kiro/options/dev-steering-options.md | 1214 | 5310 | 44K |
+| .kiro/options/storage-architecture-options.md | 764 | 3596 | 29K |
+| .kiro/options/user-journey-options.md | 85 | 346 | 2.9K |
+| .kiro/rust-idioms/Comprehensive Rust Idiomatic Patterns Guide_.txt | 769 | 12536 | 90K |
+| .kiro/rust-idioms/comprehensive-rust-patterns-guidance.md | 1846 | 5140 | 51K |
+| .kiro/rust-idioms/DeepThink20250920v1.md | 558 | 3139 | 25K |
+| .kiro/rust-idioms/Executable Specifications_ Flawless One-Shot Code Generation (1).pdf | [binary] | [binary] | 83K |
+| .kiro/rust-idioms/Executable Specifications for LLM Code Generation.md | 214 | 4231 | 33K |
+| .kiro/rust-idioms/Exploring Rust Idiomatic Patterns in Layers.pdf | [binary] | [binary] | 613K |
+| .kiro/rust-idioms/Exploring Rust in Layers_ Language Core to Idiomatic Patterns.docx.md | 270 | 12621 | 97K |
+| .kiro/rust-idioms/i00-pattern-list.txt | 607 | 2069 | 18K |
+| .kiro/rust-idioms/Proposal_ Enhancing Documentation for TDD and Feature Specifications.docx.md | 203 | 3756 | 28K |
+| .kiro/rust-idioms/Rust Idiomatic Patterns Deep Dive_.md | 878 | 12280 | 95K |
+| .kiro/rust-idioms/UBI Comprehensive Rust Idiomatic Patterns Guide.txt | 769 | 12536 | 90K |
+| .kiro/rust-idioms/Unlocking _Compile-First Success__ A Layered Blueprint for Building and Governing Rust's Idiomatic-Archive.md | 416 | 5927 | 47K |
+| .kiro/specs/pensieve-cli-tool/design.md | [binary] | [binary] | 0 |
+| .kiro/specs/pensieve-cli-tool/requirements.md | 240 | 2842 | 20K |
+| .kiro/steering/code-conventions.md | 1997 | 6142 | 53K |
+| .kiro/steering/design101-tdd-architecture-principles.md | 943 | 3431 | 29K |
+| .kiro/steering/hook-automation-guide.md | 256 | 1274 | 11K |
+| .kiro/steering/hook-system-status.md | 27 | 115 | 912 |
+| .kiro/tree-with-wc.sh | 60 | 411 | 2.7K |
+| .kiro/unified-progress-tracker.sh | 215 | 1086 | 8.8K |
+| .vscode/settings.json | [binary] | [binary] | 161 |
