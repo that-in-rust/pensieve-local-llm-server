@@ -1,9 +1,0 @@
-/home/amuldotexe/Desktop/GitHub202410/that-in-rust/pensieve/target/debug/deps/libanstyle_parse-1d5c0dc28c3ea323.rmeta: /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-parse-0.2.7/src/lib.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-parse-0.2.7/src/params.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-parse-0.2.7/src/state/mod.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-parse-0.2.7/src/state/definitions.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-parse-0.2.7/src/state/table.rs
-
-/home/amuldotexe/Desktop/GitHub202410/that-in-rust/pensieve/target/debug/deps/anstyle_parse-1d5c0dc28c3ea323.d: /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-parse-0.2.7/src/lib.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-parse-0.2.7/src/params.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-parse-0.2.7/src/state/mod.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-parse-0.2.7/src/state/definitions.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-parse-0.2.7/src/state/table.rs
-
-/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-parse-0.2.7/src/lib.rs:
-/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-parse-0.2.7/src/params.rs:
-/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-parse-0.2.7/src/state/mod.rs:
-/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-parse-0.2.7/src/state/definitions.rs:
-/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-parse-0.2.7/src/state/table.rs:
