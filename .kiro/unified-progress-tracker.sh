@@ -10,11 +10,9 @@ set -e
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 cd "$GIT_ROOT"
 
-TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S IST')
-COMMIT_TIMESTAMP=$(date '+%Y%m%d %H%M IST')
+TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+COMMIT_TIMESTAMP=$(date '+%Y%m%d %H%M')
 SNAPSHOT_DIR="$GIT_ROOT/.kiro/file-snapshots"
-SPEC_DIR="$GIT_ROOT/.kiro/specs/parseltongue-aim-daemon"
-CONTEXT_FILE="$SPEC_DIR/SESSION_CONTEXT.md"
 CURRENT_SNAPSHOT="$SNAPSHOT_DIR/current-snapshot.md"
 PREVIOUS_SNAPSHOT="$SNAPSHOT_DIR/previous-snapshot.md"
 CHANGE_LOG="$SNAPSHOT_DIR/change-log.md"
@@ -22,7 +20,6 @@ TEMP_SNAPSHOT="/tmp/unified_snapshot_$$.md"
 
 # Ensure directories exist
 mkdir -p "$SNAPSHOT_DIR"
-mkdir -p "$SPEC_DIR"
 
 echo "🔄 Unified Progress Tracker - $TIMESTAMP"
 
@@ -42,6 +39,48 @@ generate_repository_snapshot() {
     echo "- **Total Words**: $(printf "%'d" $TOTAL_WORDS)" >> "$TEMP_SNAPSHOT"
     echo "- **Snapshot Time**: $TIMESTAMP" >> "$TEMP_SNAPSHOT"
     echo "" >> "$TEMP_SNAPSHOT"
+
+    # Spec progress summary
+    if [ -d "$GIT_ROOT/.kiro/specs" ]; then
+        echo "## Spec Progress Summary" >> "$TEMP_SNAPSHOT"
+        echo "" >> "$TEMP_SNAPSHOT"
+        echo "| Spec Name | Phase | Progress | Files |" >> "$TEMP_SNAPSHOT"
+        echo "|-----------|-------|----------|-------|" >> "$TEMP_SNAPSHOT"
+        
+        find "$GIT_ROOT/.kiro/specs" -mindepth 1 -maxdepth 1 -type d | sort | while read -r spec_dir; do
+            spec_name=$(basename "$spec_dir")
+            
+            # Detect phase
+            if [ ! -f "$spec_dir/requirements.md" ]; then
+                phase="Init"
+                files="0/3"
+            elif [ ! -f "$spec_dir/design.md" ]; then
+                phase="Requirements"
+                files="1/3"
+            elif [ ! -f "$spec_dir/tasks.md" ]; then
+                phase="Design"
+                files="2/3"
+            else
+                phase="Tasks"
+                files="3/3"
+                
+                # Check task progress if tasks.md exists
+                if [ -f "$spec_dir/tasks.md" ]; then
+                    total_tasks=$(grep -c "^- \[" "$spec_dir/tasks.md" 2>/dev/null || echo "0")
+                    completed_tasks=$(grep -c "^- \[x\]" "$spec_dir/tasks.md" 2>/dev/null || echo "0")
+                    
+                    if [ "$total_tasks" -gt 0 ]; then
+                        progress=$((completed_tasks * 100 / total_tasks))
+                        phase="Implementation (${progress}%)"
+                    fi
+                fi
+            fi
+            
+            echo "| $spec_name | $phase | - | $files |" >> "$TEMP_SNAPSHOT"
+        done
+        
+        echo "" >> "$TEMP_SNAPSHOT"
+    fi
 
     # File inventory with counts
     echo "## File Inventory" >> "$TEMP_SNAPSHOT"
@@ -66,37 +105,77 @@ generate_repository_snapshot() {
     done
 }
 
-# Function to update session context
+# Function to update session context across all specs
 update_session_context() {
-    if [ -f "$CONTEXT_FILE" ]; then
-        # Update timestamp
-        sed -i "s/Last Updated: .*/Last Updated: $(date +%Y-%m-%d)/" "$CONTEXT_FILE"
-        
-        # Update task progress if requirements-tasks.md exists
-        if [ -f "$SPEC_DIR/requirements-tasks.md" ]; then
-            TOTAL_TASKS=$(grep -c "^- \[" "$SPEC_DIR/requirements-tasks.md" 2>/dev/null || echo "0")
-            COMPLETED_TASKS=$(grep -c "^- \[x\]" "$SPEC_DIR/requirements-tasks.md" 2>/dev/null || echo "0")
+    local updated_count=0
+    
+    # Find all SESSION_CONTEXT.md files in spec directories
+    if [ -d "$GIT_ROOT/.kiro/specs" ]; then
+        find "$GIT_ROOT/.kiro/specs" -name "SESSION_CONTEXT.md" -type f | while read -r context_file; do
+            spec_dir=$(dirname "$context_file")
             
-            if [ "$TOTAL_TASKS" -gt 0 ]; then
-                PROGRESS=$((COMPLETED_TASKS * 100 / TOTAL_TASKS))
-                sed -i "s/Document Analysis [0-9]*% Complete/Document Analysis ${PROGRESS}% Complete/" "$CONTEXT_FILE"
-                sed -i "s/Progress: [0-9]*%/Progress: ${PROGRESS}%/" "$CONTEXT_FILE"
+            # Update timestamp
+            sed -i "s/Last Updated: .*/Last Updated: $(date +%Y-%m-%d)/" "$context_file"
+            
+            # Update task progress if tasks.md exists
+            if [ -f "$spec_dir/tasks.md" ]; then
+                TOTAL_TASKS=$(grep -c "^- \[" "$spec_dir/tasks.md" 2>/dev/null || echo "0")
+                COMPLETED_TASKS=$(grep -c "^- \[x\]" "$spec_dir/tasks.md" 2>/dev/null || echo "0")
+                
+                if [ "$TOTAL_TASKS" -gt 0 ]; then
+                    PROGRESS=$((COMPLETED_TASKS * 100 / TOTAL_TASKS))
+                    sed -i "s/Progress: [0-9]*%/Progress: ${PROGRESS}%/" "$context_file"
+                fi
             fi
+            
+            # Detect current phase based on existing files
+            if [ ! -f "$spec_dir/requirements.md" ]; then
+                PHASE="Initialization"
+            elif [ ! -f "$spec_dir/design.md" ]; then
+                PHASE="Requirements Analysis"
+            elif [ ! -f "$spec_dir/tasks.md" ]; then
+                PHASE="Design Development"
+            else
+                # Check if any tasks are incomplete
+                if grep -q "^- \[ \]" "$spec_dir/tasks.md" 2>/dev/null; then
+                    PHASE="Implementation"
+                else
+                    PHASE="Complete"
+                fi
+            fi
+            
+            sed -i "s/Current Phase: .*/Current Phase: $PHASE/" "$context_file"
+            updated_count=$((updated_count + 1))
+        done
+        
+        if [ "$updated_count" -gt 0 ]; then
+            echo "✅ Updated $updated_count session context files"
         fi
-        
-        # Detect current phase
-        if [ ! -f "$SPEC_DIR/design.md" ]; then
-            PHASE="Requirements Analysis (Phase 1)"
-        elif [ ! -f "$SPEC_DIR/implementation-plan.md" ]; then
-            PHASE="Design Development (Phase 2)"
-        else
-            PHASE="Implementation Planning (Phase 3)"
-        fi
-        
-        sed -i "s/Current Phase: .*/Current Phase: $PHASE/" "$CONTEXT_FILE"
-        
-        echo "✅ Session context updated"
     fi
+}
+
+# Function to detect change type for commit messages
+detect_change_type() {
+    local change_type="general"
+    
+    # Check what types of files were changed in .kiro/
+    if git diff --cached --name-only .kiro/ | grep -q "requirements\.md"; then
+        change_type="requirements"
+    elif git diff --cached --name-only .kiro/ | grep -q "design\.md"; then
+        change_type="design"
+    elif git diff --cached --name-only .kiro/ | grep -q "tasks\.md"; then
+        change_type="tasks"
+    elif git diff --cached --name-only .kiro/ | grep -q "SESSION_CONTEXT\.md"; then
+        change_type="session"
+    elif git diff --cached --name-only .kiro/ | grep -q "file-snapshots/"; then
+        change_type="snapshots"
+    elif git diff --cached --name-only .kiro/ | grep -q "hooks/"; then
+        change_type="hooks"
+    elif git diff --cached --name-only .kiro/ | grep -q "steering/"; then
+        change_type="steering"
+    fi
+    
+    echo "$change_type"
 }
 
 # Function to generate delta report
@@ -199,7 +278,8 @@ else
     git add .kiro/
     
     if ! git diff --cached --quiet .kiro/; then
-        COMMIT_MSG="$COMMIT_TIMESTAMP"
+        CHANGE_TYPE=$(detect_change_type)
+        COMMIT_MSG="unified-progress [$CHANGE_TYPE] $COMMIT_TIMESTAMP"
         git commit -m "$COMMIT_MSG"
         
         CURRENT_BRANCH=$(git branch --show-current)
@@ -213,5 +293,3 @@ fi
 
 echo "✅ Unified progress tracking complete"
 echo "📊 Files: $(printf "%'d" $TOTAL_FILES) | Lines: $(printf "%'d" $TOTAL_LINES) | Words: $(printf "%'d" $TOTAL_WORDS)"
-
-echo "Is this not a cool sidekick script? Is it"

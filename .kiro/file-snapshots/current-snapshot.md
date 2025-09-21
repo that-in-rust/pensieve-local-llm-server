@@ -1,17 +1,24 @@
-# Repository Snapshot - 2025-09-21 16:23:25 IST
+# Repository Snapshot - 2025-09-21 16:35:33
 
 ## Summary Statistics
 - **Total Files**: 32
-- **Total Lines**: 5,108
-- **Total Words**: 19,086
-- **Snapshot Time**: 2025-09-21 16:23:25 IST
+- **Total Lines**: 5,119
+- **Total Words**: 19,118
+- **Snapshot Time**: 2025-09-21 16:35:33
+
+## Spec Progress Summary
+
+| Spec Name | Phase | Progress | Files |
+|-----------|-------|----------|-------|
+| parseltongue-aim-daemon | Init | - | 0/3 |
+| pensieve-cli-tool | Design | - | 2/3 |
 
 ## File Inventory
 
 | File Path | Lines | Words | Size |
 |-----------|-------|-------|------|
 | .cursorignore | 133 | 195 | 1.7K |
-| .kiro/file-snapshots/change-log.md | 1557 | 4512 | 34K |
+| .kiro/file-snapshots/change-log.md | 1568 | 4544 | 34K |
 | .kiro/file-snapshots/current-snapshot.md | 44 | 385 | 2.7K |
 | .kiro/file-snapshots/previous-snapshot.md | 44 | 385 | 2.7K |
 | .kiro/hooks/source-docs-sync.kiro.hook | [binary] | [binary] | 1.8K |
@@ -40,5 +47,5 @@
 | .kiro/steering/hook-automation-guide.md | 256 | 1274 | 11K |
 | .kiro/steering/hook-system-status.md | 27 | 115 | 912 |
 | .kiro/tree-with-wc.sh | 60 | 411 | 2.7K |
-| .kiro/unified-progress-tracker.sh | 216 | 1091 | 8.9K |
+| .kiro/unified-progress-tracker.sh | 294 | 1398 | 12K |
 | .vscode/settings.json | [binary] | [binary] | 161 |
