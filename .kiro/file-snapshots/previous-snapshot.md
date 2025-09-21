@@ -1,17 +1,17 @@
-# Repository Snapshot - 2025-09-21 21:49:05
+# Repository Snapshot - 2025-09-21 22:14:00
 
 ## Summary Statistics
-- **Total Files**: 44
-- **Total Lines**: 7,704
-- **Total Words**: 28,577
-- **Snapshot Time**: 2025-09-21 21:49:05
+- **Total Files**: 46
+- **Total Lines**: 8,504
+- **Total Words**: 31,020
+- **Snapshot Time**: 2025-09-21 22:14:00
 
 ## Spec Progress Summary
 
 | Spec Name | Phase | Progress | Files |
 |-----------|-------|----------|-------|
 | parseltongue-aim-daemon | Init | - | 0/3 |
-| pensieve-cli-tool | Implementation (15%) | - | 3/3 |
+| pensieve-cli-tool | Implementation (20%) | - | 3/3 |
 
 ## File Inventory
 
@@ -20,7 +20,8 @@
 | Cargo.lock | 2141 | 4159 | 55K |
 | Cargo.toml | 44 | 163 | 1.1K |
 | .cursorignore | 133 | 195 | 1.7K |
-| .kiro/file-snapshots/change-log.md | 1626 | 4703 | 35K |
+| examples/file_type_demo.rs | 97 | 329 | 3.7K |
+| .kiro/file-snapshots/change-log.md | 1637 | 4734 | 35K |
 | .kiro/file-snapshots/current-snapshot.md | 63 | 525 | 3.3K |
 | .kiro/file-snapshots/previous-snapshot.md | 63 | 525 | 3.3K |
 | .kiro/hooks/source-docs-sync.kiro.hook | [binary] | [binary] | 1.8K |
@@ -44,7 +45,7 @@
 | .kiro/rust-idioms/Unlocking _Compile-First Success__ A Layered Blueprint for Building and Governing Rust's Idiomatic-Archive.md | 416 | 5927 | 47K |
 | .kiro/specs/pensieve-cli-tool/design.md | 513 | 2145 | 19K |
 | .kiro/specs/pensieve-cli-tool/requirements.md | 240 | 2842 | 20K |
-| .kiro/specs/pensieve-cli-tool/tasks.md | 139 | 1011 | 7.0K |
+| .kiro/specs/pensieve-cli-tool/tasks.md | 139 | 1010 | 7.0K |
 | .kiro/steering/code-conventions.md | 1997 | 6142 | 53K |
 | .kiro/steering/design101-tdd-architecture-principles.md | 943 | 3431 | 29K |
 | .kiro/steering/hook-automation-guide.md | 256 | 1274 | 11K |
@@ -58,6 +59,7 @@
 | src/extractor.rs | 261 | 791 | 7.4K |
 | src/lib.rs | 22 | 93 | 710 |
 | src/main.rs | 7 | 17 | 147 |
-| src/scanner.rs | 149 | 506 | 4.2K |
+| src/scanner.rs | 742 | 2283 | 25K |
 | src/types.rs | 262 | 844 | 7.5K |
+| tests/file_type_detection_integration.rs | 99 | 307 | 4.4K |
 | .vscode/settings.json | [binary] | [binary] | 161 |
