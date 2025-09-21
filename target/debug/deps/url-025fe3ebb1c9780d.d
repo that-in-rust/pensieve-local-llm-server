@@ -1,0 +1,11 @@
+/home/amuldotexe/Desktop/GitHub202410/that-in-rust/pensieve/target/debug/deps/liburl-025fe3ebb1c9780d.rmeta: /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/lib.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/host.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/origin.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/parser.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/path_segments.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/slicing.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/quirks.rs
+
+/home/amuldotexe/Desktop/GitHub202410/that-in-rust/pensieve/target/debug/deps/url-025fe3ebb1c9780d.d: /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/lib.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/host.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/origin.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/parser.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/path_segments.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/slicing.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/quirks.rs
+
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/lib.rs:
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/host.rs:
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/origin.rs:
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/parser.rs:
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/path_segments.rs:
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/slicing.rs:
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.7/src/quirks.rs:

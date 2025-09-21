@@ -1,0 +1,10 @@
+/home/amuldotexe/Desktop/GitHub202410/that-in-rust/pensieve/target/debug/deps/libasync_stream-d6f573d20ae7c873.rmeta: /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-stream-0.3.6/src/lib.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-stream-0.3.6/src/async_stream.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-stream-0.3.6/src/next.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-stream-0.3.6/src/yielder.rs
+
+/home/amuldotexe/Desktop/GitHub202410/that-in-rust/pensieve/target/debug/deps/libasync_stream-d6f573d20ae7c873.rlib: /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-stream-0.3.6/src/lib.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-stream-0.3.6/src/async_stream.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-stream-0.3.6/src/next.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-stream-0.3.6/src/yielder.rs
+
+/home/amuldotexe/Desktop/GitHub202410/that-in-rust/pensieve/target/debug/deps/async_stream-d6f573d20ae7c873.d: /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-stream-0.3.6/src/lib.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-stream-0.3.6/src/async_stream.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-stream-0.3.6/src/next.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-stream-0.3.6/src/yielder.rs
+
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-stream-0.3.6/src/lib.rs:
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-stream-0.3.6/src/async_stream.rs:
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-stream-0.3.6/src/next.rs:
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-stream-0.3.6/src/yielder.rs:

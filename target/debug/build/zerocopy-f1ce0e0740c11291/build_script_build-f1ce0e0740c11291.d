@@ -1,0 +1,5 @@
+/home/amuldotexe/Desktop/GitHub202410/that-in-rust/pensieve/target/debug/build/zerocopy-f1ce0e0740c11291/build_script_build-f1ce0e0740c11291: /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/zerocopy-0.8.27/build.rs
+
+/home/amuldotexe/Desktop/GitHub202410/that-in-rust/pensieve/target/debug/build/zerocopy-f1ce0e0740c11291/build_script_build-f1ce0e0740c11291.d: /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/zerocopy-0.8.27/build.rs
+
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/zerocopy-0.8.27/build.rs:
