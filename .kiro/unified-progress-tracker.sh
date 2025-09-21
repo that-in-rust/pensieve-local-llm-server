@@ -202,8 +202,9 @@ else
         COMMIT_MSG="$COMMIT_TIMESTAMP"
         git commit -m "$COMMIT_MSG"
         
-        if git push origin v01 2>/dev/null; then
-            echo "✅ Changes committed and pushed to v01: $COMMIT_MSG"
+        CURRENT_BRANCH=$(git branch --show-current)
+        if git push origin "$CURRENT_BRANCH" 2>/dev/null; then
+            echo "✅ Changes committed and pushed to $CURRENT_BRANCH: $COMMIT_MSG"
         else
             echo "⚠️  Changes committed locally (push failed): $COMMIT_MSG"
         fi
