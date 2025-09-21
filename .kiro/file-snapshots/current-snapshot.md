@@ -1,26 +1,28 @@
-# Repository Snapshot - 2025-09-21 19:56:05
+# Repository Snapshot - 2025-09-21 21:17:44
 
 ## Summary Statistics
-- **Total Files**: 33
-- **Total Lines**: 5,807
-- **Total Words**: 22,401
-- **Snapshot Time**: 2025-09-21 19:56:05
+- **Total Files**: 44
+- **Total Lines**: 7,208
+- **Total Words**: 26,896
+- **Snapshot Time**: 2025-09-21 21:17:44
 
 ## Spec Progress Summary
 
 | Spec Name | Phase | Progress | Files |
 |-----------|-------|----------|-------|
 | parseltongue-aim-daemon | Init | - | 0/3 |
-| pensieve-cli-tool | Implementation (0%) | - | 3/3 |
+| pensieve-cli-tool | Implementation (5%) | - | 3/3 |
 
 ## File Inventory
 
 | File Path | Lines | Words | Size |
 |-----------|-------|-------|------|
+| Cargo.lock | 2141 | 4159 | 55K |
+| Cargo.toml | 44 | 163 | 1.1K |
 | .cursorignore | 133 | 195 | 1.7K |
-| .kiro/file-snapshots/change-log.md | 1590 | 4606 | 35K |
-| .kiro/file-snapshots/current-snapshot.md | 51 | 416 | 2.8K |
-| .kiro/file-snapshots/previous-snapshot.md | 51 | 416 | 2.8K |
+| .kiro/file-snapshots/change-log.md | 1604 | 4641 | 35K |
+| .kiro/file-snapshots/current-snapshot.md | 52 | 426 | 2.9K |
+| .kiro/file-snapshots/previous-snapshot.md | 52 | 426 | 2.9K |
 | .kiro/hooks/source-docs-sync.kiro.hook | [binary] | [binary] | 1.8K |
 | .kiro/hooks/unified-progress-tracker.kiro.hook | [binary] | [binary] | 549 |
 | .kiro/options/architecture-backlog.md | 2638 | 12791 | 104K |
@@ -42,11 +44,20 @@
 | .kiro/rust-idioms/Unlocking _Compile-First Success__ A Layered Blueprint for Building and Governing Rust's Idiomatic-Archive.md | 416 | 5927 | 47K |
 | .kiro/specs/pensieve-cli-tool/design.md | 513 | 2145 | 19K |
 | .kiro/specs/pensieve-cli-tool/requirements.md | 240 | 2842 | 20K |
-| .kiro/specs/pensieve-cli-tool/tasks.md | 139 | 1014 | 7.0K |
+| .kiro/specs/pensieve-cli-tool/tasks.md | 139 | 1013 | 7.0K |
 | .kiro/steering/code-conventions.md | 1997 | 6142 | 53K |
 | .kiro/steering/design101-tdd-architecture-principles.md | 943 | 3431 | 29K |
 | .kiro/steering/hook-automation-guide.md | 256 | 1274 | 11K |
 | .kiro/steering/hook-system-status.md | 27 | 115 | 912 |
 | .kiro/tree-with-wc.sh | 60 | 411 | 2.7K |
 | .kiro/unified-progress-tracker.sh | 319 | 1480 | 13K |
+| README.md | 74 | 347 | 2.7K |
+| src/cli.rs | 162 | 511 | 4.9K |
+| src/database.rs | 287 | 929 | 9.5K |
+| src/errors.rs | 235 | 750 | 7.4K |
+| src/extractor.rs | 261 | 791 | 7.4K |
+| src/lib.rs | 22 | 93 | 710 |
+| src/main.rs | 7 | 17 | 147 |
+| src/scanner.rs | 149 | 506 | 4.2K |
+| src/types.rs | 262 | 844 | 7.5K |
 | .vscode/settings.json | [binary] | [binary] | 161 |
