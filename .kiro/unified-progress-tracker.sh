@@ -29,9 +29,14 @@ generate_repository_snapshot() {
     echo "" >> "$TEMP_SNAPSHOT"
 
     # Summary statistics - exclude .git but include other hidden files
-    TOTAL_FILES=$(find "$GIT_ROOT" -type f ! -path "$GIT_ROOT/.git/*" ! -path "$GIT_ROOT/target/*" ! -path "$GIT_ROOT/node_modules/*" | wc -l)
-    TOTAL_LINES=$(find "$GIT_ROOT" -type f ! -path "$GIT_ROOT/.git/*" -name "*.md" -o -name "*.rs" -o -name "*.toml" -o -name "*.json" -o -name "*.txt" -o -name "*.yml" -o -name "*.yaml" | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}' || echo "0")
-    TOTAL_WORDS=$(find "$GIT_ROOT" -type f ! -path "$GIT_ROOT/.git/*" -name "*.md" -o -name "*.rs" -o -name "*.toml" -o -name "*.json" -o -name "*.txt" -o -name "*.yml" -o -name "*.yaml" | xargs wc -w 2>/dev/null | tail -1 | awk '{print $1}' || echo "0")
+    TOTAL_FILES=$(find "$GIT_ROOT" -type f ! -path "$GIT_ROOT/.git/*" ! -path "$GIT_ROOT/target/*" ! -path "$GIT_ROOT/node_modules/*" | wc -l | tr -d ' \n')
+    TOTAL_LINES=$(find "$GIT_ROOT" -type f ! -path "$GIT_ROOT/.git/*" -name "*.md" -o -name "*.rs" -o -name "*.toml" -o -name "*.json" -o -name "*.txt" -o -name "*.yml" -o -name "*.yaml" | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}' | tr -d ' \n' || echo "0")
+    TOTAL_WORDS=$(find "$GIT_ROOT" -type f ! -path "$GIT_ROOT/.git/*" -name "*.md" -o -name "*.rs" -o -name "*.toml" -o -name "*.json" -o -name "*.txt" -o -name "*.yml" -o -name "*.yaml" | xargs wc -w 2>/dev/null | tail -1 | awk '{print $1}' | tr -d ' \n' || echo "0")
+    
+    # Ensure variables are numeric
+    TOTAL_FILES=${TOTAL_FILES:-0}
+    TOTAL_LINES=${TOTAL_LINES:-0}
+    TOTAL_WORDS=${TOTAL_WORDS:-0}
 
     echo "## Summary Statistics" >> "$TEMP_SNAPSHOT"
     echo "- **Total Files**: $(printf "%'d" $TOTAL_FILES)" >> "$TEMP_SNAPSHOT"
@@ -66,10 +71,16 @@ generate_repository_snapshot() {
                 
                 # Check task progress if tasks.md exists
                 if [ -f "$spec_dir/tasks.md" ]; then
-                    total_tasks=$(grep -c "^- \[" "$spec_dir/tasks.md" 2>/dev/null || echo "0")
-                    completed_tasks=$(grep -c "^- \[x\]" "$spec_dir/tasks.md" 2>/dev/null || echo "0")
+                    total_tasks=$(grep -c "^- \[" "$spec_dir/tasks.md" 2>/dev/null | tr -d '\n' || echo "0")
+                    completed_tasks=$(grep -c "^- \[x\]" "$spec_dir/tasks.md" 2>/dev/null | tr -d '\n' || echo "0")
                     
-                    if [ "$total_tasks" -gt 0 ]; then
+                    # Ensure variables are numeric and clean
+                    total_tasks=$(echo "$total_tasks" | tr -cd '0-9' || echo "0")
+                    completed_tasks=$(echo "$completed_tasks" | tr -cd '0-9' || echo "0")
+                    total_tasks=${total_tasks:-0}
+                    completed_tasks=${completed_tasks:-0}
+                    
+                    if [ "$total_tasks" -gt 0 ] 2>/dev/null; then
                         progress=$((completed_tasks * 100 / total_tasks))
                         phase="Implementation (${progress}%)"
                     fi
@@ -122,7 +133,11 @@ update_session_context() {
                 TOTAL_TASKS=$(grep -c "^- \[" "$spec_dir/tasks.md" 2>/dev/null || echo "0")
                 COMPLETED_TASKS=$(grep -c "^- \[x\]" "$spec_dir/tasks.md" 2>/dev/null || echo "0")
                 
-                if [ "$TOTAL_TASKS" -gt 0 ]; then
+                # Ensure variables are numeric
+                TOTAL_TASKS=${TOTAL_TASKS:-0}
+                COMPLETED_TASKS=${COMPLETED_TASKS:-0}
+                
+                if [ "$TOTAL_TASKS" -gt 0 ] 2>/dev/null; then
                     PROGRESS=$((COMPLETED_TASKS * 100 / TOTAL_TASKS))
                     sed -i "s/Progress: [0-9]*%/Progress: ${PROGRESS}%/" "$context_file"
                 fi
@@ -193,6 +208,14 @@ generate_delta_report() {
     PREV_FILES=$(grep "Total Files" "$PREVIOUS_SNAPSHOT" | sed 's/.*: //' | tr -d ',' | tr -d '*' || echo "0")
     PREV_LINES=$(grep "Total Lines" "$PREVIOUS_SNAPSHOT" | sed 's/.*: //' | tr -d ',' | tr -d '*' || echo "0")
     PREV_WORDS=$(grep "Total Words" "$PREVIOUS_SNAPSHOT" | sed 's/.*: //' | tr -d ',' | tr -d '*' || echo "0")
+
+    # Ensure variables are numeric
+    PREV_FILES=${PREV_FILES:-0}
+    PREV_LINES=${PREV_LINES:-0}
+    PREV_WORDS=${PREV_WORDS:-0}
+    TOTAL_FILES=${TOTAL_FILES:-0}
+    TOTAL_LINES=${TOTAL_LINES:-0}
+    TOTAL_WORDS=${TOTAL_WORDS:-0}
 
     # Calculate changes
     FILE_DIFF=$((TOTAL_FILES - PREV_FILES))
