@@ -1,17 +1,17 @@
-# Repository Snapshot - 2025-09-21 21:26:13
+# Repository Snapshot - 2025-09-21 21:49:05
 
 ## Summary Statistics
 - **Total Files**: 44
-- **Total Lines**: 7,267
-- **Total Words**: 27,223
-- **Snapshot Time**: 2025-09-21 21:26:13
+- **Total Lines**: 7,704
+- **Total Words**: 28,577
+- **Snapshot Time**: 2025-09-21 21:49:05
 
 ## Spec Progress Summary
 
 | Spec Name | Phase | Progress | Files |
 |-----------|-------|----------|-------|
 | parseltongue-aim-daemon | Init | - | 0/3 |
-| pensieve-cli-tool | Implementation (10%) | - | 3/3 |
+| pensieve-cli-tool | Implementation (15%) | - | 3/3 |
 
 ## File Inventory
 
@@ -20,7 +20,7 @@
 | Cargo.lock | 2141 | 4159 | 55K |
 | Cargo.toml | 44 | 163 | 1.1K |
 | .cursorignore | 133 | 195 | 1.7K |
-| .kiro/file-snapshots/change-log.md | 1615 | 4672 | 35K |
+| .kiro/file-snapshots/change-log.md | 1626 | 4703 | 35K |
 | .kiro/file-snapshots/current-snapshot.md | 63 | 525 | 3.3K |
 | .kiro/file-snapshots/previous-snapshot.md | 63 | 525 | 3.3K |
 | .kiro/hooks/source-docs-sync.kiro.hook | [binary] | [binary] | 1.8K |
@@ -44,7 +44,7 @@
 | .kiro/rust-idioms/Unlocking _Compile-First Success__ A Layered Blueprint for Building and Governing Rust's Idiomatic-Archive.md | 416 | 5927 | 47K |
 | .kiro/specs/pensieve-cli-tool/design.md | 513 | 2145 | 19K |
 | .kiro/specs/pensieve-cli-tool/requirements.md | 240 | 2842 | 20K |
-| .kiro/specs/pensieve-cli-tool/tasks.md | 139 | 1012 | 7.0K |
+| .kiro/specs/pensieve-cli-tool/tasks.md | 139 | 1011 | 7.0K |
 | .kiro/steering/code-conventions.md | 1997 | 6142 | 53K |
 | .kiro/steering/design101-tdd-architecture-principles.md | 943 | 3431 | 29K |
 | .kiro/steering/hook-automation-guide.md | 256 | 1274 | 11K |
@@ -53,7 +53,7 @@
 | .kiro/unified-progress-tracker.sh | 319 | 1480 | 13K |
 | README.md | 74 | 347 | 2.7K |
 | src/cli.rs | 188 | 610 | 6.0K |
-| src/database.rs | 287 | 929 | 9.5K |
+| src/database.rs | 713 | 2253 | 25K |
 | src/errors.rs | 235 | 750 | 7.4K |
 | src/extractor.rs | 261 | 791 | 7.4K |
 | src/lib.rs | 22 | 93 | 710 |
