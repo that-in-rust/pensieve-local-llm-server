@@ -45,14 +45,14 @@ rayon = "1.8"
 
 # Content extraction dependencies
 encoding_rs = "0.8"
-scraper = "0.18"
+scraper = "0.15"
 html2md = "0.2"
-pdf-extract = "0.7"
-zip = "0.6"
-quick-xml = "0.31"
+zip = "0.5"
+quick-xml = "0.28"
 serde_json = "1.0"
-serde_yaml = "0.9"
-toml = "0.8"
+serde_yaml = "0.8"
+toml = "0.5"
+pdf-extract = "0.6"
 
 [dev-dependencies]
 tempfile = "3.8"
