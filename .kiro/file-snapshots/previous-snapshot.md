@@ -1,17 +1,17 @@
-# Repository Snapshot - 2025-09-22 14:21:58
+# Repository Snapshot - 2025-09-22 15:05:07
 
 ## Summary Statistics
 - **Total Files**: 58
-- **Total Lines**: 9,411
-- **Total Words**: 34,137
-- **Snapshot Time**: 2025-09-22 14:21:58
+- **Total Lines**: 10,507
+- **Total Words**: 37,464
+- **Snapshot Time**: 2025-09-22 15:05:07
 
 ## Spec Progress Summary
 
 | Spec Name | Phase | Progress | Files |
 |-----------|-------|----------|-------|
 | parseltongue-aim-daemon | Init | - | 0/3 |
-| pensieve-cli-tool | Implementation (31%) | - | 3/3 |
+| pensieve-cli-tool | Implementation (37%) | - | 3/3 |
 
 ## File Inventory
 
@@ -20,11 +20,12 @@
 | Cargo.lock | 2181 | 4235 | 56K |
 | Cargo.toml | 47 | 169 | 1.1K |
 | .cursorignore | 133 | 195 | 1.7K |
+| .env | 0 | 1 | 29 |
 | examples/file_type_demo.rs | 97 | 329 | 3.7K |
 | .gitignore | 39 | 55 | 383 |
-| .kiro/file-snapshots/change-log.md | 1703 | 4905 | 37K |
-| .kiro/file-snapshots/current-snapshot.md | 73 | 615 | 3.7K |
-| .kiro/file-snapshots/previous-snapshot.md | 73 | 615 | 3.7K |
+| .kiro/file-snapshots/change-log.md | 1714 | 4936 | 37K |
+| .kiro/file-snapshots/current-snapshot.md | 77 | 651 | 3.9K |
+| .kiro/file-snapshots/previous-snapshot.md | 77 | 651 | 3.9K |
 | .kiro/hooks/hook-automation-guide.md | 256 | 1274 | 11K |
 | .kiro/hooks/hook-system-status.md | 27 | 115 | 912 |
 | .kiro/hooks/source-docs-sync.kiro.hook | [binary] | [binary] | 1.8K |
@@ -48,27 +49,26 @@
 | .kiro/rust-idioms/Unlocking _Compile-First Success__ A Layered Blueprint for Building and Governing Rust's Idiomatic-Archive.md | 416 | 5927 | 47K |
 | .kiro/specs/pensieve-cli-tool/design.md | 677 | 3050 | 26K |
 | .kiro/specs/pensieve-cli-tool/requirements.md | 240 | 2842 | 20K |
-| .kiro/specs/pensieve-cli-tool/tasks.md | 117 | 826 | 5.5K |
+| .kiro/specs/pensieve-cli-tool/tasks.md | 117 | 825 | 5.5K |
 | .kiro/steering/code-conventions.md | 1997 | 6142 | 53K |
 | .kiro/steering/design101-tdd-architecture-principles.md | 947 | 3454 | 29K |
 | .kiro/tree-with-wc.sh | 60 | 411 | 2.7K |
 | .kiro/unified-progress-tracker.sh | 319 | 1480 | 13K |
 | README.md | 74 | 347 | 2.7K |
-| src/cli.rs | 234 | 770 | 8.1K |
-| src/database.rs | 721 | 2273 | 26K |
+| src/cli.rs | 332 | 1134 | 13K |
+| src/database.rs | 1153 | 3451 | 43K |
+| src/deduplication.rs | 507 | 1529 | 20K |
 | src/errors.rs | 235 | 750 | 7.4K |
 | src/extractor.rs | 261 | 791 | 7.4K |
-| src/lib.rs | 22 | 93 | 710 |
+| src/lib.rs | 23 | 96 | 733 |
 | src/main.rs | 7 | 17 | 147 |
-| src/scanner.rs | 1139 | 3402 | 39K |
+| src/scanner.rs | 1178 | 3553 | 40K |
 | src/types.rs | 262 | 844 | 7.5K |
 | test_data/code.rs | 14 | 41 | 253 |
 | test_data/config.json | [binary] | [binary] | 203 |
 | test_data/duplicate.txt | 4 | 37 | 226 |
 | test_data/sample.txt | 4 | 37 | 226 |
-| test.db | [binary] | [binary] | 76K |
-| test.db-shm | [binary] | [binary] | 32K |
-| test.db-wal | [binary] | [binary] | 302K |
+| test.db | [binary] | [binary] | 132K |
 | test_performance.db | [binary] | [binary] | 4.0K |
 | test_performance.db-shm | [binary] | [binary] | 32K |
 | test_performance.db-wal | [binary] | [binary] | 302K |

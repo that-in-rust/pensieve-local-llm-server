@@ -48,7 +48,7 @@ ALL DIAGRAMS WILL BE IN MERMAID ONLY TO ENSURE EASE WITH GITHUB - DO NOT SKIP TH
 
 
 
-- [-] 7. Build native content extraction for all supported formats
+- [ ] 7. Build native content extraction for all supported formats
   - Implement text file reader with encoding detection (UTF-8, Latin-1)
   - Create HTML content extractor with basic tag removal
   - Add basic PDF text extraction using native Rust crates
