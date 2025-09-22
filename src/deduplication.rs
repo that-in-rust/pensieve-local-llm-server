@@ -390,8 +390,11 @@ mod tests {
 
     fn create_test_file(path: &str, hash: &str, size: u64) -> FileMetadata {
         let now = Utc::now();
+        let path_buf = PathBuf::from(path);
+        let depth_level = path_buf.components().count() as u32;
+        
         FileMetadata {
-            full_filepath: PathBuf::from(path),
+            full_filepath: path_buf.clone(),
             folder_path: PathBuf::from("/test"),
             filename: path.split('/').last().unwrap_or(path).to_string(),
             file_extension: Some("txt".to_string()),
@@ -402,8 +405,8 @@ mod tests {
             modification_date: now,
             access_date: now,
             permissions: 644,
-            depth_level: 1,
-            relative_path: PathBuf::from(path),
+            depth_level,
+            relative_path: path_buf,
             is_hidden: false,
             is_symlink: false,
             symlink_target: None,

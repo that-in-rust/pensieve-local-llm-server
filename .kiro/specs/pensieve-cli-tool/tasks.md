@@ -140,31 +140,36 @@ ALL DIAGRAMS WILL BE IN MERMAID ONLY TO ENSURE EASE WITH GITHUB - DO NOT SKIP TH
   - Test migration system with version upgrades
   - _Requirements: Database schema evolution support_
 
-- [ ] 20. Implement missing CLI subcommands
-  - Complete `pensieve init` command for database initialization
+- [x] 20. Fix failing unit test in deduplication module
+  - Fix canonical file selection logic to properly handle path comparison
+  - Ensure deterministic canonical file selection based on path length and alphabetical order
+  - Update test expectations to match corrected logic
+  - _Requirements: 1.4, 1.5_
+
+- [-] 21. Implement missing CLI subcommands
   - Complete `pensieve check-deps` command for dependency verification
   - Complete `pensieve config` command for configuration file generation
   - Add proper error handling and user feedback for all subcommands
+  - Note: `pensieve init` is already implemented and working
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 21. Add comprehensive end-to-end integration tests
+- [ ] 22. Add comprehensive end-to-end integration tests
   - Create integration test for complete CLI workflow from directory scan to final statistics
   - Test paragraph-level deduplication across multiple files
   - Verify database consistency after full processing pipeline
   - Test error recovery and partial processing scenarios
   - _Requirements: 1.1, 2.1, 4.1, 4.2, 4.3, 5.1_
 
-- [ ] 22. Create README and documentation
+- [ ] 23. Create README and documentation
   - Write comprehensive README with installation instructions
   - Document CLI usage with examples
   - Add troubleshooting guide for common issues
   - Document supported file formats and processing capabilities
+  - Include Mermaid diagrams showing system architecture and workflow
   - _Requirements: 5.2, 5.3_
 
-
-# README UPDATE
-
-- [ ] Update All README and docs with Mermaid diagrams referencing the steering docs
-
-
-- [ ] Run .kiro/tree-with-wc.sh - and use mv commands to clean up the repo, it should look elegant for someone reading it on github
+- [ ] 24. Repository cleanup and organization
+  - Run .kiro/tree-with-wc.sh to analyze repository structure
+  - Clean up any unnecessary files or directories
+  - Ensure repository looks professional for GitHub presentation
+  - Organize examples and test data appropriately
