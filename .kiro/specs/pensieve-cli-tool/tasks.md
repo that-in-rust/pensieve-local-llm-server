@@ -1,5 +1,10 @@
 # Implementation Plan
 
+
+## IMPORTANT FOR VISUALS AND DIAGRAMS
+
+ALL DIAGRAMS WILL BE IN MERMAID ONLY TO ENSURE EASE WITH GITHUB - DO NOT SKIP THAT
+
 - [x] 1. Set up project structure and core interfaces
   - Create Cargo.toml with required dependencies (clap, sqlx, tokio, sha2, walkdir, mime_guess, thiserror, anyhow)
   - Define core data structures (FileMetadata, ProcessingStatus, DuplicateStatus, error types)
@@ -15,15 +20,15 @@
 
 - [x] 3. Create database schema and connection management
   - Implement SQLite database initialization with WAL mode
-  - Create all tables (files, paragraphs, paragraph_sources, processing_errors) with proper indexes
-  - Write database connection pool management
-  - Add database migration support for schema evolution
-  - _Requirements: 1.7, 2.3, 2.4_
+  - Create all tables (files, paragraphs, errors) with proper indexes
+  - Write database connection management
+  - Add basic database setup and table creation
+  - _Requirements: 1.7, 2.3_
 
 - [x] 4. Implement file type detection and filtering system
-  - Create file type classification (Tier 1 native, Tier 2 external, binary exclusions)
-  - Implement MIME type detection using magic number analysis
-  - Write file extension mapping for supported formats
+  - Create file type classification for supported text formats
+  - Implement basic MIME type detection using file extensions
+  - Write file extension mapping for all supported formats from Requirements 1.2
   - Add binary file detection to skip unsupported formats
   - _Requirements: 1.2, 3.1, 3.2_
 
@@ -41,100 +46,73 @@
   - Add duplicate statistics reporting (unique files found, duplicates identified)
   - _Requirements: 1.4, 1.5, 1.6_
 
-- [ ] 7. Create delta processing for incremental updates
-  - Implement file change detection by comparing modification dates and sizes
-  - Create logic to identify new, modified, and deleted files
-  - Add soft delete marking for removed files
-  - Write incremental processing queue management
-  - _Requirements: 2.1, 2.2_
 
-- [ ] 8. Build native content extraction for Tier 1 formats
-  - Implement text file reader with encoding detection (UTF-8, UTF-16, Latin-1)
-  - Create HTML content extractor with tag removal and optional Markdown conversion
+
+- [ ] 7. Build native content extraction for all supported formats
+  - Implement text file reader with encoding detection (UTF-8, Latin-1)
+  - Create HTML content extractor with basic tag removal
+  - Add basic PDF text extraction using native Rust crates
+  - Implement basic DOCX text extraction using ZIP and XML parsing
   - Add structured format parsers (JSON, YAML, TOML) for clean text extraction
-  - Write source code comment and string extraction
-  - _Requirements: 2.1, 3.1, 3.2_
+  - Write source code reader (treat as plain text)
+  - _Requirements: 2.1, 3.1, 3.2, 5.5_
 
-- [ ] 9. Implement external tool orchestration for Tier 2 formats
-  - Create external tool configuration system (command templates, timeouts)
-  - Implement subprocess execution with timeout handling
-  - Add tool availability checking at startup
-  - Write graceful degradation when tools are missing
-  - _Requirements: 2.1, 3.1, 3.2_
-
-- [ ] 10. Create content processing and paragraph splitting
+- [ ] 8. Create content processing and paragraph splitting
   - Implement content splitting by double newlines into paragraphs
   - Add paragraph hash calculation for deduplication
   - Create paragraph validation (minimum length, character filtering)
-  - Write token count estimation for paragraphs
+  - Write basic token count estimation for paragraphs
   - _Requirements: 4.1, 4.2, 4.4_
 
-- [ ] 11. Build paragraph-level deduplication system
+- [ ] 9. Build paragraph-level deduplication system
   - Implement paragraph hash comparison for duplicate detection
-  - Create many-to-many relationship tracking (paragraph_sources table)
-  - Add source file reference with byte offset tracking
-  - Write unique paragraph storage with provenance information
+  - Create simple paragraph storage with file references
+  - Add paragraph index tracking within files
+  - Write unique paragraph storage in paragraphs table
   - _Requirements: 4.2, 4.3, 4.5_
 
-- [ ] 12. Implement comprehensive error handling and logging
+- [ ] 10. Implement basic error handling and logging
   - Create structured error hierarchy with thiserror for all failure modes
   - Add error recovery logic for non-fatal failures (skip bad files, continue processing)
   - Implement error logging to both console and database
-  - Write progress reporting with error counts and processing statistics
+  - Write basic progress reporting with file and paragraph counts
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 5.4_
 
-- [ ] 13. Add progress reporting and statistics
-  - Implement real-time progress indicators for both scanning and processing phases
-  - Create processing statistics (files processed, paragraphs stored, deduplication rates)
-  - Add performance metrics (files/sec, MB processed, estimated completion time)
-  - Write final summary report with token counts and efficiency metrics
+- [ ] 11. Add basic progress reporting and statistics
+  - Implement simple progress indicators for both scanning and processing phases
+  - Create processing statistics (files processed, paragraphs stored, duplicates found)
+  - Write final summary report with counts and basic metrics
   - _Requirements: 1.6, 2.2, 5.4_
 
-- [ ] 14. Create integration tests for complete workflows
+- [ ] 12. Create integration tests for complete workflows
   - Write end-to-end test with sample directory structure and various file types
   - Test metadata scanning phase with duplicate detection
   - Test content processing phase with paragraph deduplication
   - Verify database consistency and proper error handling
   - _Requirements: 1.1, 2.1, 4.1, 5.1_
 
-- [ ] 15. Add performance optimization and memory management
+- [ ] 13. Add basic performance optimization
   - Implement batch database operations for improved throughput
-  - Add memory usage monitoring and bounded processing queues
-  - Create connection pooling for database operations
-  - Optimize parallel processing thread counts based on system resources
+  - Add basic memory management for large files
+  - Optimize parallel processing for directory traversal
   - _Requirements: 5.5, 2.2_
 
-- [ ] 16. Implement configuration file support
-  - Create TOML configuration file for external tool commands and settings
-  - Add configuration validation and default value handling
-  - Implement CLI argument override of configuration settings
-  - Write configuration file generation command for initial setup
-  - _Requirements: 5.1, 5.2_
-
-- [ ] 17. Add comprehensive unit tests for core components
+- [ ] 14. Add unit tests for core components
   - Test file type detection with various file samples and edge cases
-  - Test hash calculation consistency and collision handling
+  - Test hash calculation consistency and performance
   - Test content extraction for each supported format with sample files
   - Test deduplication logic with various duplicate scenarios
   - _Requirements: 1.2, 1.3, 4.2, 4.3_
 
-- [ ] 18. Create command-line help and documentation
-  - Implement detailed --help output with usage examples
-  - Add error message improvements with actionable suggestions
+- [ ] 15. Create command-line help and documentation
+  - Implement basic --help output with usage instructions
+  - Add clear error messages for common issues
   - Create README with installation and usage instructions
-  - Write troubleshooting guide for common issues
   - _Requirements: 5.2, 5.3_
 
-- [ ] 19. Implement final integration and performance validation
-  - Test complete pipeline with large directory structures (>10k files)
-  - Validate performance contracts (processing speed, memory usage)
-  - Test incremental processing with file modifications
-  - Verify database integrity after interruptions and restarts
+- [ ] 16. Implement final integration and validation
+  - Test complete pipeline with sample directory structures
+  - Verify database consistency and proper error handling
+  - Test with various file types and duplicate scenarios
+  - Validate basic performance and memory usage
   - _Requirements: 5.5, 2.2, 3.1_
-
-- [ ] 20. Add production readiness features
-  - Implement graceful shutdown handling with progress preservation
-  - Add database backup and recovery mechanisms
-  - Create logging configuration with different verbosity levels
-  - Write deployment documentation and system requirements
-  - _Requirements: 3.1, 5.4, 5.5_

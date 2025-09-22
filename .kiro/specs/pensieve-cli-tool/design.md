@@ -1,20 +1,26 @@
 # Design Document
 
+
+
+## IMPORTANT FOR VISUALS AND DIAGRAMS
+
+ALL DIAGRAMS WILL BE IN MERMAID ONLY TO ENSURE EASE WITH GITHUB - DO NOT SKIP THAT
+
+
 ## Overview
 
-The Pensieve CLI tool is a high-performance Rust application designed to efficiently ingest text files into a clean, deduplicated database optimized for LLM processing. The system employs a two-phase approach: metadata scanning with file-level deduplication, followed by content extraction with intelligent chunking and global deduplication. This design maximizes token efficiency while maintaining complete traceability from content back to source files.
+The Pensieve CLI tool is a simple, high-performance Rust application designed to quickly ingest text files into a clean, deduplicated database for LLM processing. The system employs a straightforward two-phase approach: metadata scanning with file-level deduplication, followed by content extraction with simple paragraph-based processing. This MVP design focuses on getting content into a queryable format quickly without complex features or optimization.
 
-The system implements a **Hybrid Extraction Architecture (HEA)** that combines native Rust parsing for simple formats with opportunistic orchestration of external tools for complex formats like PDF and DOCX, ensuring both performance and high-fidelity content extraction.
+The system prioritizes simplicity and reliability, using native Rust parsing for supported text formats while maintaining a self-contained binary with no external runtime dependencies as specified in Requirement 5.5.
 
 ### Core Design Principles
 
-1. **Performance First**: Native Rust implementation with parallel processing and efficient memory usage
-2. **Deduplication at Multiple Levels**: File-level (by hash) and content-level (by chunk) to eliminate redundancy
-3. **Hybrid Extraction Architecture**: Native parsing for Tier 1 formats, external tool orchestration for Tier 2 formats (PDF, DOCX)
-4. **Robust Error Handling**: Graceful degradation when individual files fail, comprehensive error logging
-5. **Incremental Processing**: Delta updates to avoid reprocessing unchanged files
-6. **Intelligent Chunking**: Context-aware chunking with precise tokenization for optimal LLM processing
-7. **Configuration-Driven**: Flexible external tool configuration with graceful degradation
+1. **Simplicity First**: MVP approach focused on getting content into queryable format quickly
+2. **Native Rust Implementation**: Self-contained binary with no external runtime dependencies (Requirement 5.5)
+3. **Two-Level Deduplication**: File-level (by hash) and paragraph-level (by content hash) to eliminate redundancy
+4. **Basic Error Handling**: Skip problematic files and continue processing (Requirement 3)
+5. **Simple Content Processing**: Split content by double newlines into paragraphs (Requirement 4.1)
+6. **Progress Reporting**: Show basic progress for both metadata scanning and content processing phases (Requirement 5.4)
 
 ## Architecture
 
@@ -26,22 +32,17 @@ The system follows a layered architecture with clear separation of concerns:
 ┌─────────────────────────────────────────────────────────────┐
 │                    CLI Interface Layer                       │
 ├─────────────────────────────────────────────────────────────┤
-│                 Orchestration Layer                         │
+│                 Processing Layer                            │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐ │
-│  │ Metadata Scanner │  │ Content Processor│  │ Delta Manager│ │
-│  └─────────────────┘  └─────────────────┘  └──────────────┘ │
-├─────────────────────────────────────────────────────────────┤
-│                   Processing Layer                          │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐ │
-│  │ File Type       │  │ Content         │  │ Deduplication│ │
-│  │ Detection       │  │ Extraction      │  │ Engine       │ │
+│  │ Metadata Scanner │  │ Content         │  │ Paragraph    │ │
+│  │                 │  │ Extractor       │  │ Processor    │ │
 │  └─────────────────┘  └─────────────────┘  └──────────────┘ │
 ├─────────────────────────────────────────────────────────────┤
 │                    Storage Layer                            │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐ │
-│  │ SQLite Database │  │ File System     │  │ External     │ │
-│  │ Manager         │  │ Operations      │  │ Tools        │ │
-│  └─────────────────┘  └─────────────────┘  └──────────────┘ │
+│  ┌─────────────────┐  ┌─────────────────┐                   │
+│  │ SQLite Database │  │ File System     │                   │
+│  │ Manager         │  │ Operations      │                   │
+│  └─────────────────┘  └─────────────────┘                   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -58,17 +59,14 @@ The system follows a layered architecture with clear separation of concerns:
    - Store metadata in files table with duplicate marking
    - Generate progress reports and statistics
 
-3. **Delta Processing Phase**
-   - Compare current scan against existing database state
-   - Identify new, modified, and deleted files
-   - Queue only changed files for content processing
 
-4. **Content Extraction Phase**
-   - Process only unique, changed files (Requirements 2.1)
-   - Extract text using native parsers or external tools
-   - Split content into paragraphs by double newlines (Requirements 4.1)
+
+3. **Content Extraction Phase**
+   - Process only unique files for content extraction (Requirement 2.1)
+   - Extract text using native Rust parsing for supported formats
+   - Split content into paragraphs by double newlines (Requirement 4.1)
    - Perform paragraph-level deduplication (Requirements 4.2, 4.3)
-   - Store unique paragraphs with file references
+   - Store unique paragraphs with file references in paragraphs table
 
 ## Components and Interfaces
 
@@ -127,9 +125,9 @@ pub enum DuplicateStatus {
 
 ### File Type Detection System
 
-The system uses a two-tier approach for robust file type identification:
+The system uses native Rust parsing for all supported text formats as specified in Requirements 1.2:
 
-**Tier 1 (Native Processing)**:
+**Supported Text Formats (Native Processing)**:
 - Text files: .txt, .md, .rst, .org
 - Source code: .rs, .py, .js, .ts, .java, .go, .c, .cpp, .h, .hpp, .php, .rb, .swift, .kt, .scala, .clj, .hs, .elm, .lua, .pl, .r, .m
 - Configuration: .json, .yaml, .yml, .toml, .ini, .cfg, .env, .properties, .conf
@@ -138,13 +136,8 @@ The system uses a two-tier approach for robust file type identification:
 - Data: .csv, .tsv, .log, .sql
 - Documentation: .adoc, .wiki, .tex, .bib
 - Spreadsheets: .xls, .xlsx (basic text extraction)
-
-**Tier 2 (External Tool Processing)**:
-- PDF documents: .pdf
-- Microsoft Office: .doc, .docx
-- OpenDocument: .odt, .ods
+- Documents: .pdf, .doc, .docx, .odt, .rtf, .pages
 - E-books: .epub, .mobi, .azw, .azw3, .fb2, .lit, .pdb, .tcr, .prc
-- Rich text: .rtf, .pages
 
 **Binary Exclusions**:
 - Images: .jpg, .png, .gif, .bmp, .svg
@@ -154,32 +147,28 @@ The system uses a two-tier approach for robust file type identification:
 - Executables: .exe, .bin, .app, .dmg
 - Libraries: .dll, .so, .dylib
 
+**Note**: For MVP, complex formats like PDF and DOCX will use basic text extraction methods available in Rust crates, maintaining the self-contained binary requirement.
+
 ### Content Extraction Interfaces
 
 ```rust
-// Trait for content extraction strategies
-#[async_trait]
+// Simple trait for content extraction
 pub trait ContentExtractor: Send + Sync {
-    async fn extract(&self, file_path: &Path) -> Result<String, ExtractionError>;
+    fn extract(&self, file_path: &Path) -> Result<String, ExtractionError>;
     fn supported_extensions(&self) -> &[&str];
-    fn requires_external_tool(&self) -> bool;
 }
 
-// Native text file extractor
-pub struct NativeTextExtractor;
+// Native text file extractor for simple formats
+pub struct TextExtractor;
 
-// External tool orchestrator
-pub struct ExternalToolExtractor {
-    tool_path: PathBuf,
-    args_template: String,
-    timeout: Duration,
-}
+// Basic HTML extractor that strips tags
+pub struct HtmlExtractor;
 
-// HTML content extractor with cleaning
-pub struct HtmlExtractor {
-    preserve_structure: bool,
-    convert_to_markdown: bool,
-}
+// Simple PDF text extractor using Rust crates
+pub struct PdfExtractor;
+
+// Basic DOCX extractor using Rust crates
+pub struct DocxExtractor;
 ```
 
 ### Database Schema Design
@@ -329,10 +318,9 @@ The system processes files through a well-defined pipeline:
 2. **Classification**: MIME type detection and extension-based filtering
 3. **Hashing**: SHA-256 calculation for content-based deduplication
 4. **Metadata Storage**: Complete file information persistence
-5. **Delta Analysis**: Comparison with existing database state
-6. **Content Extraction**: Text extraction using appropriate strategy
-7. **Content Processing**: Intelligent chunking and global deduplication
-8. **Storage**: Unique chunk persistence with complete provenance tracking
+5. **Content Extraction**: Text extraction using native Rust parsing
+6. **Content Processing**: Simple paragraph splitting and deduplication
+7. **Storage**: Unique paragraph persistence with file references
 
 ### Deduplication Strategy
 
@@ -349,106 +337,69 @@ The system processes files through a well-defined pipeline:
 - Store unique paragraphs once in paragraphs table with file reference (Requirements 4.3)
 - Enable traceability from any paragraph back to source file
 
-### External Tool Integration
+### Native Content Extraction
 
-For complex document formats, the system orchestrates external tools through a flexible configuration system:
+The system uses only native Rust libraries for content extraction to maintain the self-contained binary requirement:
 
-**Configuration-Driven Approach**:
-```toml
-# pensieve.toml configuration file
-[general]
-tokenizer_model = "cl100k_base"
-chunk_size = 512
-chunk_overlap = 50
-thread_count = 0  # 0 = auto-detect
+**Text Extraction Strategy**:
+- **Plain Text**: Direct file reading with encoding detection
+- **HTML**: Basic tag stripping using native HTML parsing
+- **PDF**: Simple text extraction using Rust PDF libraries (e.g., `pdf-extract`)
+- **DOCX**: Basic text extraction using Rust ZIP and XML parsing
+- **JSON/YAML/TOML**: Parse and extract string values
+- **CSV**: Extract all text content from cells
+- **Source Code**: Read as plain text (comments and strings included)
 
-[converters]
-pdf = "pdftotext {input} -"
-docx = "pandoc -f docx -t plain {input}"
-odt = "pandoc -f odt -t plain {input}"
-epub = "pandoc -f epub -t plain {input}"
+**Encoding Handling**:
+- UTF-8 detection and conversion
+- Fallback to Latin-1 for legacy files
+- Skip files with unrecognizable encodings
 
-[tool_paths]
-pdftotext = "/usr/bin/pdftotext"  # Optional explicit paths
-pandoc = "/usr/local/bin/pandoc"
-
-[timeouts]
-pdf = 120
-docx = 60
-default = 30
-```
-
-**Dependency Management**:
-- `pensieve init` command generates default configuration template
-- `pensieve check-dependencies` verifies tool availability
-- Status report shows which formats are enabled
-- Graceful degradation when tools are missing
-
-**Processing Strategy**:
-- Check tool availability at startup
-- Skip files if required tool is missing (mark as 'Skipped_Dependency')
-- Log missing dependencies for user awareness
-- Continue processing other supported formats
-- Configurable timeouts prevent hanging on corrupted files
-- Capture STDOUT (extracted text) and STDERR (for logging)
+**Error Handling**:
+- Skip files that cannot be processed
+- Log extraction failures for user awareness
+- Continue processing other files (Requirement 3)
 
 ## CLI Interface Design
 
 ### Command Structure
 
-The CLI provides a simple, intuitive interface aligned with Requirements 5:
+The CLI provides a simple interface aligned with Requirement 5:
 
 ```bash
-# Basic usage
+# Basic usage (Requirements 5.1)
 pensieve <input_directory> <database_path>
 
-# With options
-pensieve /path/to/documents ./pensieve.db --config ./pensieve.toml
-
-# Utility commands
-pensieve init                    # Generate default configuration
-pensieve check-dependencies     # Verify external tool availability
-pensieve --help                 # Show usage instructions
+# Help and version (Requirements 5.2, 5.3)
+pensieve --help                 # Show basic usage instructions
 pensieve --version              # Show version information
 
-# Advanced options
-pensieve /docs ./db.sqlite \
-    --dry-run \                 # Simulate without modifying database
-    --force-reprocess \         # Ignore delta checks, reprocess all
-    --config ./custom.toml \    # Custom configuration file
-    --threads 8 \               # Override thread count
-    --verbose                   # Detailed progress output
+# Example usage
+pensieve /path/to/documents ./pensieve.db
 ```
 
 ### Progress Reporting
 
-Real-time progress indicators as specified in Requirements FR 5.3:
+Basic progress information as specified in Requirement 5.4:
 
 ```
 Pensieve v1.0.0 - Text Ingestion Tool
 
 Phase 1: Metadata Scanning
-├─ Files scanned: 15,432 / 20,000 (77%)
-├─ Processing rate: 1,247 files/sec
-├─ Data processed: 2.3 GB / 3.1 GB
-├─ Duplicates found: 3,421 (22.1%)
-├─ Errors: 12
-└─ ETA: 00:03:45
+Scanning files... 15,432 files found
+Duplicates identified: 3,421 files
+Unique files to process: 12,011
 
-Phase 2: Content Extraction  
-├─ Files processed: 8,234 / 12,011 (68%)
-├─ Chunks created: 145,678
-├─ Deduplication rate: 34.2%
-├─ Token count: 12.4M tokens
-├─ Processing rate: 234 files/sec
-└─ ETA: 00:12:33
+Phase 2: Content Processing
+Processing files... 8,234 / 12,011 (68%)
+Paragraphs created: 145,678
+Errors: 12
 
 Summary:
 ✓ Files processed: 12,011
-✓ Unique chunks: 95,847
-✓ Total tokens: 12.4M
-✓ Deduplication savings: 34.2%
-✓ Processing time: 00:16:18
+✓ Paragraphs stored: 95,847
+✓ Duplicates skipped: 49,831
+✓ Processing complete
 ```
 
 ### Error Handling and User Feedback
@@ -472,10 +423,10 @@ $ pensieve ./docs /readonly/db.sqlite
 Error: Cannot write to database path '/readonly/db.sqlite'
 Permission denied. Please choose a writable location
 
-# Missing external tools
-Warning: pdftotext not found in PATH
-PDF files will be skipped. Install poppler-utils to enable PDF processing
-Run 'pensieve check-dependencies' for detailed tool status
+# File processing errors
+Warning: Could not process 'document.pdf': Unsupported format
+12 files skipped due to processing errors
+See error details in database for troubleshooting
 ```
 
 ## Error Handling
@@ -635,17 +586,17 @@ fn test_memory_usage_bounds() {
 
 **Trade-offs**: Slightly more complex implementation, but significant performance benefits
 
-### 3. Hybrid Extraction Architecture
+### 3. Native-Only Processing Architecture
 
-**Decision**: Native parsing for simple formats, external tools for complex formats
+**Decision**: Use native Rust parsing for all supported formats
 
 **Rationale**:
-- **Performance**: Native Rust parsing is faster and more reliable for text formats
-- **Fidelity**: External tools (Pandoc, pdftotext) provide better quality for complex formats
-- **Maintainability**: Avoid reimplementing complex document parsers
-- **Flexibility**: Users can configure their preferred tools
+- **Self-Contained**: Meets Requirement 5.5 for no external runtime dependencies
+- **Simplicity**: Single binary deployment with no configuration needed
+- **Reliability**: No external tool failures or missing dependencies
+- **MVP Focus**: Basic text extraction sufficient for initial version
 
-**Trade-offs**: External dependencies, but graceful degradation when tools are missing
+**Trade-offs**: Lower extraction fidelity for complex formats, but maintains simplicity and meets requirements
 
 ### 4. Content-Hash Based Deduplication
 
@@ -677,35 +628,34 @@ fn test_memory_usage_bounds() {
 
 **Trade-offs**: Less sophisticated than advanced chunking but sufficient for MVP and easier to implement correctly
 
-### 6. Incremental Processing with Delta Detection
+### 6. Simple Processing Model
 
-**Decision**: Compare file metadata to detect changes and avoid reprocessing
-
-**Rationale**:
-- **Performance**: Dramatically reduces processing time for subsequent runs
-- **User Experience**: Faster iteration cycles during development
-- **Resource Efficiency**: Avoids redundant computation and I/O
-- **Scalability**: Enables processing of very large corpora over time
-
-**Trade-offs**: Additional complexity in change detection logic, but essential for practical use
-
-### 7. Configuration-Driven External Tool Integration
-
-**Decision**: Implement flexible TOML-based configuration for external tools
+**Decision**: Process all files on each run without delta detection for MVP
 
 **Rationale**:
-- **User Control**: Users can specify their preferred tools and configurations
-- **Flexibility**: Support for custom command templates and tool paths
-- **Maintainability**: No need to hardcode tool configurations in source code
-- **Extensibility**: Easy to add support for new tools without code changes
+- **Simplicity**: Reduces implementation complexity for initial version
+- **Reliability**: No state management or change detection edge cases
+- **MVP Focus**: Get basic functionality working first
+- **File-Level Deduplication**: Still avoids processing duplicate files
+
+**Trade-offs**: Slower subsequent runs, but acceptable for MVP and can be optimized later
+
+### 7. Native-Only Content Extraction
+
+**Decision**: Use only native Rust libraries for content extraction
+
+**Rationale**:
+- **Self-Contained Binary**: Meets Requirement 5.5 for no external runtime dependencies
+- **Simplicity**: Reduces complexity and deployment requirements
+- **Reliability**: No external tool failures or version compatibility issues
+- **Portability**: Works on any system where Rust binary can run
 
 **Implementation**:
-- **Configuration File**: `pensieve.toml` with sections for converters, tool paths, and timeouts
-- **Command Templates**: Flexible template system with `{input}` placeholder
-- **Dependency Checking**: `check-dependencies` command verifies tool availability
-- **Graceful Degradation**: Missing tools result in skipped files, not failures
+- **Native Libraries**: Use Rust crates for PDF, DOCX, HTML parsing
+- **Basic Extraction**: Focus on getting text content rather than perfect formatting
+- **Error Handling**: Skip files that cannot be processed natively
 
-**Trade-offs**: Requires configuration management but provides maximum flexibility and user control
+**Trade-offs**: Lower fidelity extraction compared to specialized tools, but meets MVP requirements and maintains simplicity
 
 ### 8. Simple Paragraph Deduplication Model
 
@@ -725,4 +675,4 @@ fn test_memory_usage_bounds() {
 
 **Trade-offs**: Less sophisticated than M:N model but meets MVP requirements and is much simpler to implement
 
-This design provides a robust, performant, and maintainable foundation for the Pensieve CLI tool while addressing all requirements specified in the requirements document. The focus on simple paragraph-based processing ensures the MVP can be delivered quickly while still providing effective deduplication and LLM-ready content organization.
+This design provides a simple, reliable foundation for the Pensieve CLI tool MVP while addressing all requirements specified in the requirements document. The focus on native Rust processing and simple paragraph-based content organization ensures the tool can be delivered quickly as a self-contained binary while still providing effective deduplication and LLM-ready content storage.
