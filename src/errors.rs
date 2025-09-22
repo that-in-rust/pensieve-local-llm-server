@@ -57,6 +57,10 @@ pub enum PensieveError {
     /// Serialization/deserialization errors
     #[error("Serialization error: {0}")]
     Serialization(String),
+
+    /// Invalid data format errors
+    #[error("Invalid data: {0}")]
+    InvalidData(String),
 }
 
 /// Specific errors for content extraction operations

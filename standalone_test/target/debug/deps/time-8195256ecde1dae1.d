@@ -1,0 +1,11 @@
+/home/amuldotexe/Desktop/GitHub202410/that-in-rust/pensieve/standalone_test/target/debug/deps/libtime-8195256ecde1dae1.rmeta: /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/lib.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/display.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/duration.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/parse.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/sys.rs
+
+/home/amuldotexe/Desktop/GitHub202410/that-in-rust/pensieve/standalone_test/target/debug/deps/libtime-8195256ecde1dae1.rlib: /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/lib.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/display.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/duration.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/parse.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/sys.rs
+
+/home/amuldotexe/Desktop/GitHub202410/that-in-rust/pensieve/standalone_test/target/debug/deps/time-8195256ecde1dae1.d: /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/lib.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/display.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/duration.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/parse.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/sys.rs
+
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/lib.rs:
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/display.rs:
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/duration.rs:
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/parse.rs:
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/sys.rs:

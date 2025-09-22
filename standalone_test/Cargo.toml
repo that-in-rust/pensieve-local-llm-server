@@ -1,0 +1,25 @@
+[package]
+name = "standalone_extractor_test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# Content extraction dependencies
+encoding_rs = "0.8"
+scraper = "0.15"
+html2md = "0.2"
+zip = "0.5"
+quick-xml = "0.28"
+serde_json = "1.0"
+serde_yaml = "0.8"
+toml = "0.5"
+pdf-extract = "0.6"
+
+# Cryptographic hashing
+sha2 = "0.10"
+
+# Testing utilities
+tempfile = "3.8"

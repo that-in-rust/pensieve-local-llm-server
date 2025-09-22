@@ -1,0 +1,9 @@
+/home/amuldotexe/Desktop/GitHub202410/that-in-rust/pensieve/standalone_test/target/debug/deps/libencoding_index_japanese-072b2b616323bee3.rmeta: /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding-index-japanese-1.20141219.5/lib.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding-index-japanese-1.20141219.5/jis0208.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding-index-japanese-1.20141219.5/jis0212.rs
+
+/home/amuldotexe/Desktop/GitHub202410/that-in-rust/pensieve/standalone_test/target/debug/deps/libencoding_index_japanese-072b2b616323bee3.rlib: /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding-index-japanese-1.20141219.5/lib.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding-index-japanese-1.20141219.5/jis0208.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding-index-japanese-1.20141219.5/jis0212.rs
+
+/home/amuldotexe/Desktop/GitHub202410/that-in-rust/pensieve/standalone_test/target/debug/deps/encoding_index_japanese-072b2b616323bee3.d: /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding-index-japanese-1.20141219.5/lib.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding-index-japanese-1.20141219.5/jis0208.rs /home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding-index-japanese-1.20141219.5/jis0212.rs
+
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding-index-japanese-1.20141219.5/lib.rs:
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding-index-japanese-1.20141219.5/jis0208.rs:
+/home/amuldotexe/.cargo/registry/src/index.crates.io-6f17d22bba15001f/encoding-index-japanese-1.20141219.5/jis0212.rs:

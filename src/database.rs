@@ -1,10 +1,11 @@
 //! Database operations and schema management
 
 use crate::prelude::*;
-use crate::types::{FileMetadata, Paragraph, ParagraphSource, ProcessingError, FileType, DuplicateStatus, ProcessingStatus};
+use crate::types::{FileMetadata, Paragraph, ParagraphSource, ProcessingError, FileType, DuplicateStatus, ProcessingStatus, ParagraphId};
 use sqlx::{SqlitePool, Sqlite, Transaction};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use chrono::{DateTime, Utc};
 
 /// Database manager for SQLite operations with connection pooling
 #[derive(Clone)]
@@ -461,31 +462,128 @@ impl Database {
         }
     }
 
-    /// Insert paragraph
-    pub async fn insert_paragraph(&self, _paragraph: &Paragraph) -> Result<()> {
-        // TODO: Implement paragraph insertion
-        // This will be implemented in a later task
+    /// Insert paragraph with deduplication check
+    pub async fn insert_paragraph(&self, paragraph: &Paragraph) -> Result<()> {
+        let paragraph_id = paragraph.id.0.to_string();
+        let estimated_tokens = paragraph.estimated_tokens as i64;
+        let word_count = paragraph.word_count as i64;
+        let char_count = paragraph.char_count as i64;
+        
+        sqlx::query!(
+            r#"
+            INSERT INTO paragraphs (
+                paragraph_id, content_hash, content, estimated_tokens, 
+                word_count, char_count, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(content_hash) DO NOTHING
+            "#,
+            paragraph_id,
+            paragraph.content_hash,
+            paragraph.content,
+            estimated_tokens,
+            word_count,
+            char_count,
+            paragraph.created_at
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
         Ok(())
     }
 
-    /// Insert paragraph source link
-    pub async fn insert_paragraph_source(&self, _source: &ParagraphSource) -> Result<()> {
-        // TODO: Implement paragraph source insertion
-        // This will be implemented in a later task
+    /// Insert paragraph source link for file-paragraph relationships
+    pub async fn insert_paragraph_source(&self, source: &ParagraphSource) -> Result<()> {
+        let paragraph_id = source.paragraph_id.0.to_string();
+        let file_id = source.file_id.0.to_string();
+        let paragraph_index = source.paragraph_index as i64;
+        let byte_offset_start = source.byte_offset_start as i64;
+        let byte_offset_end = source.byte_offset_end as i64;
+        
+        sqlx::query!(
+            r#"
+            INSERT INTO paragraph_sources (
+                paragraph_id, file_id, paragraph_index, 
+                byte_offset_start, byte_offset_end, created_at
+            ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(paragraph_id, file_id, paragraph_index) DO NOTHING
+            "#,
+            paragraph_id,
+            file_id,
+            paragraph_index,
+            byte_offset_start,
+            byte_offset_end
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
         Ok(())
     }
 
-    /// Get paragraph by hash
-    pub async fn get_paragraph_by_hash(&self, _hash: &str) -> Result<Option<Paragraph>> {
-        // TODO: Implement paragraph retrieval
-        // This will be implemented in a later task
-        Ok(None)
+    /// Get paragraph by hash for deduplication checks
+    pub async fn get_paragraph_by_hash(&self, hash: &str) -> Result<Option<Paragraph>> {
+        let row = sqlx::query!(
+            r#"
+            SELECT paragraph_id, content_hash, content, estimated_tokens,
+                   word_count, char_count, created_at
+            FROM paragraphs 
+            WHERE content_hash = ?
+            "#,
+            hash
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
+        if let Some(row) = row {
+            let paragraph_id = uuid::Uuid::parse_str(&row.paragraph_id)
+                .map_err(|e| PensieveError::InvalidData(format!("Invalid paragraph ID: {}", e)))?;
+            
+            // Convert NaiveDateTime to DateTime<Utc>
+            let created_at = row.created_at
+                .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
+                .unwrap_or_else(|| chrono::Utc::now());
+            
+            let paragraph = Paragraph {
+                id: ParagraphId(paragraph_id),
+                content_hash: row.content_hash,
+                content: row.content,
+                estimated_tokens: row.estimated_tokens as u32,
+                word_count: row.word_count as u32,
+                char_count: row.char_count as u32,
+                created_at,
+            };
+            
+            Ok(Some(paragraph))
+        } else {
+            Ok(None)
+        }
     }
 
-    /// Insert processing error
-    pub async fn insert_error(&self, _error: &ProcessingError) -> Result<()> {
-        // TODO: Implement error insertion
-        // This will be implemented in a later task
+    /// Insert processing error for tracking and debugging
+    pub async fn insert_error(&self, error: &ProcessingError) -> Result<()> {
+        let error_id = error.id.to_string();
+        let file_id = error.file_id.map(|id| id.0.to_string());
+        
+        sqlx::query!(
+            r#"
+            INSERT INTO processing_errors (
+                error_id, file_id, error_type, error_message, 
+                stack_trace, occurred_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            "#,
+            error_id,
+            file_id,
+            error.error_type,
+            error.error_message,
+            error.stack_trace,
+            error.occurred_at
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
         Ok(())
     }
 
@@ -611,6 +709,118 @@ impl Database {
                 metadata.estimated_tokens.map(|t| t as i64),
                 metadata.processed_at,
                 metadata.error_message
+            )
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| PensieveError::Database(e))?;
+        }
+        
+        tx.commit().await.map_err(|e| PensieveError::Database(e))?;
+        Ok(())
+    }
+
+    /// Insert multiple paragraphs in a batch transaction for efficient storage
+    pub async fn insert_paragraphs_batch(&self, paragraphs: &[Paragraph]) -> Result<()> {
+        if paragraphs.is_empty() {
+            return Ok(());
+        }
+
+        let mut tx = self.begin_transaction().await?;
+        
+        for paragraph in paragraphs {
+            let paragraph_id = paragraph.id.0.to_string();
+            let estimated_tokens = paragraph.estimated_tokens as i64;
+            let word_count = paragraph.word_count as i64;
+            let char_count = paragraph.char_count as i64;
+            
+            sqlx::query!(
+                r#"
+                INSERT INTO paragraphs (
+                    paragraph_id, content_hash, content, estimated_tokens, 
+                    word_count, char_count, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(content_hash) DO NOTHING
+                "#,
+                paragraph_id,
+                paragraph.content_hash,
+                paragraph.content,
+                estimated_tokens,
+                word_count,
+                char_count,
+                paragraph.created_at
+            )
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| PensieveError::Database(e))?;
+        }
+        
+        tx.commit().await.map_err(|e| PensieveError::Database(e))?;
+        Ok(())
+    }
+
+    /// Insert multiple paragraph sources in a batch transaction
+    pub async fn insert_paragraph_sources_batch(&self, sources: &[ParagraphSource]) -> Result<()> {
+        if sources.is_empty() {
+            return Ok(());
+        }
+
+        let mut tx = self.begin_transaction().await?;
+        
+        for source in sources {
+            let paragraph_id = source.paragraph_id.0.to_string();
+            let file_id = source.file_id.0.to_string();
+            let paragraph_index = source.paragraph_index as i64;
+            let byte_offset_start = source.byte_offset_start as i64;
+            let byte_offset_end = source.byte_offset_end as i64;
+            
+            sqlx::query!(
+                r#"
+                INSERT INTO paragraph_sources (
+                    paragraph_id, file_id, paragraph_index, 
+                    byte_offset_start, byte_offset_end, created_at
+                ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(paragraph_id, file_id, paragraph_index) DO NOTHING
+                "#,
+                paragraph_id,
+                file_id,
+                paragraph_index,
+                byte_offset_start,
+                byte_offset_end
+            )
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| PensieveError::Database(e))?;
+        }
+        
+        tx.commit().await.map_err(|e| PensieveError::Database(e))?;
+        Ok(())
+    }
+
+    /// Insert multiple processing errors in a batch transaction
+    pub async fn insert_errors_batch(&self, errors: &[ProcessingError]) -> Result<()> {
+        if errors.is_empty() {
+            return Ok(());
+        }
+
+        let mut tx = self.begin_transaction().await?;
+        
+        for error in errors {
+            let error_id = error.id.to_string();
+            let file_id = error.file_id.map(|id| id.0.to_string());
+            
+            sqlx::query!(
+                r#"
+                INSERT INTO processing_errors (
+                    error_id, file_id, error_type, error_message, 
+                    stack_trace, occurred_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                "#,
+                error_id,
+                file_id,
+                error.error_type,
+                error.error_message,
+                error.stack_trace,
+                error.occurred_at
             )
             .execute(&mut *tx)
             .await
