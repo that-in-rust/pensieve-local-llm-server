@@ -1,7 +1,7 @@
 //! Database operations and schema management
 
 use crate::prelude::*;
-use crate::types::{FileMetadata, Paragraph, ParagraphSource, ProcessingError, FileType, DuplicateStatus, ProcessingStatus, ParagraphId};
+use crate::types::{FileMetadata, Paragraph, ParagraphSource, ProcessingError, FileType, DuplicateStatus, ProcessingStatus, ParagraphId, FileId};
 use sqlx::{SqlitePool, Sqlite, Transaction};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -344,6 +344,46 @@ impl Database {
         Ok(())
     }
 
+    /// Update file processing status and token count
+    pub async fn update_file_processing_status(
+        &self,
+        file_path: &std::path::Path,
+        status: ProcessingStatus,
+        estimated_tokens: Option<u32>,
+        error_message: Option<String>,
+    ) -> Result<()> {
+        let path_str = file_path.to_string_lossy().to_string();
+        let status_str = status.to_string();
+        let tokens = estimated_tokens.map(|t| t as i64);
+        let processed_at = if status == ProcessingStatus::Processed {
+            Some(chrono::Utc::now())
+        } else {
+            None
+        };
+        
+        sqlx::query!(
+            r#"
+            UPDATE files SET
+                processing_status = ?,
+                estimated_tokens = ?,
+                processed_at = ?,
+                error_message = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE full_filepath = ?
+            "#,
+            status_str,
+            tokens,
+            processed_at,
+            error_message,
+            path_str
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
+        Ok(())
+    }
+
     /// Update file metadata
     pub async fn update_file(&self, metadata: &FileMetadata) -> Result<()> {
         let folder_path = metadata.folder_path.to_string_lossy().to_string();
@@ -398,6 +438,28 @@ impl Database {
         .map_err(|e| PensieveError::Database(e))?;
         
         Ok(())
+    }
+
+    /// Get file ID by path
+    pub async fn get_file_id_by_path(&self, path: &Path) -> Result<Option<FileId>> {
+        let path_str = path.to_string_lossy().to_string();
+        
+        let row = sqlx::query!(
+            "SELECT file_id FROM files WHERE full_filepath = ?",
+            path_str
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
+        if let Some(row) = row {
+            let file_id = row.file_id.as_ref()
+                .and_then(|id_str| uuid::Uuid::parse_str(id_str).ok())
+                .map(FileId);
+            Ok(file_id)
+        } else {
+            Ok(None)
+        }
     }
 
     /// Get file by path
@@ -639,20 +701,21 @@ impl Database {
         .await
         .map_err(|e| PensieveError::Database(e))?;
         
-        // Get paragraph count
+        // Get paragraph count (unique paragraphs stored)
         let total_paragraphs: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM paragraphs")
             .fetch_optional(&self.pool)
             .await
             .map_err(|e| PensieveError::Database(e))?
             .unwrap_or(0);
         
-        // Get total tokens
+        // Get total tokens from paragraphs (more accurate than file estimates)
         let total_tokens: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(estimated_tokens), 0) FROM files WHERE estimated_tokens IS NOT NULL"
+            "SELECT COALESCE(SUM(estimated_tokens), 0) FROM paragraphs"
         )
-        .fetch_one(&self.pool)
+        .fetch_optional(&self.pool)
         .await
-        .map_err(|e| PensieveError::Database(e))?;
+        .map_err(|e| PensieveError::Database(e))?
+        .unwrap_or(0);
         
         // Get error count
         let error_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM processing_errors")
@@ -682,6 +745,63 @@ impl Database {
             total_tokens: total_tokens as u64,
             error_count: error_count as u64,
             files_by_status,
+        })
+    }
+
+    /// Get paragraph-level deduplication statistics
+    pub async fn get_paragraph_statistics(&self) -> Result<ParagraphStatistics> {
+        // Get total paragraph sources (all paragraph instances across files)
+        let total_paragraph_sources: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM paragraph_sources")
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| PensieveError::Database(e))?
+            .unwrap_or(0);
+        
+        // Get unique paragraphs count
+        let unique_paragraphs: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM paragraphs")
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| PensieveError::Database(e))?
+            .unwrap_or(0);
+        
+        // Get total tokens from unique paragraphs
+        let total_tokens: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(estimated_tokens), 0) FROM paragraphs"
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?
+        .unwrap_or(0);
+        
+        // Get average paragraph length
+        let avg_paragraph_length: f64 = sqlx::query_scalar(
+            "SELECT COALESCE(AVG(char_count), 0.0) FROM paragraphs"
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?
+        .unwrap_or(0.0);
+        
+        // Calculate deduplication metrics
+        let deduplicated_paragraphs = if total_paragraph_sources > unique_paragraphs {
+            total_paragraph_sources - unique_paragraphs
+        } else {
+            0
+        };
+        
+        let deduplication_rate = if total_paragraph_sources > 0 {
+            (deduplicated_paragraphs as f64 / total_paragraph_sources as f64) * 100.0
+        } else {
+            0.0
+        };
+        
+        Ok(ParagraphStatistics {
+            total_paragraph_instances: total_paragraph_sources as u64,
+            unique_paragraphs: unique_paragraphs as u64,
+            deduplicated_paragraphs: deduplicated_paragraphs as u64,
+            deduplication_rate,
+            total_tokens: total_tokens as u64,
+            average_paragraph_length: avg_paragraph_length,
         })
     }
 
@@ -1104,6 +1224,23 @@ pub struct DuplicateStatistics {
     pub duplicate_size: u64,
     /// Space savings from deduplication
     pub space_savings: u64,
+}
+
+/// Paragraph-level deduplication statistics
+#[derive(Debug, Default)]
+pub struct ParagraphStatistics {
+    /// Total paragraph instances across all files
+    pub total_paragraph_instances: u64,
+    /// Number of unique paragraphs stored
+    pub unique_paragraphs: u64,
+    /// Number of deduplicated paragraph instances
+    pub deduplicated_paragraphs: u64,
+    /// Deduplication rate as percentage
+    pub deduplication_rate: f64,
+    /// Total tokens in unique paragraphs
+    pub total_tokens: u64,
+    /// Average paragraph length in characters
+    pub average_paragraph_length: f64,
 }
 
 /// Database migration manager for schema evolution

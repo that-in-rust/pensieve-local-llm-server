@@ -574,34 +574,44 @@ impl ContentProcessor {
             .collect()
     }
 
-    /// Normalize text content with Unicode normalization
+    /// Normalize text content while preserving paragraph boundaries
     pub fn normalize_text(content: &str) -> String {
-        // Basic text normalization
-        let normalized = content
-            .trim()
-            .lines()
-            .map(|line| line.trim())
-            .filter(|line| !line.is_empty())
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        // Collapse multiple whitespace
-        let mut result = String::new();
-        let mut prev_was_space = false;
-        
-        for ch in normalized.chars() {
-            if ch.is_whitespace() {
-                if !prev_was_space {
-                    result.push(' ');
-                    prev_was_space = true;
+        // Split content by double newlines to preserve paragraph boundaries
+        let paragraphs: Vec<String> = content
+            .split("\n\n")
+            .map(|paragraph| {
+                // Normalize each paragraph individually
+                let normalized_paragraph = paragraph
+                    .trim()
+                    .lines()
+                    .map(|line| line.trim())
+                    .filter(|line| !line.is_empty())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                
+                // Collapse multiple whitespace within the paragraph
+                let mut result = String::new();
+                let mut prev_was_space = false;
+                
+                for ch in normalized_paragraph.chars() {
+                    if ch.is_whitespace() {
+                        if !prev_was_space {
+                            result.push(' ');
+                            prev_was_space = true;
+                        }
+                    } else {
+                        result.push(ch);
+                        prev_was_space = false;
+                    }
                 }
-            } else {
-                result.push(ch);
-                prev_was_space = false;
-            }
-        }
+                
+                result.trim().to_string()
+            })
+            .filter(|paragraph| !paragraph.is_empty())
+            .collect();
         
-        result.trim().to_string()
+        // Rejoin paragraphs with double newlines
+        paragraphs.join("\n\n")
     }
 
     /// Estimate token count for content (simple approximation)

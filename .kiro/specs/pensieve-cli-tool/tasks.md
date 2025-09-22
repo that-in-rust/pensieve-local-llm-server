@@ -65,14 +65,14 @@ ALL DIAGRAMS WILL BE IN MERMAID ONLY TO ENSURE EASE WITH GITHUB - DO NOT SKIP TH
   - Add batch operations for efficient paragraph storage
   - _Requirements: 4.2, 4.3, 4.5_
 
-- [ ] 9. Integrate content processing and paragraph splitting into main workflow
+- [x] 9. Integrate content processing and paragraph splitting into main workflow
   - Integrate existing ContentProcessor into CLI workflow after metadata scanning
   - Connect content extraction with paragraph splitting and storage
   - Add paragraph processing to unique files after deduplication
   - Update file records with token counts after content processing
   - _Requirements: 4.1, 4.2, 4.4_
 
-- [ ] 10. Integrate paragraph-level deduplication system
+- [-] 10. Integrate paragraph-level deduplication system
   - Connect existing database paragraph methods with content processing
   - Implement paragraph deduplication logic in main workflow
   - Add paragraph-to-file relationship tracking via paragraph_sources table

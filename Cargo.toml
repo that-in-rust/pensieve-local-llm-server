@@ -11,9 +11,7 @@ repository = "https://github.com/pensieve/pensieve"
 name = "pensieve"
 path = "src/main.rs"
 
-[[bin]]
-name = "test_extractor"
-path = "test_extractor.rs"
+
 
 [dependencies]
 # CLI argument parsing

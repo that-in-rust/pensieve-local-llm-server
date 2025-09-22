@@ -1,6 +1,7 @@
 //! Command-line interface for the Pensieve tool
 
 use crate::prelude::*;
+use crate::types::FileMetadata;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -197,11 +198,29 @@ impl Cli {
                 }
                 
                 println!("\nContent Statistics:");
-                println!("  Total paragraphs: {}", stats.total_paragraphs);
-                println!("  Estimated tokens: {}", stats.total_tokens);
+                println!("  Unique paragraphs: {}", stats.total_paragraphs);
+                println!("  Total tokens: {}", stats.total_tokens);
+                
+                // Get paragraph-level deduplication statistics
+                let paragraph_stats = db.get_paragraph_statistics().await?;
+                if paragraph_stats.total_paragraph_instances > 0 {
+                    println!("  Total paragraph instances: {}", paragraph_stats.total_paragraph_instances);
+                    if paragraph_stats.deduplicated_paragraphs > 0 {
+                        println!("  Paragraphs deduplicated: {} ({:.1}%)", 
+                            paragraph_stats.deduplicated_paragraphs,
+                            paragraph_stats.deduplication_rate);
+                    }
+                    println!("  Average paragraph length: {:.0} characters", 
+                        paragraph_stats.average_paragraph_length);
+                }
                 
                 if stats.total_tokens > 0 && stats.total_files > 0 {
                     println!("  Average tokens per file: {:.0}", stats.total_tokens as f64 / stats.total_files as f64);
+                }
+                
+                if stats.total_paragraphs > 0 {
+                    println!("  Average tokens per paragraph: {:.1}", 
+                        stats.total_tokens as f64 / stats.total_paragraphs as f64);
                 }
                 
                 println!("\nProcessing Status:");
@@ -320,14 +339,411 @@ impl Cli {
                 println!("  Space savings: {:.2} MB", dup_stats.space_savings as f64 / 1_048_576.0);
             }
             
-            // TODO: Phase 4: Content processing
+            // Phase 4: Content processing
             println!("\nPhase 4: Content processing...");
-            println!("Content processing will be implemented in the next task");
+            
+            // Get unique files that need content processing
+            let unique_files = processed_files.iter()
+                .filter(|f| f.duplicate_status == crate::types::DuplicateStatus::Unique || 
+                           f.duplicate_status == crate::types::DuplicateStatus::Canonical)
+                .collect::<Vec<_>>();
+            
+            if unique_files.is_empty() {
+                println!("No unique files to process for content extraction");
+            } else {
+                println!("Processing content for {} unique files...", unique_files.len());
+                
+                // Initialize content processing components
+                let extraction_manager = crate::extractor::ExtractionManager::new();
+                let content_processor = crate::extractor::ContentProcessor;
+                
+                let mut processed_count = 0;
+                let mut error_count = 0;
+                let mut total_paragraphs = 0;
+                let mut total_tokens = 0;
+                
+                // Process each unique file with paragraph-level deduplication
+                for file_metadata in unique_files {
+                    if self.verbose {
+                        println!("Processing: {}", file_metadata.full_filepath.display());
+                    }
+                    
+                    match self.process_file_content(
+                        &database,
+                        &extraction_manager,
+                        &content_processor,
+                        file_metadata
+                    ).await {
+                        Ok((paragraph_count, token_count)) => {
+                            processed_count += 1;
+                            total_paragraphs += paragraph_count;
+                            total_tokens += token_count;
+                            
+                            if processed_count % 100 == 0 {
+                                println!("Processed {} files, {} paragraphs, {} tokens", 
+                                    processed_count, total_paragraphs, total_tokens);
+                            }
+                        }
+                        Err(e) => {
+                            error_count += 1;
+                            if self.verbose {
+                                eprintln!("Error processing {}: {}", 
+                                    file_metadata.full_filepath.display(), e);
+                            }
+                            
+                            // Get file ID for error tracking
+                            let file_id = database.get_file_id_by_path(&file_metadata.full_filepath).await
+                                .unwrap_or(None);
+                            
+                            // Store error in database
+                            let processing_error = crate::types::ProcessingError {
+                                id: uuid::Uuid::new_v4(),
+                                file_id,
+                                error_type: "ContentProcessing".to_string(),
+                                error_message: e.to_string(),
+                                stack_trace: None,
+                                occurred_at: chrono::Utc::now(),
+                            };
+                            
+                            if let Err(db_err) = database.insert_error(&processing_error).await {
+                                eprintln!("Failed to store error in database: {}", db_err);
+                            }
+                            
+                            // Update file status to error
+                            if let Err(status_err) = database.update_file_processing_status(
+                                &file_metadata.full_filepath,
+                                crate::types::ProcessingStatus::Error,
+                                None,
+                                Some(e.to_string()),
+                            ).await {
+                                eprintln!("Failed to update file status: {}", status_err);
+                            }
+                        }
+                    }
+                }
+                
+                println!("\nContent Processing Complete:");
+                println!("  Files processed: {}", processed_count);
+                println!("  Processing errors: {}", error_count);
+                println!("  Total paragraphs processed: {}", total_paragraphs);
+                println!("  Total tokens: {}", total_tokens);
+                
+                // Get comprehensive paragraph statistics from database
+                let paragraph_stats = database.get_paragraph_statistics().await?;
+                
+                if total_paragraphs > 0 {
+                    println!("  Unique paragraphs stored: {}", paragraph_stats.unique_paragraphs);
+                    
+                    if paragraph_stats.deduplicated_paragraphs > 0 {
+                        println!("  Paragraphs deduplicated: {} ({:.1}%)", 
+                            paragraph_stats.deduplicated_paragraphs, 
+                            paragraph_stats.deduplication_rate);
+                    }
+                    
+                    println!("  Average tokens per paragraph: {:.1}", 
+                        total_tokens as f64 / total_paragraphs as f64);
+                    
+                    if paragraph_stats.unique_paragraphs > 0 {
+                        println!("  Average paragraph length: {:.0} characters", 
+                            paragraph_stats.average_paragraph_length);
+                        println!("  Total unique tokens: {}", paragraph_stats.total_tokens);
+                    }
+                }
+            }
         } else {
             println!("DRY RUN: Skipping database operations");
         }
 
         println!("Ingestion workflow completed successfully!");
         Ok(())
+    }
+
+    /// Process content for a single file with paragraph-level deduplication
+    async fn process_file_content(
+        &self,
+        database: &crate::database::Database,
+        extraction_manager: &crate::extractor::ExtractionManager,
+        _content_processor: &crate::extractor::ContentProcessor,
+        file_metadata: &FileMetadata,
+    ) -> Result<(u32, u32)> {
+        use crate::types::{Paragraph, ParagraphSource, ParagraphId};
+        use crate::extractor::ContentProcessor;
+        
+        // Extract content from file
+        let content = extraction_manager.extract_content(&file_metadata.full_filepath).await?;
+        
+        if content.trim().is_empty() {
+            // Update file status to processed with zero tokens
+            database.update_file_processing_status(
+                &file_metadata.full_filepath,
+                crate::types::ProcessingStatus::Processed,
+                Some(0),
+                None,
+            ).await?;
+            return Ok((0, 0));
+        }
+        
+        // Normalize content
+        let normalized_content = ContentProcessor::normalize_text(&content);
+        
+        // Split into paragraphs
+        let paragraph_texts = ContentProcessor::split_paragraphs(&normalized_content);
+        
+        if paragraph_texts.is_empty() {
+            // Update file status to processed with zero tokens
+            database.update_file_processing_status(
+                &file_metadata.full_filepath,
+                crate::types::ProcessingStatus::Processed,
+                Some(0),
+                None,
+            ).await?;
+            return Ok((0, 0));
+        }
+        
+        let mut total_tokens = 0;
+        let mut new_paragraphs_count = 0;
+        let total_paragraphs_count = paragraph_texts.len() as u32;
+        
+        // Get the actual file ID from database
+        let file_id = database.get_file_id_by_path(&file_metadata.full_filepath).await?
+            .ok_or_else(|| PensieveError::InvalidData(
+                format!("File not found in database: {}", file_metadata.full_filepath.display())
+            ))?;
+        
+        // Calculate byte offsets for each paragraph in the normalized content
+        let mut byte_offsets = Vec::new();
+        let mut current_offset = 0;
+        
+        for paragraph_text in &paragraph_texts {
+            let start_offset = current_offset;
+            let end_offset = current_offset + paragraph_text.len();
+            byte_offsets.push((start_offset, end_offset));
+            
+            // Account for paragraph separator (double newline) in offset calculation
+            current_offset = end_offset + 2; // +2 for "\n\n"
+        }
+        
+        // Process each paragraph with proper deduplication
+        for (index, paragraph_text) in paragraph_texts.iter().enumerate() {
+            // Calculate paragraph metadata
+            let content_hash = ContentProcessor::calculate_content_hash(paragraph_text);
+            let estimated_tokens = ContentProcessor::estimate_tokens(paragraph_text);
+            let word_count = ContentProcessor::count_words(paragraph_text);
+            let char_count = ContentProcessor::count_characters(paragraph_text);
+            
+            total_tokens += estimated_tokens;
+            
+            let (byte_offset_start, byte_offset_end) = byte_offsets[index];
+            
+            // Check if paragraph already exists (deduplication)
+            if let Some(existing_paragraph) = database.get_paragraph_by_hash(&content_hash).await? {
+                // Paragraph exists, just create source link
+                let paragraph_source = ParagraphSource {
+                    paragraph_id: existing_paragraph.id,
+                    file_id,
+                    paragraph_index: index as u32,
+                    byte_offset_start: byte_offset_start as u64,
+                    byte_offset_end: byte_offset_end as u64,
+                };
+                
+                database.insert_paragraph_source(&paragraph_source).await?;
+                
+                if self.verbose {
+                    println!("  Deduplicated paragraph {} (hash: {}...)", 
+                        index + 1, &content_hash[..8]);
+                }
+            } else {
+                // Create new unique paragraph
+                let paragraph = Paragraph {
+                    id: ParagraphId::new(),
+                    content_hash: content_hash.clone(),
+                    content: paragraph_text.clone(),
+                    estimated_tokens,
+                    word_count,
+                    char_count,
+                    created_at: chrono::Utc::now(),
+                };
+                
+                // Insert paragraph
+                database.insert_paragraph(&paragraph).await?;
+                
+                // Create source link
+                let paragraph_source = ParagraphSource {
+                    paragraph_id: paragraph.id,
+                    file_id,
+                    paragraph_index: index as u32,
+                    byte_offset_start: byte_offset_start as u64,
+                    byte_offset_end: byte_offset_end as u64,
+                };
+                
+                database.insert_paragraph_source(&paragraph_source).await?;
+                new_paragraphs_count += 1;
+                
+                if self.verbose {
+                    println!("  New paragraph {} (hash: {}..., {} tokens)", 
+                        index + 1, &content_hash[..8], estimated_tokens);
+                }
+            }
+        }
+        
+        // Update file metadata with processing results
+        database.update_file_processing_status(
+            &file_metadata.full_filepath,
+            crate::types::ProcessingStatus::Processed,
+            Some(total_tokens),
+            None,
+        ).await?;
+        
+        if self.verbose {
+            println!("  File processed: {} total paragraphs, {} new, {} deduplicated, {} tokens",
+                total_paragraphs_count, 
+                new_paragraphs_count, 
+                total_paragraphs_count - new_paragraphs_count,
+                total_tokens);
+        }
+        
+        Ok((total_paragraphs_count, total_tokens))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::Database;
+    use crate::extractor::{ExtractionManager, ContentProcessor};
+    use crate::types::{FileMetadata, DuplicateStatus, ProcessingStatus, FileType};
+    use std::fs;
+    use tempfile::TempDir;
+    use chrono::Utc;
+
+    async fn create_test_database() -> Result<Database> {
+        let temp_dir = TempDir::new().map_err(|e| PensieveError::Io(e))?;
+        let db_path = temp_dir.path().join("test.db");
+        let db = Database::new(&db_path).await?;
+        db.initialize_schema().await?;
+        Ok(db)
+    }
+
+    #[tokio::test]
+    async fn test_paragraph_deduplication_integration() {
+        let db = create_test_database().await.unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        
+        // Create test files with duplicate content
+        let file1_path = temp_dir.path().join("file1.txt");
+        let file2_path = temp_dir.path().join("file2.txt");
+        
+        let content1 = "First paragraph with unique content.\n\nShared paragraph content.\n\nAnother unique paragraph.";
+        let content2 = "Different first paragraph.\n\nShared paragraph content.\n\nDifferent last paragraph.";
+        
+        fs::write(&file1_path, content1).unwrap();
+        fs::write(&file2_path, content2).unwrap();
+        
+        // Create file metadata
+        let now = Utc::now();
+        let file1_metadata = FileMetadata {
+            full_filepath: file1_path.clone(),
+            folder_path: temp_dir.path().to_path_buf(),
+            filename: "file1.txt".to_string(),
+            file_extension: Some("txt".to_string()),
+            file_type: FileType::File,
+            size: content1.len() as u64,
+            hash: "hash1".to_string(),
+            creation_date: now,
+            modification_date: now,
+            access_date: now,
+            permissions: 644,
+            depth_level: 0,
+            relative_path: "file1.txt".into(),
+            is_hidden: false,
+            is_symlink: false,
+            symlink_target: None,
+            duplicate_status: DuplicateStatus::Unique,
+            duplicate_group_id: None,
+            processing_status: ProcessingStatus::Pending,
+            estimated_tokens: None,
+            processed_at: None,
+            error_message: None,
+        };
+        
+        let file2_metadata = FileMetadata {
+            full_filepath: file2_path.clone(),
+            folder_path: temp_dir.path().to_path_buf(),
+            filename: "file2.txt".to_string(),
+            file_extension: Some("txt".to_string()),
+            file_type: FileType::File,
+            size: content2.len() as u64,
+            hash: "hash2".to_string(),
+            creation_date: now,
+            modification_date: now,
+            access_date: now,
+            permissions: 644,
+            depth_level: 0,
+            relative_path: "file2.txt".into(),
+            is_hidden: false,
+            is_symlink: false,
+            symlink_target: None,
+            duplicate_status: DuplicateStatus::Unique,
+            duplicate_group_id: None,
+            processing_status: ProcessingStatus::Pending,
+            estimated_tokens: None,
+            processed_at: None,
+            error_message: None,
+        };
+        
+        // Insert files into database
+        db.insert_file(&file1_metadata).await.unwrap();
+        db.insert_file(&file2_metadata).await.unwrap();
+        
+        // Create CLI instance for testing
+        let cli = Cli {
+            input: None,
+            database: None,
+            verbose: false,
+            dry_run: false,
+            force_reprocess: false,
+            config: None,
+            command: None,
+        };
+        
+        // Process both files
+        let extraction_manager = ExtractionManager::new();
+        let content_processor = ContentProcessor;
+        
+        let (paragraphs1, tokens1) = cli.process_file_content(
+            &db,
+            &extraction_manager,
+            &content_processor,
+            &file1_metadata,
+        ).await.unwrap();
+        
+        let (paragraphs2, tokens2) = cli.process_file_content(
+            &db,
+            &extraction_manager,
+            &content_processor,
+            &file2_metadata,
+        ).await.unwrap();
+        
+        // Verify paragraph counts
+        assert_eq!(paragraphs1, 3); // 3 paragraphs in file1
+        assert_eq!(paragraphs2, 3); // 3 paragraphs in file2
+        assert!(tokens1 > 0);
+        assert!(tokens2 > 0);
+        
+        // Get paragraph statistics
+        let paragraph_stats = db.get_paragraph_statistics().await.unwrap();
+        
+        // Should have 6 total paragraph instances but only 5 unique paragraphs
+        // (one shared paragraph between the files)
+        assert_eq!(paragraph_stats.total_paragraph_instances, 6);
+        assert_eq!(paragraph_stats.unique_paragraphs, 5);
+        assert_eq!(paragraph_stats.deduplicated_paragraphs, 1);
+        assert!(paragraph_stats.deduplication_rate > 0.0);
+        assert!(paragraph_stats.total_tokens > 0);
+        
+        // Verify database statistics
+        let stats = db.get_statistics().await.unwrap();
+        assert_eq!(stats.total_paragraphs, 5); // 5 unique paragraphs
+        assert!(stats.total_tokens > 0);
     }
 }
