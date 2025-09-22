@@ -72,7 +72,7 @@ ALL DIAGRAMS WILL BE IN MERMAID ONLY TO ENSURE EASE WITH GITHUB - DO NOT SKIP TH
   - Update file records with token counts after content processing
   - _Requirements: 4.1, 4.2, 4.4_
 
-- [-] 10. Integrate paragraph-level deduplication system
+- [x] 10. Integrate paragraph-level deduplication system
   - Connect existing database paragraph methods with content processing
   - Implement paragraph deduplication logic in main workflow
   - Add paragraph-to-file relationship tracking via paragraph_sources table
@@ -92,7 +92,7 @@ ALL DIAGRAMS WILL BE IN MERMAID ONLY TO ENSURE EASE WITH GITHUB - DO NOT SKIP TH
   - Write final summary report with counts and basic metrics
   - _Requirements: 1.6, 2.2, 5.4_
 
-- [ ] 13. Create integration tests for complete workflows
+- [x] 13. Create integration tests for complete workflows
   - Write end-to-end test with sample directory structure and various file types
   - Test metadata scanning phase with duplicate detection
   - Test content processing phase with paragraph deduplication
@@ -118,7 +118,7 @@ ALL DIAGRAMS WILL BE IN MERMAID ONLY TO ENSURE EASE WITH GITHUB - DO NOT SKIP TH
   - Create README with installation and usage instructions
   - _Requirements: 5.2, 5.3_
 
-- [ ] 17. Complete content processing integration in CLI workflow
+- [x] 17. Complete content processing integration in CLI workflow
   - Add Phase 4 content processing to CLI after metadata storage
   - Integrate ExtractionManager to process unique files only
   - Connect paragraph splitting, deduplication, and storage
@@ -126,9 +126,45 @@ ALL DIAGRAMS WILL BE IN MERMAID ONLY TO ENSURE EASE WITH GITHUB - DO NOT SKIP TH
   - Add content processing progress reporting and statistics
   - _Requirements: 2.1, 4.1, 4.2, 4.3, 4.5_
 
-- [ ] 18. Implement final integration and validation
+- [x] 18. Implement final integration and validation
   - Test complete pipeline with sample directory structures
   - Verify database consistency and proper error handling
   - Test with various file types and duplicate scenarios
   - Validate basic performance and memory usage
   - _Requirements: 5.5, 2.2, 3.1_
+
+- [-] 19. Complete database migration system implementation
+  - Implement MigrationManager struct with version tracking
+  - Add migration methods for schema updates and data transformations
+  - Create migration files for schema evolution
+  - Test migration system with version upgrades
+  - _Requirements: Database schema evolution support_
+
+- [ ] 20. Implement missing CLI subcommands
+  - Complete `pensieve init` command for database initialization
+  - Complete `pensieve check-deps` command for dependency verification
+  - Complete `pensieve config` command for configuration file generation
+  - Add proper error handling and user feedback for all subcommands
+  - _Requirements: 5.1, 5.2, 5.3_
+
+- [ ] 21. Add comprehensive end-to-end integration tests
+  - Create integration test for complete CLI workflow from directory scan to final statistics
+  - Test paragraph-level deduplication across multiple files
+  - Verify database consistency after full processing pipeline
+  - Test error recovery and partial processing scenarios
+  - _Requirements: 1.1, 2.1, 4.1, 4.2, 4.3, 5.1_
+
+- [ ] 22. Create README and documentation
+  - Write comprehensive README with installation instructions
+  - Document CLI usage with examples
+  - Add troubleshooting guide for common issues
+  - Document supported file formats and processing capabilities
+  - _Requirements: 5.2, 5.3_
+
+
+# README UPDATE
+
+- [ ] Update All README and docs with Mermaid diagrams referencing the steering docs
+
+
+- [ ] Run .kiro/tree-with-wc.sh - and use mv commands to clean up the repo, it should look elegant for someone reading it on github

@@ -63,6 +63,39 @@ pub enum Commands {
         #[arg(short, long, value_name = "FILE")]
         database: PathBuf,
     },
+    /// Database migration commands
+    Migrate {
+        /// Database file path
+        #[arg(short, long, value_name = "FILE")]
+        database: PathBuf,
+        
+        /// Migration subcommand
+        #[command(subcommand)]
+        action: MigrateAction,
+    },
+}
+
+/// Migration subcommands
+#[derive(Subcommand, Debug, Clone)]
+pub enum MigrateAction {
+    /// Run all pending migrations
+    Up,
+    /// Show migration status and history
+    Status,
+    /// Rollback to a specific version
+    Rollback {
+        /// Target version to rollback to
+        #[arg(value_name = "VERSION")]
+        version: u32,
+    },
+    /// Validate database schema integrity
+    Validate,
+    /// Reset database (drop all tables and start fresh)
+    Reset {
+        /// Confirm the reset operation
+        #[arg(long)]
+        confirm: bool,
+    },
 }
 
 impl Cli {
@@ -143,7 +176,17 @@ impl Cli {
         match command {
             Commands::Init { database } => {
                 println!("Initializing database at: {}", database.display());
-                // TODO: Implement database initialization
+                
+                // Create database and run initial migration
+                let db = crate::database::Database::new(&database).await?;
+                db.initialize_schema().await?;
+                
+                println!("Database initialized successfully");
+                
+                // Show current schema version
+                let version = db.get_schema_version().await?;
+                println!("Schema version: {}", version);
+                
                 Ok(())
             }
             Commands::CheckDeps => {
@@ -155,6 +198,9 @@ impl Cli {
                 println!("Generating configuration file at: {}", output.display());
                 // TODO: Implement config generation
                 Ok(())
+            }
+            Commands::Migrate { database, action } => {
+                self.run_migration_command(&database, action).await
             }
             Commands::Stats { database } => {
                 println!("Showing statistics for database: {}", database.display());
@@ -458,6 +504,188 @@ impl Cli {
         Ok(())
     }
 
+    /// Run migration commands
+    async fn run_migration_command(&self, database_path: &PathBuf, action: MigrateAction) -> Result<()> {
+        use crate::database::{Database, MigrationManager};
+        
+        // Check if database exists for most operations
+        match action {
+            MigrateAction::Up => {
+                // Create database if it doesn't exist
+                if !database_path.exists() {
+                    println!("Database does not exist, creating: {}", database_path.display());
+                }
+            }
+            _ => {
+                if !database_path.exists() {
+                    return Err(PensieveError::CliArgument(format!(
+                        "Database file does not exist: {}",
+                        database_path.display()
+                    )));
+                }
+            }
+        }
+        
+        let db = Database::new(database_path).await?;
+        let migration_manager = MigrationManager::new(db.clone());
+        
+        match action {
+            MigrateAction::Up => {
+                println!("Running database migrations...");
+                
+                let current_version = migration_manager.get_current_version().await?;
+                let target_version = migration_manager.get_target_version();
+                
+                if current_version >= target_version {
+                    println!("Database is already up to date (version {})", current_version);
+                    return Ok(());
+                }
+                
+                println!("Upgrading from version {} to {}", current_version, target_version);
+                migration_manager.migrate().await?;
+                
+                println!("Migrations completed successfully");
+                
+                // Show final status
+                let final_version = migration_manager.get_current_version().await?;
+                println!("Current schema version: {}", final_version);
+            }
+            
+            MigrateAction::Status => {
+                println!("=== Migration Status ===");
+                
+                let current_version = migration_manager.get_current_version().await?;
+                let target_version = migration_manager.get_target_version();
+                
+                println!("Current version: {}", current_version);
+                println!("Target version: {}", target_version);
+                
+                if current_version < target_version {
+                    println!("Status: {} migrations pending", target_version - current_version);
+                } else if current_version > target_version {
+                    println!("Status: Database is newer than expected (version {})", current_version);
+                } else {
+                    println!("Status: Up to date");
+                }
+                
+                println!("\n=== Migration History ===");
+                let history = migration_manager.get_migration_history().await?;
+                
+                if history.is_empty() {
+                    println!("No migrations applied yet");
+                } else {
+                    for (version, description, applied_at) in history {
+                        println!("Version {}: {} (applied: {})", 
+                            version, 
+                            description, 
+                            applied_at.format("%Y-%m-%d %H:%M:%S UTC"));
+                    }
+                }
+            }
+            
+            MigrateAction::Rollback { version } => {
+                let current_version = migration_manager.get_current_version().await?;
+                
+                if version >= current_version {
+                    println!("Cannot rollback to version {} (current version is {})", version, current_version);
+                    return Ok(());
+                }
+                
+                println!("Rolling back from version {} to {}", current_version, version);
+                println!("WARNING: This operation may result in data loss!");
+                
+                // Confirm rollback
+                print!("Are you sure you want to continue? (y/N): ");
+                use std::io::{self, Write};
+                io::stdout().flush().unwrap();
+                
+                let mut input = String::new();
+                io::stdin().read_line(&mut input).unwrap();
+                
+                if input.trim().to_lowercase() != "y" {
+                    println!("Rollback cancelled");
+                    return Ok(());
+                }
+                
+                migration_manager.rollback_to(version).await?;
+                println!("Rollback completed successfully");
+                
+                let final_version = migration_manager.get_current_version().await?;
+                println!("Current schema version: {}", final_version);
+            }
+            
+            MigrateAction::Validate => {
+                println!("Validating database schema...");
+                
+                let issues = migration_manager.validate_schema().await?;
+                
+                if issues.is_empty() {
+                    println!("✓ Schema validation passed - no issues found");
+                } else {
+                    println!("✗ Schema validation found {} issues:", issues.len());
+                    for (i, issue) in issues.iter().enumerate() {
+                        println!("  {}: {}", i + 1, issue);
+                    }
+                    return Err(PensieveError::Migration(
+                        format!("Schema validation failed with {} issues", issues.len())
+                    ));
+                }
+                
+                // Additional integrity checks
+                println!("Running additional integrity checks...");
+                
+                // Check foreign key constraints
+                let fk_check: Vec<(String, i64, String, i64)> = sqlx::query_as(
+                    "PRAGMA foreign_key_check"
+                )
+                .fetch_all(db.pool())
+                .await
+                .map_err(|e| PensieveError::Database(e))?;
+                
+                if fk_check.is_empty() {
+                    println!("✓ Foreign key constraints are valid");
+                } else {
+                    println!("✗ Foreign key constraint violations found:");
+                    for (table, rowid, parent, fkid) in fk_check {
+                        println!("  Table: {}, Row: {}, Parent: {}, FK: {}", table, rowid, parent, fkid);
+                    }
+                }
+                
+                // Check database integrity
+                let integrity_check: String = sqlx::query_scalar("PRAGMA integrity_check")
+                    .fetch_one(db.pool())
+                    .await
+                    .map_err(|e| PensieveError::Database(e))?;
+                
+                if integrity_check == "ok" {
+                    println!("✓ Database integrity check passed");
+                } else {
+                    println!("✗ Database integrity issues: {}", integrity_check);
+                }
+                
+                println!("Schema validation completed");
+            }
+            
+            MigrateAction::Reset { confirm } => {
+                if !confirm {
+                    println!("WARNING: This will delete ALL data in the database!");
+                    println!("Use --confirm flag to proceed with the reset");
+                    return Ok(());
+                }
+                
+                println!("Resetting database (dropping all tables)...");
+                
+                // Rollback to version 0 (drops all tables)
+                migration_manager.rollback_to(0).await?;
+                
+                println!("Database reset completed");
+                println!("Run 'pensieve migrate up' to recreate the schema");
+            }
+        }
+        
+        Ok(())
+    }
+
     /// Process content for a single file with paragraph-level deduplication
     async fn process_file_content(
         &self,
@@ -616,17 +844,17 @@ mod tests {
     use tempfile::TempDir;
     use chrono::Utc;
 
-    async fn create_test_database() -> Result<Database> {
+    async fn create_test_database() -> Result<(Database, TempDir)> {
         let temp_dir = TempDir::new().map_err(|e| PensieveError::Io(e))?;
         let db_path = temp_dir.path().join("test.db");
         let db = Database::new(&db_path).await?;
         db.initialize_schema().await?;
-        Ok(db)
+        Ok((db, temp_dir))
     }
 
     #[tokio::test]
     async fn test_paragraph_deduplication_integration() {
-        let db = create_test_database().await.unwrap();
+        let (db, _db_temp_dir) = create_test_database().await.unwrap();
         let temp_dir = TempDir::new().unwrap();
         
         // Create test files with duplicate content

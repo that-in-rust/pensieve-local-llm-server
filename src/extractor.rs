@@ -724,10 +724,10 @@ mod tests {
         assert_eq!(paragraphs[1], "Second paragraph here.");
         assert_eq!(paragraphs[2], "Third paragraph after extra newlines.");
         
-        // Test text normalization
+        // Test text normalization (now preserves paragraph boundaries)
         let messy_text = "  Multiple   spaces   and\n\n\nextra\n\nlines  ";
         let normalized = ContentProcessor::normalize_text(messy_text);
-        assert_eq!(normalized, "Multiple spaces and extra lines");
+        assert_eq!(normalized, "Multiple spaces and\n\nextra\n\nlines");
         
         // Test token estimation
         let test_text = "This is a test sentence with exactly eight words.";
