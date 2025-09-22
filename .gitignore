@@ -37,5 +37,14 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Database files (test artifacts)
+*.db
+*.db-shm
+*.db-wal
+
 # Test artifacts
 standalone_test/target/
+
+# Archive folder (for development cleanup)
+zzzzArchive/
