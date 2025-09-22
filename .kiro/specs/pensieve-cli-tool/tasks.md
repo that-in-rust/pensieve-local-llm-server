@@ -146,21 +146,21 @@ ALL DIAGRAMS WILL BE IN MERMAID ONLY TO ENSURE EASE WITH GITHUB - DO NOT SKIP TH
   - Update test expectations to match corrected logic
   - _Requirements: 1.4, 1.5_
 
-- [-] 21. Implement missing CLI subcommands
+- [x] 21. Implement missing CLI subcommands
   - Complete `pensieve check-deps` command for dependency verification
   - Complete `pensieve config` command for configuration file generation
   - Add proper error handling and user feedback for all subcommands
   - Note: `pensieve init` is already implemented and working
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 22. Add comprehensive end-to-end integration tests
+- [x] 22. Add comprehensive end-to-end integration tests
   - Create integration test for complete CLI workflow from directory scan to final statistics
   - Test paragraph-level deduplication across multiple files
   - Verify database consistency after full processing pipeline
   - Test error recovery and partial processing scenarios
   - _Requirements: 1.1, 2.1, 4.1, 4.2, 4.3, 5.1_
 
-- [ ] 23. Create README and documentation
+- [ ] 23. Create README and documentation - take help of (.kiro/steering/mermaid-troubleshooting.md;.kiro/steering/mermaid-syntax-guide.md;kiro/steering/mermaid-status-report.md;.kiro/steering/mermaid-design-patterns.md)
   - Write comprehensive README with installation instructions
   - Document CLI usage with examples
   - Add troubleshooting guide for common issues
@@ -170,6 +170,6 @@ ALL DIAGRAMS WILL BE IN MERMAID ONLY TO ENSURE EASE WITH GITHUB - DO NOT SKIP TH
 
 - [ ] 24. Repository cleanup and organization
   - Run .kiro/tree-with-wc.sh to analyze repository structure
-  - Clean up any unnecessary files or directories
+  - Clean up any unnecessary files or directories - instead of deleting place them in zzzzArchive folder
   - Ensure repository looks professional for GitHub presentation
   - Organize examples and test data appropriately

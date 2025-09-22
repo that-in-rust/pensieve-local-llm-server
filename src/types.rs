@@ -261,3 +261,40 @@ impl std::fmt::Display for FileType {
         }
     }
 }
+
+/// Dependency check information for CLI subcommands
+#[derive(Debug, Clone)]
+pub struct DependencyCheck {
+    /// Name of the dependency
+    pub name: &'static str,
+    /// Description of what this dependency provides
+    pub description: &'static str,
+    /// Type of dependency check to perform
+    pub check_type: DependencyType,
+    /// Whether this dependency is required for basic functionality
+    pub required: bool,
+    /// Current status of the dependency
+    pub status: DependencyStatus,
+}
+
+/// Type of dependency to check
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DependencyType {
+    /// Library or crate dependency
+    Library,
+    /// System access requirement (file system, network, etc.)
+    SystemAccess,
+}
+
+/// Status of a dependency check
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DependencyStatus {
+    /// Dependency is available and working
+    Available,
+    /// Dependency is missing or not accessible
+    Missing,
+    /// Error occurred while checking dependency
+    Error(String),
+    /// Status is unknown or not yet checked
+    Unknown,
+}
