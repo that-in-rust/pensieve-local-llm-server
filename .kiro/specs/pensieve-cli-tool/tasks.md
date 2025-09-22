@@ -48,7 +48,7 @@ ALL DIAGRAMS WILL BE IN MERMAID ONLY TO ENSURE EASE WITH GITHUB - DO NOT SKIP TH
 
 
 
-- [ ] 7. Build native content extraction for all supported formats
+- [x] 7. Build native content extraction for all supported formats
   - Implement text file reader with encoding detection (UTF-8, Latin-1)
   - Create HTML content extractor with basic tag removal
   - Add basic PDF text extraction using native Rust crates
@@ -57,60 +57,76 @@ ALL DIAGRAMS WILL BE IN MERMAID ONLY TO ENSURE EASE WITH GITHUB - DO NOT SKIP TH
   - Write source code reader (treat as plain text)
   - _Requirements: 2.1, 3.1, 3.2, 5.5_
 
-- [ ] 8. Create content processing and paragraph splitting
-  - Implement content splitting by double newlines into paragraphs
-  - Add paragraph hash calculation for deduplication
-  - Create paragraph validation (minimum length, character filtering)
-  - Write basic token count estimation for paragraphs
-  - _Requirements: 4.1, 4.2, 4.4_
-
-- [ ] 9. Build paragraph-level deduplication system
-  - Implement paragraph hash comparison for duplicate detection
-  - Create simple paragraph storage with file references
-  - Add paragraph index tracking within files
-  - Write unique paragraph storage in paragraphs table
+- [ ] 8. Implement missing database methods for paragraph processing
+  - Complete insert_paragraph method with proper SQL insertion
+  - Complete insert_paragraph_source method for file-paragraph relationships
+  - Complete get_paragraph_by_hash method for deduplication checks
+  - Complete insert_error method for processing error tracking
+  - Add batch operations for efficient paragraph storage
   - _Requirements: 4.2, 4.3, 4.5_
 
-- [ ] 10. Implement basic error handling and logging
+- [ ] 9. Integrate content processing and paragraph splitting into main workflow
+  - Integrate existing ContentProcessor into CLI workflow after metadata scanning
+  - Connect content extraction with paragraph splitting and storage
+  - Add paragraph processing to unique files after deduplication
+  - Update file records with token counts after content processing
+  - _Requirements: 4.1, 4.2, 4.4_
+
+- [ ] 10. Integrate paragraph-level deduplication system
+  - Connect existing database paragraph methods with content processing
+  - Implement paragraph deduplication logic in main workflow
+  - Add paragraph-to-file relationship tracking via paragraph_sources table
+  - Ensure only unique paragraphs are stored with proper file references
+  - _Requirements: 4.2, 4.3, 4.5_
+
+- [x] 11. Implement basic error handling and logging
   - Create structured error hierarchy with thiserror for all failure modes
   - Add error recovery logic for non-fatal failures (skip bad files, continue processing)
   - Implement error logging to both console and database
   - Write basic progress reporting with file and paragraph counts
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 5.4_
 
-- [ ] 11. Add basic progress reporting and statistics
+- [x] 12. Add basic progress reporting and statistics
   - Implement simple progress indicators for both scanning and processing phases
   - Create processing statistics (files processed, paragraphs stored, duplicates found)
   - Write final summary report with counts and basic metrics
   - _Requirements: 1.6, 2.2, 5.4_
 
-- [ ] 12. Create integration tests for complete workflows
+- [ ] 13. Create integration tests for complete workflows
   - Write end-to-end test with sample directory structure and various file types
   - Test metadata scanning phase with duplicate detection
   - Test content processing phase with paragraph deduplication
   - Verify database consistency and proper error handling
   - _Requirements: 1.1, 2.1, 4.1, 5.1_
 
-- [ ] 13. Add basic performance optimization
+- [x] 14. Add basic performance optimization
   - Implement batch database operations for improved throughput
   - Add basic memory management for large files
   - Optimize parallel processing for directory traversal
   - _Requirements: 5.5, 2.2_
 
-- [ ] 14. Add unit tests for core components
+- [x] 15. Add unit tests for core components
   - Test file type detection with various file samples and edge cases
   - Test hash calculation consistency and performance
   - Test content extraction for each supported format with sample files
   - Test deduplication logic with various duplicate scenarios
   - _Requirements: 1.2, 1.3, 4.2, 4.3_
 
-- [ ] 15. Create command-line help and documentation
+- [x] 16. Create command-line help and documentation
   - Implement basic --help output with usage instructions
   - Add clear error messages for common issues
   - Create README with installation and usage instructions
   - _Requirements: 5.2, 5.3_
 
-- [ ] 16. Implement final integration and validation
+- [ ] 17. Complete content processing integration in CLI workflow
+  - Add Phase 4 content processing to CLI after metadata storage
+  - Integrate ExtractionManager to process unique files only
+  - Connect paragraph splitting, deduplication, and storage
+  - Update file records with token counts and processing status
+  - Add content processing progress reporting and statistics
+  - _Requirements: 2.1, 4.1, 4.2, 4.3, 4.5_
+
+- [ ] 18. Implement final integration and validation
   - Test complete pipeline with sample directory structures
   - Verify database consistency and proper error handling
   - Test with various file types and duplicate scenarios
