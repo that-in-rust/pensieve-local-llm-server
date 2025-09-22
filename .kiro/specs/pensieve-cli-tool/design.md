@@ -64,11 +64,11 @@ The system follows a layered architecture with clear separation of concerns:
    - Queue only changed files for content processing
 
 4. **Content Extraction Phase**
-   - Process only unique, changed files
+   - Process only unique, changed files (Requirements 2.1)
    - Extract text using native parsers or external tools
-   - Apply intelligent chunking strategies (recursive character splitting, structure-aware splitting)
-   - Perform global deduplication with provenance tracking
-   - Store unique chunks with complete source file references
+   - Split content into paragraphs by double newlines (Requirements 4.1)
+   - Perform paragraph-level deduplication (Requirements 4.2, 4.3)
+   - Store unique paragraphs with file references
 
 ## Components and Interfaces
 
@@ -184,10 +184,10 @@ pub struct HtmlExtractor {
 
 ### Database Schema Design
 
-The database schema supports the complete workflow with proper relationships and indexing. The design has evolved from simple paragraph-based chunking to intelligent chunk-based processing with precise tokenization:
+The database schema supports the complete workflow with proper relationships and indexing, following the requirements for simple paragraph-based processing:
 
 ```sql
--- File metadata with comprehensive tracking
+-- File metadata with comprehensive tracking (Requirements 1.7)
 CREATE TABLE files (
     file_id INTEGER PRIMARY KEY AUTOINCREMENT,
     full_filepath TEXT NOT NULL UNIQUE,
@@ -210,34 +210,21 @@ CREATE TABLE files (
     duplicate_group_id TEXT,
     processing_status TEXT NOT NULL DEFAULT 'pending' 
         CHECK(processing_status IN ('pending', 'processed', 'error', 'skipped_binary', 'skipped_dependency', 'deleted')),
-    estimated_tokens INTEGER,
+    estimated_tokens INTEGER, -- Updated after content processing (Requirements 2.4)
     processed_at TIMESTAMP,
     error_message TEXT,
     mime_type TEXT -- From MIME sniffing for robust file type detection
 );
 
--- Unique content chunks with precise tokenization
-CREATE TABLE chunks (
-    chunk_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    content_hash TEXT NOT NULL UNIQUE, -- SHA-256 of chunk content
-    content TEXT NOT NULL,
-    estimated_tokens INTEGER NOT NULL,
-    tokenizer_model TEXT NOT NULL, -- e.g., 'cl100k_base'
-    word_count INTEGER NOT NULL,
-    char_count INTEGER NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Many-to-many relationship between chunks and source files with provenance
-CREATE TABLE chunk_sources (
-    chunk_id INTEGER NOT NULL,
+-- Simple paragraph storage linked to files (Requirements 2.3, 4.3)
+CREATE TABLE paragraphs (
+    paragraph_id INTEGER PRIMARY KEY AUTOINCREMENT,
     file_id INTEGER NOT NULL,
-    start_index INTEGER NOT NULL, -- Byte offset start
-    end_index INTEGER NOT NULL,   -- Byte offset end
-    chunking_strategy TEXT NOT NULL, -- e.g., 'Recursive_512_50' or 'Markdown_Aware'
-    chunk_index INTEGER NOT NULL, -- Position within the file
-    PRIMARY KEY (chunk_id, file_id, start_index),
-    FOREIGN KEY (chunk_id) REFERENCES chunks(chunk_id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    content_hash TEXT NOT NULL, -- SHA-256 for deduplication (Requirements 4.2)
+    paragraph_index INTEGER NOT NULL, -- Position within the file
+    estimated_tokens INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (file_id) REFERENCES files(file_id) ON DELETE CASCADE
 );
 
@@ -258,76 +245,76 @@ CREATE INDEX idx_files_duplicate_group ON files(duplicate_group_id);
 CREATE INDEX idx_files_processing_status ON files(processing_status);
 CREATE INDEX idx_files_modification_date ON files(modification_date);
 CREATE INDEX idx_files_mime_type ON files(mime_type);
-CREATE INDEX idx_chunks_hash ON chunks(content_hash);
-CREATE INDEX idx_chunks_tokenizer ON chunks(tokenizer_model);
-CREATE INDEX idx_chunk_sources_file ON chunk_sources(file_id);
-CREATE INDEX idx_chunk_sources_strategy ON chunk_sources(chunking_strategy);
+CREATE INDEX idx_paragraphs_hash ON paragraphs(content_hash);
+CREATE INDEX idx_paragraphs_file ON paragraphs(file_id);
 ```
 
-## Intelligent Chunking System
+## Simple Paragraph Processing System
 
-### Chunking Strategy Evolution
+### Content Splitting Strategy
 
-The system has evolved from simple paragraph-based splitting to intelligent, context-aware chunking:
+Following the MVP requirements, the system implements simple paragraph-based content processing:
 
-**Legacy Approach (Requirements 4.1)**:
-- Split content by double newlines (paragraph boundaries)
-- Simple but may not respect document structure
+**Paragraph Splitting (Requirements 4.1)**:
+- Split content by double newlines (`\n\n`) to identify paragraph boundaries
+- Each paragraph becomes a separate record in the paragraphs table
+- Simple and reliable approach suitable for most text content
 
-**Enhanced Approach (Requirements FR 4.1)**:
-- **Recursive Character Splitting**: Default strategy for most content
-- **Structure-Aware Splitting**: For structured content (Markdown, HTML)
-- **Token-Based Sizing**: Precise tokenization using specified tokenizer model
+**Deduplication Strategy (Requirements 4.2, 4.3)**:
+- Calculate SHA-256 hash for each paragraph
+- Skip paragraphs that already exist in the database
+- Store only unique paragraphs with file reference for traceability
 
-### Chunking Strategies
-
-```rust
-#[derive(Debug, Clone)]
-pub enum ChunkingStrategy {
-    Paragraph,                    // Legacy: split by double newlines
-    RecursiveCharacter {          // Default: recursive splitting
-        chunk_size: usize,        // Target size in tokens
-        chunk_overlap: usize,     // Overlap between chunks
-    },
-    StructureAware {              // For structured content
-        respect_headings: bool,   // Split at section boundaries
-        preserve_lists: bool,     // Keep lists intact
-        preserve_tables: bool,    // Keep tables intact
-    },
-    Custom(String),               // User-defined strategy
-}
-
-#[derive(Debug, Clone)]
-pub struct ChunkingConfig {
-    pub strategy: ChunkingStrategy,
-    pub tokenizer_model: String,  // e.g., "cl100k_base"
-    pub max_chunk_size: usize,    // Maximum tokens per chunk
-    pub min_chunk_size: usize,    // Minimum tokens per chunk
-    pub overlap_size: usize,      // Overlap between chunks
-}
-```
-
-### Tokenization Integration
+### Content Processing Interface
 
 ```rust
-pub trait Tokenizer: Send + Sync {
-    fn count_tokens(&self, text: &str) -> Result<usize, TokenizerError>;
-    fn model_name(&self) -> &str;
+// Simple paragraph processor
+pub struct ParagraphProcessor {
+    min_paragraph_length: usize,
+    max_paragraph_length: usize,
 }
 
-pub struct TikTokenizer {
-    model: String,
-    // tiktoken integration
-}
-
-impl Tokenizer for TikTokenizer {
-    fn count_tokens(&self, text: &str) -> Result<usize, TokenizerError> {
-        // Precise token counting using tiktoken
-        todo!()
+impl ParagraphProcessor {
+    pub fn new() -> Self {
+        Self {
+            min_paragraph_length: 10,   // Skip very short paragraphs
+            max_paragraph_length: 10000, // Split very long paragraphs
+        }
     }
     
-    fn model_name(&self) -> &str {
-        &self.model
+    pub fn split_content(&self, content: &str) -> Vec<String> {
+        content
+            .split("\n\n")
+            .map(|p| p.trim())
+            .filter(|p| !p.is_empty() && p.len() >= self.min_paragraph_length)
+            .map(|p| p.to_string())
+            .collect()
+    }
+    
+    pub fn calculate_hash(&self, content: &str) -> String {
+        use sha2::{Sha256, Digest};
+        let mut hasher = Sha256::new();
+        hasher.update(content.as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
+}
+```
+
+### Token Estimation
+
+```rust
+// Simple token estimation for paragraph content
+pub struct TokenEstimator;
+
+impl TokenEstimator {
+    pub fn estimate_tokens(&self, text: &str) -> usize {
+        // Simple estimation: ~4 characters per token for English text
+        // This is a rough approximation suitable for MVP
+        (text.len() as f64 / 4.0).ceil() as usize
+    }
+    
+    pub fn estimate_words(&self, text: &str) -> usize {
+        text.split_whitespace().count()
     }
 }
 ```
@@ -355,13 +342,12 @@ The system processes files through a well-defined pipeline:
 - Subsequent occurrences marked as "duplicate" with group ID
 - Only canonical files proceed to content processing
 
-**Content-Level Deduplication (Global M:N Model)**:
-- Apply intelligent chunking strategies based on content type
-- Calculate SHA-256 hash for each chunk
-- Store unique chunks once in chunks table with precise tokenization
-- Track all source locations in chunk_sources junction table with provenance
-- Support multiple chunking strategies: Recursive Character Splitting, Structure-Aware Splitting
-- Enable traceability from any chunk back to all source files and locations
+**Content-Level Deduplication (Simple Paragraph Model)**:
+- Split content by double newlines into paragraphs (Requirements 4.1)
+- Calculate SHA-256 hash for each paragraph
+- Skip duplicate paragraphs during processing (Requirements 4.2)
+- Store unique paragraphs once in paragraphs table with file reference (Requirements 4.3)
+- Enable traceability from any paragraph back to source file
 
 ### External Tool Integration
 
@@ -673,23 +659,23 @@ fn test_memory_usage_bounds() {
 
 **Trade-offs**: Slightly slower than non-cryptographic hashes, but negligible for file sizes involved
 
-### 5. Intelligent Chunking with Precise Tokenization
+### 5. Simple Paragraph-Based Processing
 
-**Decision**: Implement multiple chunking strategies with precise tokenization
+**Decision**: Implement simple paragraph splitting by double newlines for MVP
 
 **Rationale**:
-- **Flexibility**: Different content types benefit from different chunking approaches
-- **Precision**: Token-based sizing ensures optimal LLM context utilization
-- **Structure Preservation**: Structure-aware splitting maintains document semantics
-- **Backward Compatibility**: Paragraph-based splitting remains available as legacy option
+- **Simplicity**: Easy to understand and implement for MVP requirements
+- **Reliability**: Double newline splitting is predictable and works across content types
+- **Performance**: Fast processing without complex tokenization overhead
+- **MVP Focus**: Meets requirements without over-engineering for initial version
 
 **Implementation**:
-- **Default Strategy**: Recursive Character Splitting with configurable chunk size and overlap
-- **Structured Content**: Structure-Aware Splitting for Markdown, HTML with preserved headings
-- **Precise Tokenization**: Integration with tiktoken library for exact token counting
-- **Configurable**: Users can specify tokenizer model (cl100k_base, etc.)
+- **Single Strategy**: Split content by double newlines (`\n\n`) (Requirements 4.1)
+- **Simple Deduplication**: SHA-256 hash comparison for duplicate detection (Requirements 4.2)
+- **Basic Token Estimation**: Simple character-based estimation (~4 chars per token)
+- **File Traceability**: Each paragraph linked to source file (Requirements 4.3)
 
-**Trade-offs**: Increased complexity but significantly better LLM compatibility and content quality
+**Trade-offs**: Less sophisticated than advanced chunking but sufficient for MVP and easier to implement correctly
 
 ### 6. Incremental Processing with Delta Detection
 
@@ -721,22 +707,22 @@ fn test_memory_usage_bounds() {
 
 **Trade-offs**: Requires configuration management but provides maximum flexibility and user control
 
-### 8. Global Deduplication with Many-to-Many Provenance Model
+### 8. Simple Paragraph Deduplication Model
 
-**Decision**: Implement M:N relationship between chunks and source files
+**Decision**: Implement simple paragraph storage with file references
 
 **Rationale**:
-- **Complete Provenance**: Track all source locations for every unique chunk
-- **Space Efficiency**: Store each unique chunk only once regardless of source count
-- **Traceability**: Enable queries to find all sources of any given content
-- **Analytics**: Support deduplication analysis and content overlap reporting
+- **MVP Simplicity**: Direct relationship between paragraphs and files is easier to understand
+- **Requirements Compliance**: Matches the specified paragraphs table structure (Requirements 2.3)
+- **Sufficient Traceability**: Each paragraph knows its source file for LLM processing (Requirements 4.5)
+- **Performance**: Simple schema reduces complexity and improves query performance
 
 **Implementation**:
-- **Chunks Table**: Stores unique content with precise token counts
-- **Junction Table**: `chunk_sources` links chunks to files with byte offsets
-- **Chunking Strategy Tracking**: Record which strategy was used for each chunk
-- **Provenance Queries**: Enable finding all sources of duplicate content
+- **Paragraphs Table**: Stores unique paragraphs with file references
+- **Direct Relationship**: Each paragraph belongs to exactly one file
+- **Hash-Based Deduplication**: Skip paragraphs with duplicate content hashes
+- **Source Tracking**: Maintain file_id and paragraph_index for traceability
 
-**Trade-offs**: More complex data model but essential for comprehensive content analysis
+**Trade-offs**: Less sophisticated than M:N model but meets MVP requirements and is much simpler to implement
 
-This design provides a robust, performant, and maintainable foundation for the Pensieve CLI tool while addressing all requirements specified in the requirements document. The evolution from simple paragraph-based processing to intelligent chunking with precise tokenization ensures optimal LLM compatibility while maintaining complete traceability and efficient deduplication.
+This design provides a robust, performant, and maintainable foundation for the Pensieve CLI tool while addressing all requirements specified in the requirements document. The focus on simple paragraph-based processing ensures the MVP can be delivered quickly while still providing effective deduplication and LLM-ready content organization.
