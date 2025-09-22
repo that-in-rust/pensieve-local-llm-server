@@ -5,6 +5,7 @@ use crate::types::{FileMetadata, DuplicateStatus};
 use crate::database::Database;
 use std::collections::HashMap;
 use uuid::Uuid;
+use chrono::{DateTime, Utc};
 
 /// Service for handling file-level deduplication
 pub struct DeduplicationService {
@@ -243,6 +244,19 @@ impl DeduplicationService {
                 _ => crate::types::FileType::File,
             };
             
+            // Convert NaiveDateTime to DateTime<Utc>
+            let creation_date = row.creation_date
+                .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
+                .unwrap_or_else(|| chrono::Utc::now());
+            let modification_date = row.modification_date
+                .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
+                .unwrap_or_else(|| chrono::Utc::now());
+            let access_date = row.access_date
+                .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
+                .unwrap_or_else(|| chrono::Utc::now());
+            let processed_at = row.processed_at
+                .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
+
             let metadata = FileMetadata {
                 full_filepath: std::path::PathBuf::from(row.full_filepath),
                 folder_path: std::path::PathBuf::from(row.folder_path),
@@ -251,20 +265,20 @@ impl DeduplicationService {
                 file_type,
                 size: row.size as u64,
                 hash: row.hash,
-                creation_date: row.creation_date.unwrap_or_else(|| chrono::Utc::now()),
-                modification_date: row.modification_date.unwrap_or_else(|| chrono::Utc::now()),
-                access_date: row.access_date.unwrap_or_else(|| chrono::Utc::now()),
-                permissions: row.permissions as u32,
+                creation_date,
+                modification_date,
+                access_date,
+                permissions: row.permissions.unwrap_or(0) as u32,
                 depth_level: row.depth_level as u32,
                 relative_path: std::path::PathBuf::from(row.relative_path),
                 is_hidden: row.is_hidden,
                 is_symlink: row.is_symlink,
                 symlink_target: row.symlink_target.map(std::path::PathBuf::from),
                 duplicate_status,
-                duplicate_group_id: row.duplicate_group_id.and_then(|s| Uuid::parse_str(s).ok()),
+                duplicate_group_id: row.duplicate_group_id.as_ref().and_then(|s| Uuid::parse_str(s).ok()),
                 processing_status,
                 estimated_tokens: row.estimated_tokens.map(|t| t as u32),
-                processed_at: row.processed_at,
+                processed_at,
                 error_message: row.error_message,
             };
             
@@ -276,7 +290,7 @@ impl DeduplicationService {
 
     /// List all duplicate groups with summary information
     pub async fn list_duplicate_groups(&self) -> Result<Vec<DuplicateGroupSummary>> {
-        let rows = sqlx::query!(
+        let rows = sqlx::query_as::<_, (Option<String>, i64, i64, String, String)>(
             r#"
             SELECT 
                 duplicate_group_id,
@@ -296,15 +310,15 @@ impl DeduplicationService {
         .map_err(|e| PensieveError::Database(e))?;
         
         let mut groups = Vec::new();
-        for row in rows {
-            if let Some(group_id_str) = row.duplicate_group_id {
-                if let Ok(group_id) = Uuid::parse_str(group_id_str) {
+        for (group_id_str, file_count, total_size, canonical_path, hash) in rows {
+            if let Some(group_id_str) = group_id_str {
+                if let Ok(group_id) = Uuid::parse_str(&group_id_str) {
                     let summary = DuplicateGroupSummary {
                         group_id,
-                        file_count: row.file_count as u32,
-                        total_size: row.total_size as u64,
-                        canonical_path: std::path::PathBuf::from(row.canonical_path),
-                        hash: row.hash,
+                        file_count: file_count as u32,
+                        total_size: total_size as u64,
+                        canonical_path: std::path::PathBuf::from(canonical_path),
+                        hash,
                     };
                     groups.push(summary);
                 }

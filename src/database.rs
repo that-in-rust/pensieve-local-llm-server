@@ -346,6 +346,19 @@ impl Database {
 
     /// Update file metadata
     pub async fn update_file(&self, metadata: &FileMetadata) -> Result<()> {
+        let folder_path = metadata.folder_path.to_string_lossy().to_string();
+        let file_type = metadata.file_type.to_string();
+        let size = metadata.size as i64;
+        let permissions = metadata.permissions as i64;
+        let depth_level = metadata.depth_level as i64;
+        let relative_path = metadata.relative_path.to_string_lossy().to_string();
+        let symlink_target = metadata.symlink_target.as_ref().map(|p| p.to_string_lossy().to_string());
+        let duplicate_status = metadata.duplicate_status.to_string();
+        let duplicate_group_id = metadata.duplicate_group_id.map(|id| id.to_string());
+        let processing_status = metadata.processing_status.to_string();
+        let estimated_tokens = metadata.estimated_tokens.map(|t| t as i64);
+        let full_filepath = metadata.full_filepath.to_string_lossy().to_string();
+        
         sqlx::query!(
             r#"
             UPDATE files SET
@@ -357,28 +370,28 @@ impl Database {
                 updated_at = CURRENT_TIMESTAMP
             WHERE full_filepath = ?
             "#,
-            metadata.folder_path.to_string_lossy(),
+            folder_path,
             metadata.filename,
             metadata.file_extension,
-            metadata.file_type.to_string(),
-            metadata.size as i64,
+            file_type,
+            size,
             metadata.hash,
             metadata.creation_date,
             metadata.modification_date,
             metadata.access_date,
-            metadata.permissions as i64,
-            metadata.depth_level as i64,
-            metadata.relative_path.to_string_lossy(),
+            permissions,
+            depth_level,
+            relative_path,
             metadata.is_hidden,
             metadata.is_symlink,
-            metadata.symlink_target.as_ref().map(|p| p.to_string_lossy().to_string()),
-            metadata.duplicate_status.to_string(),
-            metadata.duplicate_group_id.map(|id| id.to_string()),
-            metadata.processing_status.to_string(),
-            metadata.estimated_tokens.map(|t| t as i64),
+            symlink_target,
+            duplicate_status,
+            duplicate_group_id,
+            processing_status,
+            estimated_tokens,
             metadata.processed_at,
             metadata.error_message,
-            metadata.full_filepath.to_string_lossy()
+            full_filepath
         )
         .execute(&self.pool)
         .await
@@ -389,7 +402,7 @@ impl Database {
 
     /// Get file by path
     pub async fn get_file_by_path(&self, path: &Path) -> Result<Option<FileMetadata>> {
-        let path_str = path.to_string_lossy();
+        let path_str = path.to_string_lossy().to_string();
         
         let row = sqlx::query!(
             r#"
@@ -431,6 +444,19 @@ impl Database {
                 _ => FileType::File,
             };
             
+            // Convert NaiveDateTime to DateTime<Utc>
+            let creation_date = row.creation_date
+                .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
+                .unwrap_or_else(|| chrono::Utc::now());
+            let modification_date = row.modification_date
+                .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
+                .unwrap_or_else(|| chrono::Utc::now());
+            let access_date = row.access_date
+                .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
+                .unwrap_or_else(|| chrono::Utc::now());
+            let processed_at = row.processed_at
+                .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
+            
             let metadata = FileMetadata {
                 full_filepath: PathBuf::from(row.full_filepath),
                 folder_path: PathBuf::from(row.folder_path),
@@ -439,20 +465,20 @@ impl Database {
                 file_type,
                 size: row.size as u64,
                 hash: row.hash,
-                creation_date: row.creation_date.unwrap_or_else(|| chrono::Utc::now()),
-                modification_date: row.modification_date.unwrap_or_else(|| chrono::Utc::now()),
-                access_date: row.access_date.unwrap_or_else(|| chrono::Utc::now()),
-                permissions: row.permissions as u32,
+                creation_date,
+                modification_date,
+                access_date,
+                permissions: row.permissions.unwrap_or(0) as u32,
                 depth_level: row.depth_level as u32,
                 relative_path: PathBuf::from(row.relative_path),
                 is_hidden: row.is_hidden,
                 is_symlink: row.is_symlink,
                 symlink_target: row.symlink_target.map(PathBuf::from),
                 duplicate_status,
-                duplicate_group_id: row.duplicate_group_id.and_then(|s| uuid::Uuid::parse_str(s).ok()),
+                duplicate_group_id: row.duplicate_group_id.as_ref().and_then(|s| uuid::Uuid::parse_str(s).ok()),
                 processing_status,
                 estimated_tokens: row.estimated_tokens.map(|t| t as u32),
-                processed_at: row.processed_at,
+                processed_at,
                 error_message: row.error_message,
             };
             
@@ -537,7 +563,9 @@ impl Database {
         .map_err(|e| PensieveError::Database(e))?;
         
         if let Some(row) = row {
-            let paragraph_id = uuid::Uuid::parse_str(&row.paragraph_id)
+            let paragraph_id_str = row.paragraph_id.ok_or_else(|| 
+                PensieveError::InvalidData("Paragraph ID is null".to_string()))?;
+            let paragraph_id = uuid::Uuid::parse_str(&paragraph_id_str)
                 .map_err(|e| PensieveError::InvalidData(format!("Invalid paragraph ID: {}", e)))?;
             
             // Convert NaiveDateTime to DateTime<Utc>
@@ -633,8 +661,8 @@ impl Database {
             .map_err(|e| PensieveError::Database(e))?
             .unwrap_or(0);
         
-        // Get files by status
-        let status_rows = sqlx::query!(
+        // Get files by status using raw query to avoid type issues
+        let status_rows = sqlx::query_as::<_, (String, i64)>(
             "SELECT processing_status, COUNT(*) as count FROM files GROUP BY processing_status"
         )
         .fetch_all(&self.pool)
@@ -642,8 +670,8 @@ impl Database {
         .map_err(|e| PensieveError::Database(e))?;
         
         let mut files_by_status = std::collections::HashMap::new();
-        for row in status_rows {
-            files_by_status.insert(row.processing_status, row.count as u64);
+        for (status, count) in status_rows {
+            files_by_status.insert(status, count as u64);
         }
         
         Ok(DatabaseStatistics {
@@ -673,6 +701,18 @@ impl Database {
         
         for metadata in files {
             let file_id = uuid::Uuid::new_v4().to_string();
+            let full_filepath = metadata.full_filepath.to_string_lossy().to_string();
+            let folder_path = metadata.folder_path.to_string_lossy().to_string();
+            let file_type = metadata.file_type.to_string();
+            let size = metadata.size as i64;
+            let permissions = metadata.permissions as i64;
+            let depth_level = metadata.depth_level as i64;
+            let relative_path = metadata.relative_path.to_string_lossy().to_string();
+            let symlink_target = metadata.symlink_target.as_ref().map(|p| p.to_string_lossy().to_string());
+            let duplicate_status = metadata.duplicate_status.to_string();
+            let duplicate_group_id = metadata.duplicate_group_id.map(|id| id.to_string());
+            let processing_status = metadata.processing_status.to_string();
+            let estimated_tokens = metadata.estimated_tokens.map(|t| t as i64);
             
             sqlx::query!(
                 r#"
@@ -687,26 +727,26 @@ impl Database {
                 )
                 "#,
                 file_id,
-                metadata.full_filepath.to_string_lossy(),
-                metadata.folder_path.to_string_lossy(),
+                full_filepath,
+                folder_path,
                 metadata.filename,
                 metadata.file_extension,
-                metadata.file_type.to_string(),
-                metadata.size as i64,
+                file_type,
+                size,
                 metadata.hash,
                 metadata.creation_date,
                 metadata.modification_date,
                 metadata.access_date,
-                metadata.permissions as i64,
-                metadata.depth_level as i64,
-                metadata.relative_path.to_string_lossy(),
+                permissions,
+                depth_level,
+                relative_path,
                 metadata.is_hidden,
                 metadata.is_symlink,
-                metadata.symlink_target.as_ref().map(|p| p.to_string_lossy().to_string()),
-                metadata.duplicate_status.to_string(),
-                metadata.duplicate_group_id.map(|id| id.to_string()),
-                metadata.processing_status.to_string(),
-                metadata.estimated_tokens.map(|t| t as i64),
+                symlink_target,
+                duplicate_status,
+                duplicate_group_id,
+                processing_status,
+                estimated_tokens,
                 metadata.processed_at,
                 metadata.error_message
             )
@@ -875,6 +915,19 @@ impl Database {
                 _ => FileType::File,
             };
             
+            // Convert NaiveDateTime to DateTime<Utc>
+            let creation_date = row.creation_date
+                .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
+                .unwrap_or_else(|| chrono::Utc::now());
+            let modification_date = row.modification_date
+                .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
+                .unwrap_or_else(|| chrono::Utc::now());
+            let access_date = row.access_date
+                .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
+                .unwrap_or_else(|| chrono::Utc::now());
+            let processed_at = row.processed_at
+                .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
+            
             let metadata = FileMetadata {
                 full_filepath: PathBuf::from(row.full_filepath),
                 folder_path: PathBuf::from(row.folder_path),
@@ -883,20 +936,20 @@ impl Database {
                 file_type,
                 size: row.size as u64,
                 hash: row.hash,
-                creation_date: row.creation_date.unwrap_or_else(|| chrono::Utc::now()),
-                modification_date: row.modification_date.unwrap_or_else(|| chrono::Utc::now()),
-                access_date: row.access_date.unwrap_or_else(|| chrono::Utc::now()),
-                permissions: row.permissions as u32,
+                creation_date,
+                modification_date,
+                access_date,
+                permissions: row.permissions.unwrap_or(0) as u32,
                 depth_level: row.depth_level as u32,
                 relative_path: PathBuf::from(row.relative_path),
                 is_hidden: row.is_hidden,
                 is_symlink: row.is_symlink,
                 symlink_target: row.symlink_target.map(PathBuf::from),
                 duplicate_status,
-                duplicate_group_id: row.duplicate_group_id.and_then(|s| uuid::Uuid::parse_str(s).ok()),
+                duplicate_group_id: row.duplicate_group_id.as_ref().and_then(|s| uuid::Uuid::parse_str(s).ok()),
                 processing_status,
                 estimated_tokens: row.estimated_tokens.map(|t| t as u32),
-                processed_at: row.processed_at,
+                processed_at,
                 error_message: row.error_message,
             };
             
@@ -1360,5 +1413,155 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(table_count_after, 0);
+    }
+
+    #[tokio::test]
+    async fn test_paragraph_processing_methods() {
+        use crate::types::{Paragraph, ParagraphId, ParagraphSource, FileId, ProcessingError};
+        use chrono::Utc;
+        use uuid::Uuid;
+        
+        let (db, _temp_file) = create_test_database().await.unwrap();
+        db.initialize_schema().await.unwrap();
+        
+        // Test insert_paragraph
+        let paragraph = Paragraph {
+            id: ParagraphId(Uuid::new_v4()),
+            content_hash: "test_hash_123".to_string(),
+            content: "This is a test paragraph content.".to_string(),
+            estimated_tokens: 8,
+            word_count: 6,
+            char_count: 33,
+            created_at: Utc::now(),
+        };
+        
+        db.insert_paragraph(&paragraph).await.unwrap();
+        
+        // Test get_paragraph_by_hash
+        let retrieved = db.get_paragraph_by_hash("test_hash_123").await.unwrap();
+        assert!(retrieved.is_some());
+        let retrieved_paragraph = retrieved.unwrap();
+        assert_eq!(retrieved_paragraph.content_hash, "test_hash_123");
+        assert_eq!(retrieved_paragraph.content, "This is a test paragraph content.");
+        assert_eq!(retrieved_paragraph.estimated_tokens, 8);
+        
+        // Test deduplication - inserting same hash should not create duplicate
+        let duplicate_paragraph = Paragraph {
+            id: ParagraphId(Uuid::new_v4()),
+            content_hash: "test_hash_123".to_string(), // Same hash
+            content: "Different content but same hash".to_string(),
+            estimated_tokens: 10,
+            word_count: 5,
+            char_count: 32,
+            created_at: Utc::now(),
+        };
+        
+        db.insert_paragraph(&duplicate_paragraph).await.unwrap();
+        
+        // Should still return the original paragraph
+        let retrieved_again = db.get_paragraph_by_hash("test_hash_123").await.unwrap();
+        assert!(retrieved_again.is_some());
+        let retrieved_paragraph_again = retrieved_again.unwrap();
+        assert_eq!(retrieved_paragraph_again.content, "This is a test paragraph content."); // Original content
+        
+        // Test insert_paragraph_source - first need to create a file
+        let file_id = FileId(Uuid::new_v4());
+        let file_id_str = file_id.0.to_string();
+        let now = Utc::now();
+        
+        // Insert a test file directly with specific ID to satisfy foreign key constraint
+        sqlx::query!(
+            r#"
+            INSERT INTO files (
+                file_id, full_filepath, folder_path, filename, file_extension, file_type,
+                size, hash, creation_date, modification_date, access_date, permissions,
+                depth_level, relative_path, is_hidden, is_symlink, symlink_target,
+                duplicate_status, duplicate_group_id, processing_status, estimated_tokens,
+                processed_at, error_message
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
+            "#,
+            file_id_str,
+            "/test/file.txt",
+            "/test",
+            "file.txt",
+            "txt",
+            "file",
+            100i64,
+            "test_file_hash",
+            now,
+            now,
+            now,
+            644i64,
+            1i64,
+            "file.txt",
+            false,
+            false,
+            None::<String>,
+            "unique",
+            None::<String>,
+            "pending",
+            None::<i64>,
+            None::<chrono::DateTime<Utc>>,
+            None::<String>
+        )
+        .execute(&db.pool)
+        .await
+        .unwrap();
+        
+        let paragraph_source = ParagraphSource {
+            paragraph_id: paragraph.id,
+            file_id,
+            paragraph_index: 0,
+            byte_offset_start: 0,
+            byte_offset_end: 33,
+        };
+        
+        db.insert_paragraph_source(&paragraph_source).await.unwrap();
+        
+        // Test insert_error
+        let processing_error = ProcessingError {
+            id: Uuid::new_v4(),
+            file_id: Some(file_id),
+            error_type: "TestError".to_string(),
+            error_message: "This is a test error message".to_string(),
+            stack_trace: Some("test stack trace".to_string()),
+            occurred_at: Utc::now(),
+        };
+        
+        db.insert_error(&processing_error).await.unwrap();
+        
+        // Test batch operations
+        let batch_paragraphs = vec![
+            Paragraph {
+                id: ParagraphId(Uuid::new_v4()),
+                content_hash: "batch_hash_1".to_string(),
+                content: "Batch paragraph 1".to_string(),
+                estimated_tokens: 3,
+                word_count: 3,
+                char_count: 17,
+                created_at: Utc::now(),
+            },
+            Paragraph {
+                id: ParagraphId(Uuid::new_v4()),
+                content_hash: "batch_hash_2".to_string(),
+                content: "Batch paragraph 2".to_string(),
+                estimated_tokens: 3,
+                word_count: 3,
+                char_count: 17,
+                created_at: Utc::now(),
+            },
+        ];
+        
+        db.insert_paragraphs_batch(&batch_paragraphs).await.unwrap();
+        
+        // Verify batch inserts worked
+        let batch_1 = db.get_paragraph_by_hash("batch_hash_1").await.unwrap();
+        let batch_2 = db.get_paragraph_by_hash("batch_hash_2").await.unwrap();
+        assert!(batch_1.is_some());
+        assert!(batch_2.is_some());
+        assert_eq!(batch_1.unwrap().content, "Batch paragraph 1");
+        assert_eq!(batch_2.unwrap().content, "Batch paragraph 2");
     }
 }

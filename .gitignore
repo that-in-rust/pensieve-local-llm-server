@@ -37,3 +37,5 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+# Test artifacts
+standalone_test/target/
