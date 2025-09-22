@@ -66,8 +66,9 @@ The system follows a layered architecture with clear separation of concerns:
 4. **Content Extraction Phase**
    - Process only unique, changed files
    - Extract text using native parsers or external tools
-   - Split content into paragraphs and deduplicate
-   - Store unique paragraphs with source file references
+   - Apply intelligent chunking strategies (recursive character splitting, structure-aware splitting)
+   - Perform global deduplication with provenance tracking
+   - Store unique chunks with complete source file references
 
 ## Components and Interfaces
 
@@ -130,19 +131,20 @@ The system uses a two-tier approach for robust file type identification:
 
 **Tier 1 (Native Processing)**:
 - Text files: .txt, .md, .rst, .org
-- Source code: .rs, .py, .js, .ts, .java, .go, .c, .cpp, .h, .hpp
-- Configuration: .json, .yaml, .yml, .toml, .ini, .cfg, .env
+- Source code: .rs, .py, .js, .ts, .java, .go, .c, .cpp, .h, .hpp, .php, .rb, .swift, .kt, .scala, .clj, .hs, .elm, .lua, .pl, .r, .m
+- Configuration: .json, .yaml, .yml, .toml, .ini, .cfg, .env, .properties, .conf
 - Web: .html, .css, .xml
-- Scripts: .sh, .bat, .ps1
-- Data: .csv, .tsv, .log
+- Scripts: .sh, .bat, .ps1, .dockerfile, .gitignore
+- Data: .csv, .tsv, .log, .sql
 - Documentation: .adoc, .wiki, .tex, .bib
+- Spreadsheets: .xls, .xlsx (basic text extraction)
 
 **Tier 2 (External Tool Processing)**:
 - PDF documents: .pdf
-- Microsoft Office: .docx, .xlsx
+- Microsoft Office: .doc, .docx
 - OpenDocument: .odt, .ods
-- E-books: .epub, .mobi, .azw, .azw3
-- Rich text: .rtf
+- E-books: .epub, .mobi, .azw, .azw3, .fb2, .lit, .pdb, .tcr, .prc
+- Rich text: .rtf, .pages
 
 **Binary Exclusions**:
 - Images: .jpg, .png, .gif, .bmp, .svg
@@ -182,7 +184,7 @@ pub struct HtmlExtractor {
 
 ### Database Schema Design
 
-The database schema supports the complete workflow with proper relationships and indexing:
+The database schema supports the complete workflow with proper relationships and indexing. The design has evolved from simple paragraph-based chunking to intelligent chunk-based processing with precise tokenization:
 
 ```sql
 -- File metadata with comprehensive tracking
@@ -194,7 +196,7 @@ CREATE TABLE files (
     file_extension TEXT,
     file_type TEXT NOT NULL CHECK(file_type IN ('file', 'folder')),
     size INTEGER NOT NULL,
-    hash TEXT NOT NULL,
+    hash TEXT NOT NULL, -- SHA-256 of file content
     creation_date TIMESTAMP,
     modification_date TIMESTAMP,
     access_date TIMESTAMP,
@@ -210,40 +212,43 @@ CREATE TABLE files (
         CHECK(processing_status IN ('pending', 'processed', 'error', 'skipped_binary', 'skipped_dependency', 'deleted')),
     estimated_tokens INTEGER,
     processed_at TIMESTAMP,
-    error_message TEXT
+    error_message TEXT,
+    mime_type TEXT -- From MIME sniffing for robust file type detection
 );
 
--- Unique content paragraphs
-CREATE TABLE paragraphs (
-    paragraph_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    content_hash TEXT NOT NULL UNIQUE,
+-- Unique content chunks with precise tokenization
+CREATE TABLE chunks (
+    chunk_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content_hash TEXT NOT NULL UNIQUE, -- SHA-256 of chunk content
     content TEXT NOT NULL,
     estimated_tokens INTEGER NOT NULL,
+    tokenizer_model TEXT NOT NULL, -- e.g., 'cl100k_base'
     word_count INTEGER NOT NULL,
     char_count INTEGER NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Many-to-many relationship between paragraphs and source files
-CREATE TABLE paragraph_sources (
-    paragraph_id INTEGER NOT NULL,
+-- Many-to-many relationship between chunks and source files with provenance
+CREATE TABLE chunk_sources (
+    chunk_id INTEGER NOT NULL,
     file_id INTEGER NOT NULL,
-    paragraph_index INTEGER NOT NULL, -- Position within the file
-    byte_offset_start INTEGER NOT NULL,
-    byte_offset_end INTEGER NOT NULL,
-    PRIMARY KEY (paragraph_id, file_id, paragraph_index),
-    FOREIGN KEY (paragraph_id) REFERENCES paragraphs(paragraph_id) ON DELETE CASCADE,
+    start_index INTEGER NOT NULL, -- Byte offset start
+    end_index INTEGER NOT NULL,   -- Byte offset end
+    chunking_strategy TEXT NOT NULL, -- e.g., 'Recursive_512_50' or 'Markdown_Aware'
+    chunk_index INTEGER NOT NULL, -- Position within the file
+    PRIMARY KEY (chunk_id, file_id, start_index),
+    FOREIGN KEY (chunk_id) REFERENCES chunks(chunk_id) ON DELETE CASCADE,
     FOREIGN KEY (file_id) REFERENCES files(file_id) ON DELETE CASCADE
 );
 
 -- Processing errors for debugging and monitoring
-CREATE TABLE processing_errors (
+CREATE TABLE errors (
     error_id INTEGER PRIMARY KEY AUTOINCREMENT,
     file_id INTEGER,
-    error_type TEXT NOT NULL,
+    error_type TEXT NOT NULL, -- e.g., 'ExtractionFailed', 'Permissions', 'MissingDependency'
     error_message TEXT NOT NULL,
     stack_trace TEXT,
-    occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (file_id) REFERENCES files(file_id) ON DELETE SET NULL
 );
 
@@ -252,8 +257,79 @@ CREATE INDEX idx_files_hash ON files(hash);
 CREATE INDEX idx_files_duplicate_group ON files(duplicate_group_id);
 CREATE INDEX idx_files_processing_status ON files(processing_status);
 CREATE INDEX idx_files_modification_date ON files(modification_date);
-CREATE INDEX idx_paragraphs_hash ON paragraphs(content_hash);
-CREATE INDEX idx_paragraph_sources_file ON paragraph_sources(file_id);
+CREATE INDEX idx_files_mime_type ON files(mime_type);
+CREATE INDEX idx_chunks_hash ON chunks(content_hash);
+CREATE INDEX idx_chunks_tokenizer ON chunks(tokenizer_model);
+CREATE INDEX idx_chunk_sources_file ON chunk_sources(file_id);
+CREATE INDEX idx_chunk_sources_strategy ON chunk_sources(chunking_strategy);
+```
+
+## Intelligent Chunking System
+
+### Chunking Strategy Evolution
+
+The system has evolved from simple paragraph-based splitting to intelligent, context-aware chunking:
+
+**Legacy Approach (Requirements 4.1)**:
+- Split content by double newlines (paragraph boundaries)
+- Simple but may not respect document structure
+
+**Enhanced Approach (Requirements FR 4.1)**:
+- **Recursive Character Splitting**: Default strategy for most content
+- **Structure-Aware Splitting**: For structured content (Markdown, HTML)
+- **Token-Based Sizing**: Precise tokenization using specified tokenizer model
+
+### Chunking Strategies
+
+```rust
+#[derive(Debug, Clone)]
+pub enum ChunkingStrategy {
+    Paragraph,                    // Legacy: split by double newlines
+    RecursiveCharacter {          // Default: recursive splitting
+        chunk_size: usize,        // Target size in tokens
+        chunk_overlap: usize,     // Overlap between chunks
+    },
+    StructureAware {              // For structured content
+        respect_headings: bool,   // Split at section boundaries
+        preserve_lists: bool,     // Keep lists intact
+        preserve_tables: bool,    // Keep tables intact
+    },
+    Custom(String),               // User-defined strategy
+}
+
+#[derive(Debug, Clone)]
+pub struct ChunkingConfig {
+    pub strategy: ChunkingStrategy,
+    pub tokenizer_model: String,  // e.g., "cl100k_base"
+    pub max_chunk_size: usize,    // Maximum tokens per chunk
+    pub min_chunk_size: usize,    // Minimum tokens per chunk
+    pub overlap_size: usize,      // Overlap between chunks
+}
+```
+
+### Tokenization Integration
+
+```rust
+pub trait Tokenizer: Send + Sync {
+    fn count_tokens(&self, text: &str) -> Result<usize, TokenizerError>;
+    fn model_name(&self) -> &str;
+}
+
+pub struct TikTokenizer {
+    model: String,
+    // tiktoken integration
+}
+
+impl Tokenizer for TikTokenizer {
+    fn count_tokens(&self, text: &str) -> Result<usize, TokenizerError> {
+        // Precise token counting using tiktoken
+        todo!()
+    }
+    
+    fn model_name(&self) -> &str {
+        &self.model
+    }
+}
 ```
 
 ## Data Models
@@ -268,47 +344,153 @@ The system processes files through a well-defined pipeline:
 4. **Metadata Storage**: Complete file information persistence
 5. **Delta Analysis**: Comparison with existing database state
 6. **Content Extraction**: Text extraction using appropriate strategy
-7. **Content Processing**: Paragraph splitting and deduplication
-8. **Storage**: Unique content persistence with source tracking
+7. **Content Processing**: Intelligent chunking and global deduplication
+8. **Storage**: Unique chunk persistence with complete provenance tracking
 
 ### Deduplication Strategy
 
 **File-Level Deduplication**:
 - SHA-256 hash calculation for entire file content
-- First occurrence marked as "canonical"
+- First occurrence marked as "canonical" 
 - Subsequent occurrences marked as "duplicate" with group ID
 - Only canonical files proceed to content processing
 
-**Content-Level Deduplication**:
-- Split extracted text by double newlines (paragraph boundaries)
-- Calculate SHA-256 hash for each paragraph
-- Store unique paragraphs once in paragraphs table
-- Track all source locations in paragraph_sources junction table
+**Content-Level Deduplication (Global M:N Model)**:
+- Apply intelligent chunking strategies based on content type
+- Calculate SHA-256 hash for each chunk
+- Store unique chunks once in chunks table with precise tokenization
+- Track all source locations in chunk_sources junction table with provenance
+- Support multiple chunking strategies: Recursive Character Splitting, Structure-Aware Splitting
+- Enable traceability from any chunk back to all source files and locations
 
 ### External Tool Integration
 
-For complex document formats, the system orchestrates external tools:
+For complex document formats, the system orchestrates external tools through a flexible configuration system:
 
 **Configuration-Driven Approach**:
 ```toml
-[extractors.pdf]
-command = "pdftotext"
-args = ["{input}", "-"]
-timeout = 120
-required = false
+# pensieve.toml configuration file
+[general]
+tokenizer_model = "cl100k_base"
+chunk_size = 512
+chunk_overlap = 50
+thread_count = 0  # 0 = auto-detect
 
-[extractors.docx]
-command = "pandoc"
-args = ["-f", "docx", "-t", "plain", "{input}"]
-timeout = 60
-required = false
+[converters]
+pdf = "pdftotext {input} -"
+docx = "pandoc -f docx -t plain {input}"
+odt = "pandoc -f odt -t plain {input}"
+epub = "pandoc -f epub -t plain {input}"
+
+[tool_paths]
+pdftotext = "/usr/bin/pdftotext"  # Optional explicit paths
+pandoc = "/usr/local/bin/pandoc"
+
+[timeouts]
+pdf = 120
+docx = 60
+default = 30
 ```
 
-**Graceful Degradation**:
+**Dependency Management**:
+- `pensieve init` command generates default configuration template
+- `pensieve check-dependencies` verifies tool availability
+- Status report shows which formats are enabled
+- Graceful degradation when tools are missing
+
+**Processing Strategy**:
 - Check tool availability at startup
-- Skip files if required tool is missing
+- Skip files if required tool is missing (mark as 'Skipped_Dependency')
 - Log missing dependencies for user awareness
 - Continue processing other supported formats
+- Configurable timeouts prevent hanging on corrupted files
+- Capture STDOUT (extracted text) and STDERR (for logging)
+
+## CLI Interface Design
+
+### Command Structure
+
+The CLI provides a simple, intuitive interface aligned with Requirements 5:
+
+```bash
+# Basic usage
+pensieve <input_directory> <database_path>
+
+# With options
+pensieve /path/to/documents ./pensieve.db --config ./pensieve.toml
+
+# Utility commands
+pensieve init                    # Generate default configuration
+pensieve check-dependencies     # Verify external tool availability
+pensieve --help                 # Show usage instructions
+pensieve --version              # Show version information
+
+# Advanced options
+pensieve /docs ./db.sqlite \
+    --dry-run \                 # Simulate without modifying database
+    --force-reprocess \         # Ignore delta checks, reprocess all
+    --config ./custom.toml \    # Custom configuration file
+    --threads 8 \               # Override thread count
+    --verbose                   # Detailed progress output
+```
+
+### Progress Reporting
+
+Real-time progress indicators as specified in Requirements FR 5.3:
+
+```
+Pensieve v1.0.0 - Text Ingestion Tool
+
+Phase 1: Metadata Scanning
+├─ Files scanned: 15,432 / 20,000 (77%)
+├─ Processing rate: 1,247 files/sec
+├─ Data processed: 2.3 GB / 3.1 GB
+├─ Duplicates found: 3,421 (22.1%)
+├─ Errors: 12
+└─ ETA: 00:03:45
+
+Phase 2: Content Extraction  
+├─ Files processed: 8,234 / 12,011 (68%)
+├─ Chunks created: 145,678
+├─ Deduplication rate: 34.2%
+├─ Token count: 12.4M tokens
+├─ Processing rate: 234 files/sec
+└─ ETA: 00:12:33
+
+Summary:
+✓ Files processed: 12,011
+✓ Unique chunks: 95,847
+✓ Total tokens: 12.4M
+✓ Deduplication savings: 34.2%
+✓ Processing time: 00:16:18
+```
+
+### Error Handling and User Feedback
+
+Clear, actionable error messages as specified in Requirements 3:
+
+```bash
+# Missing arguments
+$ pensieve
+Error: Missing required arguments
+Usage: pensieve <input_directory> <database_path>
+Run 'pensieve --help' for more information
+
+# Invalid directory
+$ pensieve /nonexistent ./db.sqlite
+Error: Input directory '/nonexistent' does not exist
+Please check the path and try again
+
+# Invalid database path
+$ pensieve ./docs /readonly/db.sqlite
+Error: Cannot write to database path '/readonly/db.sqlite'
+Permission denied. Please choose a writable location
+
+# Missing external tools
+Warning: pdftotext not found in PATH
+PDF files will be skipped. Install poppler-utils to enable PDF processing
+Run 'pensieve check-dependencies' for detailed tool status
+```
 
 ## Error Handling
 
@@ -491,17 +673,23 @@ fn test_memory_usage_bounds() {
 
 **Trade-offs**: Slightly slower than non-cryptographic hashes, but negligible for file sizes involved
 
-### 5. Paragraph-Level Content Splitting
+### 5. Intelligent Chunking with Precise Tokenization
 
-**Decision**: Split content by double newlines for paragraph boundaries
+**Decision**: Implement multiple chunking strategies with precise tokenization
 
 **Rationale**:
-- **Simplicity**: Universal pattern across text formats
-- **LLM Compatibility**: Paragraph-sized chunks are optimal for most LLM contexts
-- **Deduplication Granularity**: Balances between too fine (sentences) and too coarse (files)
-- **Semantic Coherence**: Paragraphs typically contain coherent thoughts
+- **Flexibility**: Different content types benefit from different chunking approaches
+- **Precision**: Token-based sizing ensures optimal LLM context utilization
+- **Structure Preservation**: Structure-aware splitting maintains document semantics
+- **Backward Compatibility**: Paragraph-based splitting remains available as legacy option
 
-**Trade-offs**: May not be optimal for all document structures, but provides good general-purpose chunking
+**Implementation**:
+- **Default Strategy**: Recursive Character Splitting with configurable chunk size and overlap
+- **Structured Content**: Structure-Aware Splitting for Markdown, HTML with preserved headings
+- **Precise Tokenization**: Integration with tiktoken library for exact token counting
+- **Configurable**: Users can specify tokenizer model (cl100k_base, etc.)
+
+**Trade-offs**: Increased complexity but significantly better LLM compatibility and content quality
 
 ### 6. Incremental Processing with Delta Detection
 
@@ -515,4 +703,40 @@ fn test_memory_usage_bounds() {
 
 **Trade-offs**: Additional complexity in change detection logic, but essential for practical use
 
-This design provides a robust, performant, and maintainable foundation for the Pensieve CLI tool while addressing all requirements specified in the requirements document.
+### 7. Configuration-Driven External Tool Integration
+
+**Decision**: Implement flexible TOML-based configuration for external tools
+
+**Rationale**:
+- **User Control**: Users can specify their preferred tools and configurations
+- **Flexibility**: Support for custom command templates and tool paths
+- **Maintainability**: No need to hardcode tool configurations in source code
+- **Extensibility**: Easy to add support for new tools without code changes
+
+**Implementation**:
+- **Configuration File**: `pensieve.toml` with sections for converters, tool paths, and timeouts
+- **Command Templates**: Flexible template system with `{input}` placeholder
+- **Dependency Checking**: `check-dependencies` command verifies tool availability
+- **Graceful Degradation**: Missing tools result in skipped files, not failures
+
+**Trade-offs**: Requires configuration management but provides maximum flexibility and user control
+
+### 8. Global Deduplication with Many-to-Many Provenance Model
+
+**Decision**: Implement M:N relationship between chunks and source files
+
+**Rationale**:
+- **Complete Provenance**: Track all source locations for every unique chunk
+- **Space Efficiency**: Store each unique chunk only once regardless of source count
+- **Traceability**: Enable queries to find all sources of any given content
+- **Analytics**: Support deduplication analysis and content overlap reporting
+
+**Implementation**:
+- **Chunks Table**: Stores unique content with precise token counts
+- **Junction Table**: `chunk_sources` links chunks to files with byte offsets
+- **Chunking Strategy Tracking**: Record which strategy was used for each chunk
+- **Provenance Queries**: Enable finding all sources of duplicate content
+
+**Trade-offs**: More complex data model but essential for comprehensive content analysis
+
+This design provides a robust, performant, and maintainable foundation for the Pensieve CLI tool while addressing all requirements specified in the requirements document. The evolution from simple paragraph-based processing to intelligent chunking with precise tokenization ensures optimal LLM compatibility while maintaining complete traceability and efficient deduplication.

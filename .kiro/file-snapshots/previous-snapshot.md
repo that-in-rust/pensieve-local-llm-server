@@ -1,10 +1,10 @@
-# Repository Snapshot - 2025-09-21 22:14:00
+# Repository Snapshot - 2025-09-21 22:20:40
 
 ## Summary Statistics
-- **Total Files**: 46
-- **Total Lines**: 8,504
-- **Total Words**: 31,020
-- **Snapshot Time**: 2025-09-21 22:14:00
+- **Total Files**: 47
+- **Total Lines**: 8,917
+- **Total Words**: 32,210
+- **Snapshot Time**: 2025-09-21 22:20:40
 
 ## Spec Progress Summary
 
@@ -21,9 +21,10 @@
 | Cargo.toml | 44 | 163 | 1.1K |
 | .cursorignore | 133 | 195 | 1.7K |
 | examples/file_type_demo.rs | 97 | 329 | 3.7K |
-| .kiro/file-snapshots/change-log.md | 1637 | 4734 | 35K |
-| .kiro/file-snapshots/current-snapshot.md | 63 | 525 | 3.3K |
-| .kiro/file-snapshots/previous-snapshot.md | 63 | 525 | 3.3K |
+| .gitignore | 39 | 55 | 383 |
+| .kiro/file-snapshots/change-log.md | 1648 | 4765 | 36K |
+| .kiro/file-snapshots/current-snapshot.md | 65 | 543 | 3.4K |
+| .kiro/file-snapshots/previous-snapshot.md | 65 | 543 | 3.4K |
 | .kiro/hooks/source-docs-sync.kiro.hook | [binary] | [binary] | 1.8K |
 | .kiro/hooks/unified-progress-tracker.kiro.hook | [binary] | [binary] | 549 |
 | .kiro/options/architecture-backlog.md | 2638 | 12791 | 104K |
@@ -59,7 +60,7 @@
 | src/extractor.rs | 261 | 791 | 7.4K |
 | src/lib.rs | 22 | 93 | 710 |
 | src/main.rs | 7 | 17 | 147 |
-| src/scanner.rs | 742 | 2283 | 25K |
+| src/scanner.rs | 1140 | 3406 | 39K |
 | src/types.rs | 262 | 844 | 7.5K |
 | tests/file_type_detection_integration.rs | 99 | 307 | 4.4K |
 | .vscode/settings.json | [binary] | [binary] | 161 |

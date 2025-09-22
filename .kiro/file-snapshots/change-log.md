@@ -1660,3 +1660,22 @@
 
 ---
 
+
+## Delta Report - 2025-09-22 13:40:31
+
+### Summary Changes
+- **File Count**: 0 (47 total)
+- **Line Count**: 248 (9,165 total)
+- **Word Count**: 1,250 (33,460 total)
+
+### File-Level Changes
+**Added Files:**
+- .kiro/hooks/hook-automation-guide.md
+- .kiro/hooks/hook-system-status.md
+
+**Removed Files:**
+- .kiro/steering/hook-automation-guide.md
+- .kiro/steering/hook-system-status.md
+
+---
+
