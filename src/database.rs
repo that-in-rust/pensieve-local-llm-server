@@ -1,9 +1,9 @@
 //! Database operations and schema management
 
 use crate::prelude::*;
-use crate::types::{FileMetadata, Paragraph, ParagraphSource, ProcessingError};
+use crate::types::{FileMetadata, Paragraph, ParagraphSource, ProcessingError, FileType, DuplicateStatus, ProcessingStatus};
 use sqlx::{SqlitePool, Sqlite, Transaction};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// Database manager for SQLite operations with connection pooling
@@ -16,7 +16,15 @@ pub struct Database {
 impl Database {
     /// Create new database connection with optimized pool settings
     pub async fn new(database_path: &Path) -> Result<Self> {
-        let database_url = format!("sqlite:{}", database_path.display());
+        // Ensure the parent directory exists
+        if let Some(parent) = database_path.parent() {
+            if !parent.exists() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| PensieveError::Io(e))?;
+            }
+        }
+        
+        let database_url = format!("sqlite://{}?mode=rwc", database_path.display());
         
         // Create connection pool with optimized settings for CLI tool usage
         let pool = sqlx::sqlite::SqlitePoolOptions::new()
@@ -277,24 +285,180 @@ impl Database {
     }
 
     /// Insert file metadata
-    pub async fn insert_file(&self, _metadata: &FileMetadata) -> Result<()> {
-        // TODO: Implement file insertion
-        // This will be implemented in a later task
+    pub async fn insert_file(&self, metadata: &FileMetadata) -> Result<()> {
+        let file_id = uuid::Uuid::new_v4().to_string();
+        let full_filepath = metadata.full_filepath.to_string_lossy().to_string();
+        let folder_path = metadata.folder_path.to_string_lossy().to_string();
+        let file_type = metadata.file_type.to_string();
+        let size = metadata.size as i64;
+        let permissions = metadata.permissions as i64;
+        let depth_level = metadata.depth_level as i64;
+        let relative_path = metadata.relative_path.to_string_lossy().to_string();
+        let symlink_target = metadata.symlink_target.as_ref().map(|p| p.to_string_lossy().to_string());
+        let duplicate_status = metadata.duplicate_status.to_string();
+        let duplicate_group_id = metadata.duplicate_group_id.map(|id| id.to_string());
+        let processing_status = metadata.processing_status.to_string();
+        let estimated_tokens = metadata.estimated_tokens.map(|t| t as i64);
+        
+        sqlx::query!(
+            r#"
+            INSERT INTO files (
+                file_id, full_filepath, folder_path, filename, file_extension, file_type,
+                size, hash, creation_date, modification_date, access_date, permissions,
+                depth_level, relative_path, is_hidden, is_symlink, symlink_target,
+                duplicate_status, duplicate_group_id, processing_status, estimated_tokens,
+                processed_at, error_message
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
+            "#,
+            file_id,
+            full_filepath,
+            folder_path,
+            metadata.filename,
+            metadata.file_extension,
+            file_type,
+            size,
+            metadata.hash,
+            metadata.creation_date,
+            metadata.modification_date,
+            metadata.access_date,
+            permissions,
+            depth_level,
+            relative_path,
+            metadata.is_hidden,
+            metadata.is_symlink,
+            symlink_target,
+            duplicate_status,
+            duplicate_group_id,
+            processing_status,
+            estimated_tokens,
+            metadata.processed_at,
+            metadata.error_message
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
         Ok(())
     }
 
     /// Update file metadata
-    pub async fn update_file(&self, _metadata: &FileMetadata) -> Result<()> {
-        // TODO: Implement file update
-        // This will be implemented in a later task
+    pub async fn update_file(&self, metadata: &FileMetadata) -> Result<()> {
+        sqlx::query!(
+            r#"
+            UPDATE files SET
+                folder_path = ?, filename = ?, file_extension = ?, file_type = ?,
+                size = ?, hash = ?, creation_date = ?, modification_date = ?, access_date = ?,
+                permissions = ?, depth_level = ?, relative_path = ?, is_hidden = ?,
+                is_symlink = ?, symlink_target = ?, duplicate_status = ?, duplicate_group_id = ?,
+                processing_status = ?, estimated_tokens = ?, processed_at = ?, error_message = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE full_filepath = ?
+            "#,
+            metadata.folder_path.to_string_lossy(),
+            metadata.filename,
+            metadata.file_extension,
+            metadata.file_type.to_string(),
+            metadata.size as i64,
+            metadata.hash,
+            metadata.creation_date,
+            metadata.modification_date,
+            metadata.access_date,
+            metadata.permissions as i64,
+            metadata.depth_level as i64,
+            metadata.relative_path.to_string_lossy(),
+            metadata.is_hidden,
+            metadata.is_symlink,
+            metadata.symlink_target.as_ref().map(|p| p.to_string_lossy().to_string()),
+            metadata.duplicate_status.to_string(),
+            metadata.duplicate_group_id.map(|id| id.to_string()),
+            metadata.processing_status.to_string(),
+            metadata.estimated_tokens.map(|t| t as i64),
+            metadata.processed_at,
+            metadata.error_message,
+            metadata.full_filepath.to_string_lossy()
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
         Ok(())
     }
 
     /// Get file by path
-    pub async fn get_file_by_path(&self, _path: &Path) -> Result<Option<FileMetadata>> {
-        // TODO: Implement file retrieval
-        // This will be implemented in a later task
-        Ok(None)
+    pub async fn get_file_by_path(&self, path: &Path) -> Result<Option<FileMetadata>> {
+        let path_str = path.to_string_lossy();
+        
+        let row = sqlx::query!(
+            r#"
+            SELECT file_id, full_filepath, folder_path, filename, file_extension, file_type,
+                   size, hash, creation_date, modification_date, access_date, permissions,
+                   depth_level, relative_path, is_hidden, is_symlink, symlink_target,
+                   duplicate_status, duplicate_group_id, processing_status, estimated_tokens,
+                   processed_at, error_message
+            FROM files 
+            WHERE full_filepath = ?
+            "#,
+            path_str
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
+        if let Some(row) = row {
+            let duplicate_status = match row.duplicate_status.as_str() {
+                "unique" => DuplicateStatus::Unique,
+                "canonical" => DuplicateStatus::Canonical,
+                "duplicate" => DuplicateStatus::Duplicate,
+                _ => DuplicateStatus::Unique,
+            };
+            
+            let processing_status = match row.processing_status.as_str() {
+                "pending" => ProcessingStatus::Pending,
+                "processed" => ProcessingStatus::Processed,
+                "error" => ProcessingStatus::Error,
+                "skipped_binary" => ProcessingStatus::SkippedBinary,
+                "skipped_dependency" => ProcessingStatus::SkippedDependency,
+                "deleted" => ProcessingStatus::Deleted,
+                _ => ProcessingStatus::Pending,
+            };
+            
+            let file_type = match row.file_type.as_str() {
+                "file" => FileType::File,
+                "directory" => FileType::Directory,
+                _ => FileType::File,
+            };
+            
+            let metadata = FileMetadata {
+                full_filepath: PathBuf::from(row.full_filepath),
+                folder_path: PathBuf::from(row.folder_path),
+                filename: row.filename,
+                file_extension: row.file_extension,
+                file_type,
+                size: row.size as u64,
+                hash: row.hash,
+                creation_date: row.creation_date.unwrap_or_else(|| chrono::Utc::now()),
+                modification_date: row.modification_date.unwrap_or_else(|| chrono::Utc::now()),
+                access_date: row.access_date.unwrap_or_else(|| chrono::Utc::now()),
+                permissions: row.permissions as u32,
+                depth_level: row.depth_level as u32,
+                relative_path: PathBuf::from(row.relative_path),
+                is_hidden: row.is_hidden,
+                is_symlink: row.is_symlink,
+                symlink_target: row.symlink_target.map(PathBuf::from),
+                duplicate_status,
+                duplicate_group_id: row.duplicate_group_id.and_then(|s| uuid::Uuid::parse_str(s).ok()),
+                processing_status,
+                estimated_tokens: row.estimated_tokens.map(|t| t as u32),
+                processed_at: row.processed_at,
+                error_message: row.error_message,
+            };
+            
+            Ok(Some(metadata))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Insert paragraph
@@ -327,15 +491,267 @@ impl Database {
 
     /// Get processing statistics
     pub async fn get_statistics(&self) -> Result<DatabaseStatistics> {
-        // TODO: Implement statistics calculation
-        // This will be implemented in a later task
-        Ok(DatabaseStatistics::default())
+        // Get total file counts
+        let total_files: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM files")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| PensieveError::Database(e))?;
+        
+        // Get unique files (unique + canonical)
+        let unique_files: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM files WHERE duplicate_status IN ('unique', 'canonical')"
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
+        // Get duplicate files
+        let duplicate_files: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM files WHERE duplicate_status = 'duplicate'"
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
+        // Get paragraph count
+        let total_paragraphs: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM paragraphs")
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| PensieveError::Database(e))?
+            .unwrap_or(0);
+        
+        // Get total tokens
+        let total_tokens: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(estimated_tokens), 0) FROM files WHERE estimated_tokens IS NOT NULL"
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
+        // Get error count
+        let error_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM processing_errors")
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| PensieveError::Database(e))?
+            .unwrap_or(0);
+        
+        // Get files by status
+        let status_rows = sqlx::query!(
+            "SELECT processing_status, COUNT(*) as count FROM files GROUP BY processing_status"
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
+        let mut files_by_status = std::collections::HashMap::new();
+        for row in status_rows {
+            files_by_status.insert(row.processing_status, row.count as u64);
+        }
+        
+        Ok(DatabaseStatistics {
+            total_files: total_files as u64,
+            unique_files: unique_files as u64,
+            duplicate_files: duplicate_files as u64,
+            total_paragraphs: total_paragraphs as u64,
+            total_tokens: total_tokens as u64,
+            error_count: error_count as u64,
+            files_by_status,
+        })
     }
 
     /// Begin transaction for batch operations
     pub async fn begin_transaction(&self) -> Result<Transaction<'_, Sqlite>> {
         self.pool.begin().await
             .map_err(|e| PensieveError::Database(e))
+    }
+
+    /// Insert multiple files in a batch transaction
+    pub async fn insert_files_batch(&self, files: &[FileMetadata]) -> Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
+
+        let mut tx = self.begin_transaction().await?;
+        
+        for metadata in files {
+            let file_id = uuid::Uuid::new_v4().to_string();
+            
+            sqlx::query!(
+                r#"
+                INSERT INTO files (
+                    file_id, full_filepath, folder_path, filename, file_extension, file_type,
+                    size, hash, creation_date, modification_date, access_date, permissions,
+                    depth_level, relative_path, is_hidden, is_symlink, symlink_target,
+                    duplicate_status, duplicate_group_id, processing_status, estimated_tokens,
+                    processed_at, error_message
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                )
+                "#,
+                file_id,
+                metadata.full_filepath.to_string_lossy(),
+                metadata.folder_path.to_string_lossy(),
+                metadata.filename,
+                metadata.file_extension,
+                metadata.file_type.to_string(),
+                metadata.size as i64,
+                metadata.hash,
+                metadata.creation_date,
+                metadata.modification_date,
+                metadata.access_date,
+                metadata.permissions as i64,
+                metadata.depth_level as i64,
+                metadata.relative_path.to_string_lossy(),
+                metadata.is_hidden,
+                metadata.is_symlink,
+                metadata.symlink_target.as_ref().map(|p| p.to_string_lossy().to_string()),
+                metadata.duplicate_status.to_string(),
+                metadata.duplicate_group_id.map(|id| id.to_string()),
+                metadata.processing_status.to_string(),
+                metadata.estimated_tokens.map(|t| t as i64),
+                metadata.processed_at,
+                metadata.error_message
+            )
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| PensieveError::Database(e))?;
+        }
+        
+        tx.commit().await.map_err(|e| PensieveError::Database(e))?;
+        Ok(())
+    }
+
+    /// Get files by hash for duplicate detection
+    pub async fn get_files_by_hash(&self, hash: &str) -> Result<Vec<FileMetadata>> {
+        let rows = sqlx::query!(
+            r#"
+            SELECT file_id, full_filepath, folder_path, filename, file_extension, file_type,
+                   size, hash, creation_date, modification_date, access_date, permissions,
+                   depth_level, relative_path, is_hidden, is_symlink, symlink_target,
+                   duplicate_status, duplicate_group_id, processing_status, estimated_tokens,
+                   processed_at, error_message
+            FROM files 
+            WHERE hash = ? AND hash != ''
+            ORDER BY full_filepath
+            "#,
+            hash
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
+        let mut files = Vec::new();
+        for row in rows {
+            let duplicate_status = match row.duplicate_status.as_str() {
+                "unique" => DuplicateStatus::Unique,
+                "canonical" => DuplicateStatus::Canonical,
+                "duplicate" => DuplicateStatus::Duplicate,
+                _ => DuplicateStatus::Unique,
+            };
+            
+            let processing_status = match row.processing_status.as_str() {
+                "pending" => ProcessingStatus::Pending,
+                "processed" => ProcessingStatus::Processed,
+                "error" => ProcessingStatus::Error,
+                "skipped_binary" => ProcessingStatus::SkippedBinary,
+                "skipped_dependency" => ProcessingStatus::SkippedDependency,
+                "deleted" => ProcessingStatus::Deleted,
+                _ => ProcessingStatus::Pending,
+            };
+            
+            let file_type = match row.file_type.as_str() {
+                "file" => FileType::File,
+                "directory" => FileType::Directory,
+                _ => FileType::File,
+            };
+            
+            let metadata = FileMetadata {
+                full_filepath: PathBuf::from(row.full_filepath),
+                folder_path: PathBuf::from(row.folder_path),
+                filename: row.filename,
+                file_extension: row.file_extension,
+                file_type,
+                size: row.size as u64,
+                hash: row.hash,
+                creation_date: row.creation_date.unwrap_or_else(|| chrono::Utc::now()),
+                modification_date: row.modification_date.unwrap_or_else(|| chrono::Utc::now()),
+                access_date: row.access_date.unwrap_or_else(|| chrono::Utc::now()),
+                permissions: row.permissions as u32,
+                depth_level: row.depth_level as u32,
+                relative_path: PathBuf::from(row.relative_path),
+                is_hidden: row.is_hidden,
+                is_symlink: row.is_symlink,
+                symlink_target: row.symlink_target.map(PathBuf::from),
+                duplicate_status,
+                duplicate_group_id: row.duplicate_group_id.and_then(|s| uuid::Uuid::parse_str(s).ok()),
+                processing_status,
+                estimated_tokens: row.estimated_tokens.map(|t| t as u32),
+                processed_at: row.processed_at,
+                error_message: row.error_message,
+            };
+            
+            files.push(metadata);
+        }
+        
+        Ok(files)
+    }
+
+    /// Get duplicate statistics
+    pub async fn get_duplicate_statistics(&self) -> Result<DuplicateStatistics> {
+        // Get duplicate groups
+        let duplicate_groups: i64 = sqlx::query_scalar(
+            "SELECT COUNT(DISTINCT duplicate_group_id) FROM files WHERE duplicate_group_id IS NOT NULL"
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
+        // Get files by duplicate status
+        let unique_files: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM files WHERE duplicate_status = 'unique'"
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
+        let canonical_files: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM files WHERE duplicate_status = 'canonical'"
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
+        let duplicate_files: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM files WHERE duplicate_status = 'duplicate'"
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
+        // Calculate space savings
+        let total_size: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(size), 0) FROM files"
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
+        let duplicate_size: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(size), 0) FROM files WHERE duplicate_status = 'duplicate'"
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| PensieveError::Database(e))?;
+        
+        Ok(DuplicateStatistics {
+            duplicate_groups: duplicate_groups as u64,
+            unique_files: unique_files as u64,
+            canonical_files: canonical_files as u64,
+            duplicate_files: duplicate_files as u64,
+            total_size: total_size as u64,
+            duplicate_size: duplicate_size as u64,
+            space_savings: duplicate_size as u64,
+        })
     }
 
 
@@ -373,6 +789,11 @@ impl Database {
     pub async fn close(self) {
         self.pool.close().await;
     }
+    
+    /// Get reference to the connection pool for advanced operations
+    pub fn pool(&self) -> &SqlitePool {
+        &self.pool
+    }
 }
 
 /// Database statistics for monitoring and reporting
@@ -401,6 +822,25 @@ pub struct PoolStats {
     pub size: u32,
     /// Number of idle connections
     pub idle: usize,
+}
+
+/// Duplicate detection statistics
+#[derive(Debug, Default)]
+pub struct DuplicateStatistics {
+    /// Number of duplicate groups
+    pub duplicate_groups: u64,
+    /// Number of unique files
+    pub unique_files: u64,
+    /// Number of canonical files (first in each duplicate group)
+    pub canonical_files: u64,
+    /// Number of duplicate files
+    pub duplicate_files: u64,
+    /// Total size of all files
+    pub total_size: u64,
+    /// Total size of duplicate files
+    pub duplicate_size: u64,
+    /// Space savings from deduplication
+    pub space_savings: u64,
 }
 
 /// Database migration manager for schema evolution

@@ -3,6 +3,9 @@
 use crate::prelude::*;
 use crate::errors::ExtractionError;
 use async_trait::async_trait;
+use encoding_rs::{Encoding, UTF_8, WINDOWS_1252};
+use scraper::{Html, Selector};
+use std::fs;
 use std::path::Path;
 use std::time::Duration;
 

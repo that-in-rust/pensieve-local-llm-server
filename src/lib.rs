@@ -5,6 +5,7 @@
 
 pub mod cli;
 pub mod database;
+pub mod deduplication;
 pub mod errors;
 pub mod extractor;
 pub mod scanner;

@@ -63,8 +63,7 @@ impl FileScanner {
             .into_par_iter()
             .map(|path| {
                 // Extract metadata for each file
-                let metadata = self.extract_metadata_sync(&path, &file_detector)?;
-                Ok(metadata)
+                self.extract_metadata_sync(&path, &file_detector)
             })
             .collect();
         
@@ -200,7 +199,7 @@ impl FileScanner {
     }
     
     /// Synchronous version of metadata extraction for use with rayon
-    fn extract_metadata_sync(&self, path: &Path, file_detector: &FileTypeDetector) -> Result<FileMetadata> {
+    fn extract_metadata_sync(&self, path: &Path, _file_detector: &FileTypeDetector) -> Result<FileMetadata> {
         let std_metadata = std::fs::metadata(path)
             .with_file_context(path)?;
         
@@ -326,7 +325,7 @@ impl FileScanner {
     fn detect_duplicates(&self, mut metadata: Vec<FileMetadata>) -> Vec<FileMetadata> {
         let mut hash_to_files: HashMap<String, Vec<usize>> = HashMap::new();
         
-        // Group files by hash
+        // Group files by hash (only non-empty hashes)
         for (index, file_metadata) in metadata.iter().enumerate() {
             if !file_metadata.hash.is_empty() {
                 hash_to_files
@@ -338,34 +337,73 @@ impl FileScanner {
         
         let mut unique_count = 0;
         let mut duplicate_count = 0;
+        let mut duplicate_groups = 0;
+        let mut total_duplicate_size = 0u64;
         
         // Assign duplicate status and group IDs
-        for (hash, indices) in hash_to_files {
+        for (_hash, indices) in hash_to_files {
             if indices.len() == 1 {
                 // Unique file
                 metadata[indices[0]].duplicate_status = DuplicateStatus::Unique;
                 unique_count += 1;
             } else {
-                // Duplicate files - first one is canonical, rest are duplicates
+                // Duplicate files - choose canonical file (prefer shortest path, then alphabetical)
+                duplicate_groups += 1;
                 let group_id = Uuid::new_v4();
                 
-                for (i, &index) in indices.iter().enumerate() {
+                // Sort indices by path length first, then alphabetically for deterministic canonical selection
+                let mut sorted_indices = indices.clone();
+                sorted_indices.sort_by(|&a, &b| {
+                    let path_a = &metadata[a].full_filepath;
+                    let path_b = &metadata[b].full_filepath;
+                    
+                    // First compare by path length (shorter paths preferred)
+                    let len_cmp = path_a.to_string_lossy().len().cmp(&path_b.to_string_lossy().len());
+                    if len_cmp != std::cmp::Ordering::Equal {
+                        return len_cmp;
+                    }
+                    
+                    // Then compare alphabetically for deterministic ordering
+                    path_a.cmp(path_b)
+                });
+                
+                for (i, &index) in sorted_indices.iter().enumerate() {
                     metadata[index].duplicate_group_id = Some(group_id);
                     if i == 0 {
+                        // First file (shortest path) becomes canonical
                         metadata[index].duplicate_status = DuplicateStatus::Canonical;
                         unique_count += 1;
                     } else {
+                        // Rest are duplicates
                         metadata[index].duplicate_status = DuplicateStatus::Duplicate;
                         duplicate_count += 1;
+                        total_duplicate_size += metadata[index].size;
                     }
                 }
             }
         }
         
+        // Calculate deduplication statistics
+        let total_files = metadata.len();
+        let dedup_percentage = if total_files > 0 {
+            (duplicate_count as f64 / total_files as f64) * 100.0
+        } else {
+            0.0
+        };
+        
+        let space_savings_mb = total_duplicate_size as f64 / 1_048_576.0;
+        
         println!(
-            "Deduplication complete: {} unique files, {} duplicates identified",
-            unique_count, duplicate_count
+            "Deduplication complete: {} unique files, {} duplicates in {} groups ({:.1}% deduplication rate)",
+            unique_count, duplicate_count, duplicate_groups, dedup_percentage
         );
+        
+        if duplicate_count > 0 {
+            println!(
+                "Space savings: {:.2} MB from duplicate elimination",
+                space_savings_mb
+            );
+        }
         
         metadata
     }
