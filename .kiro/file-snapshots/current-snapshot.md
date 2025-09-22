@@ -1,17 +1,17 @@
-# Repository Snapshot - 2025-09-22 18:35:05
+# Repository Snapshot - 2025-09-22 23:53:20
 
 ## Summary Statistics
 - **Total Files**: 1,772
-- **Total Lines**: 15,538
-- **Total Words**: 72,943
-- **Snapshot Time**: 2025-09-22 18:35:05
+- **Total Lines**: 15,769
+- **Total Words**: 73,574
+- **Snapshot Time**: 2025-09-22 23:53:20
 
 ## Spec Progress Summary
 
 | Spec Name | Phase | Progress | Files |
 |-----------|-------|----------|-------|
 | parseltongue-aim-daemon | Init | - | 0/3 |
-| pensieve-cli-tool | Implementation (66%) | - | 3/3 |
+| pensieve-cli-tool | Implementation (72%) | - | 3/3 |
 
 ## File Inventory
 
@@ -22,8 +22,8 @@
 | .cursorignore | 133 | 195 | 1.7K |
 | .env | 0 | 1 | 29 |
 | examples/file_type_demo.rs | 97 | 329 | 3.7K |
-| .gitignore | 39 | 55 | 383 |
-| .kiro/file-snapshots/change-log.md | 1761 | 5064 | 38K |
+| .gitignore | 41 | 59 | 424 |
+| .kiro/file-snapshots/change-log.md | 1775 | 5099 | 38K |
 | .kiro/file-snapshots/current-snapshot.md | 1791 | 16077 | 198K |
 | .kiro/file-snapshots/previous-snapshot.md | 1791 | 16077 | 198K |
 | .kiro/hooks/hook-automation-guide.md | 256 | 1274 | 11K |
@@ -55,8 +55,8 @@
 | .kiro/unified-progress-tracker.sh | 319 | 1480 | 13K |
 | README.md | 74 | 347 | 2.7K |
 | src/cli.rs | 332 | 1134 | 13K |
-| src/database.rs | 1363 | 3949 | 50K |
-| src/deduplication.rs | 507 | 1529 | 20K |
+| src/database.rs | 1566 | 4502 | 58K |
+| src/deduplication.rs | 521 | 1572 | 21K |
 | src/errors.rs | 239 | 759 | 7.5K |
 | src/extractor.rs | 995 | 2850 | 33K |
 | src/lib.rs | 23 | 96 | 733 |

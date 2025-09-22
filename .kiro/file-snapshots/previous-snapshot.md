@@ -1,10 +1,10 @@
-# Repository Snapshot - 2025-09-22 18:05:50
+# Repository Snapshot - 2025-09-22 18:35:05
 
 ## Summary Statistics
 - **Total Files**: 1,772
-- **Total Lines**: 15,313
-- **Total Words**: 72,406
-- **Snapshot Time**: 2025-09-22 18:05:50
+- **Total Lines**: 15,538
+- **Total Words**: 72,943
+- **Snapshot Time**: 2025-09-22 18:35:05
 
 ## Spec Progress Summary
 
@@ -23,12 +23,11 @@
 | .env | 0 | 1 | 29 |
 | examples/file_type_demo.rs | 97 | 329 | 3.7K |
 | .gitignore | 39 | 55 | 383 |
-| .kiro/file-snapshots/change-log.md | 1750 | 5033 | 37K |
+| .kiro/file-snapshots/change-log.md | 1761 | 5064 | 38K |
 | .kiro/file-snapshots/current-snapshot.md | 1791 | 16077 | 198K |
 | .kiro/file-snapshots/previous-snapshot.md | 1791 | 16077 | 198K |
 | .kiro/hooks/hook-automation-guide.md | 256 | 1274 | 11K |
 | .kiro/hooks/hook-system-status.md | 27 | 115 | 912 |
-| .kiro/hooks/source-docs-sync.kiro.hook | [binary] | [binary] | 1.8K |
 | .kiro/hooks/unified-progress-tracker.kiro.hook | [binary] | [binary] | 577 |
 | .kiro/options/architecture-backlog.md | 2638 | 12791 | 104K |
 | .kiro/options/backlog.md | 339 | 2385 | 19K |
@@ -49,16 +48,16 @@
 | .kiro/rust-idioms/Unlocking _Compile-First Success__ A Layered Blueprint for Building and Governing Rust's Idiomatic-Archive.md | 416 | 5927 | 47K |
 | .kiro/specs/pensieve-cli-tool/design.md | 677 | 3050 | 26K |
 | .kiro/specs/pensieve-cli-tool/requirements.md | 240 | 2842 | 20K |
-| .kiro/specs/pensieve-cli-tool/tasks.md | 133 | 949 | 6.5K |
+| .kiro/specs/pensieve-cli-tool/tasks.md | 133 | 948 | 6.5K |
 | .kiro/steering/code-conventions.md | 1997 | 6142 | 53K |
 | .kiro/steering/design101-tdd-architecture-principles.md | 947 | 3454 | 29K |
 | .kiro/tree-with-wc.sh | 60 | 411 | 2.7K |
 | .kiro/unified-progress-tracker.sh | 319 | 1480 | 13K |
 | README.md | 74 | 347 | 2.7K |
 | src/cli.rs | 332 | 1134 | 13K |
-| src/database.rs | 1153 | 3451 | 43K |
+| src/database.rs | 1363 | 3949 | 50K |
 | src/deduplication.rs | 507 | 1529 | 20K |
-| src/errors.rs | 235 | 750 | 7.4K |
+| src/errors.rs | 239 | 759 | 7.5K |
 | src/extractor.rs | 995 | 2850 | 33K |
 | src/lib.rs | 23 | 96 | 733 |
 | src/main.rs | 7 | 17 | 147 |
@@ -1783,6 +1782,7 @@
 | test_data/sample.txt | 4 | 37 | 226 |
 | test.db | [binary] | [binary] | 132K |
 | test_extractor.rs | 555 | 1668 | 18K |
+| test_paragraph_methods.rs | 96 | 241 | 3.1K |
 | test_performance.db | [binary] | [binary] | 4.0K |
 | test_performance.db-shm | [binary] | [binary] | 32K |
 | test_performance.db-wal | [binary] | [binary] | 302K |
