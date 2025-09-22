@@ -160,7 +160,7 @@ ALL DIAGRAMS WILL BE IN MERMAID ONLY TO ENSURE EASE WITH GITHUB - DO NOT SKIP TH
   - Test error recovery and partial processing scenarios
   - _Requirements: 1.1, 2.1, 4.1, 4.2, 4.3, 5.1_
 
-- [ ] 23. Create README and documentation - take help of (.kiro/steering/mermaid-troubleshooting.md;.kiro/steering/mermaid-syntax-guide.md;kiro/steering/mermaid-status-report.md;.kiro/steering/mermaid-design-patterns.md)
+- [-] 23. Create README and documentation - take help of (.kiro/steering/mermaid-troubleshooting.md;.kiro/steering/mermaid-syntax-guide.md;kiro/steering/mermaid-status-report.md;.kiro/steering/mermaid-design-patterns.md)
   - Write comprehensive README with installation instructions
   - Document CLI usage with examples
   - Add troubleshooting guide for common issues
@@ -173,3 +173,4 @@ ALL DIAGRAMS WILL BE IN MERMAID ONLY TO ENSURE EASE WITH GITHUB - DO NOT SKIP TH
   - Clean up any unnecessary files or directories - instead of deleting place them in zzzzArchive folder
   - Ensure repository looks professional for GitHub presentation
   - Organize examples and test data appropriately
+  - Can we make the README minimalistic x Minto Pyramid Principle - starting from essence at the top and then adding details and lower layers x also all the mermaid diagrams should follow guidance of steering docs x .kiro/steering/mermaid-design-patterns.md x .kiro/steering/mermaid-status-report.md x .kiro/steering/mermaid-syntax-guide.md x .kiro/steering/mermaid-troubleshooting.md
