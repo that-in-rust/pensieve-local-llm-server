@@ -527,7 +527,16 @@ impl Cli {
         }
         
         let db = Database::new(database_path).await?;
-        let migration_manager = MigrationManager::new(db.clone());
+        
+        // Try to load migrations from files first, fallback to hardcoded migrations
+        let migrations_dir = std::path::Path::new("migrations");
+        let migration_manager = if migrations_dir.exists() {
+            println!("Loading migrations from directory: {}", migrations_dir.display());
+            MigrationManager::from_files(db.clone(), migrations_dir)?
+        } else {
+            println!("Using built-in migrations (migrations directory not found)");
+            MigrationManager::new(db.clone())
+        };
         
         match action {
             MigrateAction::Up => {
@@ -675,8 +684,22 @@ impl Cli {
                 
                 println!("Resetting database (dropping all tables)...");
                 
-                // Rollback to version 0 (drops all tables)
-                migration_manager.rollback_to(0).await?;
+                // Drop all tables directly instead of using rollback
+                let tables_to_drop = vec![
+                    "DROP TABLE IF EXISTS processing_stats",
+                    "DROP TABLE IF EXISTS paragraph_sources", 
+                    "DROP TABLE IF EXISTS processing_errors",
+                    "DROP TABLE IF EXISTS paragraphs",
+                    "DROP TABLE IF EXISTS files",
+                    "DROP TABLE IF EXISTS schema_version",
+                ];
+                
+                for drop_sql in tables_to_drop {
+                    sqlx::query(drop_sql)
+                        .execute(db.pool())
+                        .await
+                        .map_err(|e| PensieveError::Database(e))?;
+                }
                 
                 println!("Database reset completed");
                 println!("Run 'pensieve migrate up' to recreate the schema");

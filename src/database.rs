@@ -1968,9 +1968,11 @@ mod tests {
         // Test schema initialization
         db.initialize_schema().await.unwrap();
         
-        // Verify schema version
+        // Verify schema version (should be the latest version)
         let version = db.get_schema_version().await.unwrap();
-        assert_eq!(version, 1);
+        let migration_manager = MigrationManager::new(db.clone());
+        let target_version = migration_manager.get_target_version();
+        assert_eq!(version, target_version);
         
         // Test health check
         db.health_check().await.unwrap();
