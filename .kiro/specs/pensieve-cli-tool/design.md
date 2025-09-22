@@ -2,15 +2,19 @@
 
 ## Overview
 
-The Pensieve CLI tool is a high-performance Rust application designed to efficiently ingest text files into a clean, deduplicated database optimized for LLM processing. The system employs a two-phase approach: metadata scanning with file-level deduplication, followed by content extraction with paragraph-level deduplication. This design maximizes token efficiency while maintaining complete traceability from content back to source files.
+The Pensieve CLI tool is a high-performance Rust application designed to efficiently ingest text files into a clean, deduplicated database optimized for LLM processing. The system employs a two-phase approach: metadata scanning with file-level deduplication, followed by content extraction with intelligent chunking and global deduplication. This design maximizes token efficiency while maintaining complete traceability from content back to source files.
+
+The system implements a **Hybrid Extraction Architecture (HEA)** that combines native Rust parsing for simple formats with opportunistic orchestration of external tools for complex formats like PDF and DOCX, ensuring both performance and high-fidelity content extraction.
 
 ### Core Design Principles
 
 1. **Performance First**: Native Rust implementation with parallel processing and efficient memory usage
-2. **Deduplication at Multiple Levels**: File-level (by hash) and content-level (by paragraph) to eliminate redundancy
-3. **Comprehensive Format Support**: Native parsing for simple formats, external tool orchestration for complex formats (PDF, DOCX)
-4. **Robust Error Handling**: Graceful degradation when individual files fail
+2. **Deduplication at Multiple Levels**: File-level (by hash) and content-level (by chunk) to eliminate redundancy
+3. **Hybrid Extraction Architecture**: Native parsing for Tier 1 formats, external tool orchestration for Tier 2 formats (PDF, DOCX)
+4. **Robust Error Handling**: Graceful degradation when individual files fail, comprehensive error logging
 5. **Incremental Processing**: Delta updates to avoid reprocessing unchanged files
+6. **Intelligent Chunking**: Context-aware chunking with precise tokenization for optimal LLM processing
+7. **Configuration-Driven**: Flexible external tool configuration with graceful degradation
 
 ## Architecture
 
