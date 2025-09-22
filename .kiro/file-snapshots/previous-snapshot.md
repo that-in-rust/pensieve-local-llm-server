@@ -1,17 +1,17 @@
-# Repository Snapshot - 2025-09-22 14:06:42
+# Repository Snapshot - 2025-09-22 14:21:58
 
 ## Summary Statistics
-- **Total Files**: 54
-- **Total Lines**: 9,176
-- **Total Words**: 33,384
-- **Snapshot Time**: 2025-09-22 14:06:42
+- **Total Files**: 58
+- **Total Lines**: 9,411
+- **Total Words**: 34,137
+- **Snapshot Time**: 2025-09-22 14:21:58
 
 ## Spec Progress Summary
 
 | Spec Name | Phase | Progress | Files |
 |-----------|-------|----------|-------|
 | parseltongue-aim-daemon | Init | - | 0/3 |
-| pensieve-cli-tool | Implementation (25%) | - | 3/3 |
+| pensieve-cli-tool | Implementation (31%) | - | 3/3 |
 
 ## File Inventory
 
@@ -22,7 +22,7 @@
 | .cursorignore | 133 | 195 | 1.7K |
 | examples/file_type_demo.rs | 97 | 329 | 3.7K |
 | .gitignore | 39 | 55 | 383 |
-| .kiro/file-snapshots/change-log.md | 1692 | 4874 | 36K |
+| .kiro/file-snapshots/change-log.md | 1703 | 4905 | 37K |
 | .kiro/file-snapshots/current-snapshot.md | 73 | 615 | 3.7K |
 | .kiro/file-snapshots/previous-snapshot.md | 73 | 615 | 3.7K |
 | .kiro/hooks/hook-automation-guide.md | 256 | 1274 | 11K |
@@ -48,7 +48,7 @@
 | .kiro/rust-idioms/Unlocking _Compile-First Success__ A Layered Blueprint for Building and Governing Rust's Idiomatic-Archive.md | 416 | 5927 | 47K |
 | .kiro/specs/pensieve-cli-tool/design.md | 677 | 3050 | 26K |
 | .kiro/specs/pensieve-cli-tool/requirements.md | 240 | 2842 | 20K |
-| .kiro/specs/pensieve-cli-tool/tasks.md | 117 | 827 | 5.5K |
+| .kiro/specs/pensieve-cli-tool/tasks.md | 117 | 826 | 5.5K |
 | .kiro/steering/code-conventions.md | 1997 | 6142 | 53K |
 | .kiro/steering/design101-tdd-architecture-principles.md | 947 | 3454 | 29K |
 | .kiro/tree-with-wc.sh | 60 | 411 | 2.7K |
@@ -69,5 +69,9 @@
 | test.db | [binary] | [binary] | 76K |
 | test.db-shm | [binary] | [binary] | 32K |
 | test.db-wal | [binary] | [binary] | 302K |
+| test_performance.db | [binary] | [binary] | 4.0K |
+| test_performance.db-shm | [binary] | [binary] | 32K |
+| test_performance.db-wal | [binary] | [binary] | 302K |
 | tests/file_type_detection_integration.rs | 99 | 307 | 4.4K |
+| tests/metadata_scanning_integration.rs | 224 | 723 | 8.3K |
 | .vscode/settings.json | [binary] | [binary] | 161 |
