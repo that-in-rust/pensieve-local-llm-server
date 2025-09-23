@@ -1,0 +1,54 @@
+[package]
+name = "pensieve-validator"
+version = "0.1.0"
+edition = "2021"
+authors = ["Pensieve Team"]
+description = "Real-world validation framework for pensieve and other CLI tools"
+license = "MIT"
+
+[[bin]]
+name = "pensieve-validator"
+path = "src/main.rs"
+
+[dependencies]
+# CLI argument parsing
+clap = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+
+# System monitoring
+sysinfo = { workspace = true }
+
+# File system operations
+walkdir = { workspace = true }
+
+# Additional utilities
+chrono = { workspace = true }
+uuid = { workspace = true }
+
+# MIME type detection
+mime_guess = { workspace = true }
+mime = { workspace = true }
+
+# Cryptographic hashing
+sha2 = "0.10"
+
+# Regular expressions
+regex = "1.10"
+
+# Temporary file handling
+tempfile = "3.8"
+
+[dev-dependencies]
+tempfile = "3.8"
+tokio-test = "0.4"
