@@ -154,7 +154,7 @@ pub struct MonitoringResults {
 }
 
 /// Summary statistics from monitoring session
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MonitoringSummary {
     pub duration: Duration,
     pub snapshot_count: usize,
@@ -170,7 +170,7 @@ pub struct MonitoringSummary {
 }
 
 /// Monitoring alerts for threshold violations
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MonitoringAlert {
     #[serde(skip, default = "Instant::now")]
     pub timestamp: Instant,
@@ -227,7 +227,7 @@ pub enum AlertSeverity {
 }
 
 /// Performance analysis based on monitoring data
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerformanceAnalysis {
     pub resource_utilization_score: f64, // 0.0 - 1.0
     pub stability_score: f64,            // 0.0 - 1.0 (low variance = high stability)

@@ -20,6 +20,50 @@ enable_ux_analysis = true
 # Enable performance profiling
 enable_performance_profiling = true
 
+[validation.benchmarking]
+# Enable baseline establishment for performance comparisons
+enable_baseline_establishment = true
+
+# Enable degradation detection compared to baseline
+enable_degradation_detection = true
+
+# Enable scalability testing with extrapolation
+enable_scalability_testing = true
+
+# Enable memory usage pattern analysis and leak detection
+enable_memory_analysis = true
+
+# Enable database performance profiling
+enable_database_profiling = true
+
+# Number of benchmark iterations to run
+benchmark_iterations = 3
+
+# Number of warmup iterations before benchmarking
+warmup_iterations = 1
+
+# Timeout in seconds for benchmarking operations
+timeout_seconds = 3600
+
+# Memory sampling interval in milliseconds
+memory_sampling_interval_ms = 100
+
+[validation.benchmarking.degradation_thresholds]
+# Maximum allowed files per second degradation (0.2 = 20%)
+max_files_per_second_degradation = 0.2
+
+# Maximum memory growth rate in MB per second
+max_memory_growth_rate_mb_per_sec = 10.0
+
+# Maximum database operation time in milliseconds
+max_database_operation_time_ms = 1000
+
+# Minimum CPU efficiency score (0.0 - 1.0)
+min_cpu_efficiency_score = 0.6
+
+# Maximum memory leak rate in MB per hour
+max_memory_leak_rate_mb_per_hour = 50.0
+
 [pensieve]
 # Path to pensieve binary (leave empty to use system PATH)
 # binary_path = "/usr/local/bin/pensieve"

@@ -34,7 +34,8 @@ walkdir = { workspace = true }
 
 # Additional utilities
 chrono = { workspace = true }
-uuid = { workspace = true }
+uuid = { workspace = true, features = ["v4", "serde"] }
+num_cpus = { workspace = true }
 
 # MIME type detection
 mime_guess = { workspace = true }
@@ -56,3 +57,4 @@ log = "0.4"
 [dev-dependencies]
 tempfile = "3.8"
 tokio-test = "0.4"
+chrono = { workspace = true, features = ["serde"] }

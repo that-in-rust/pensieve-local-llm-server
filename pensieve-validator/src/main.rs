@@ -6,6 +6,8 @@ use pensieve_validator::{
     directory_analyzer::DirectoryAnalyzer,
     chaos_detector::ChaosDetector,
     report_generator::ReportGenerator,
+    ComparativeAnalyzer, HistoricalReportGenerator, ExportFormat,
+    comparative_analyzer::SystemInfo,
 };
 use std::path::PathBuf;
 use std::time::Duration;
@@ -163,6 +165,112 @@ enum Commands {
         focus_metrics: Option<Vec<String>>,
     },
     
+    /// Establish a baseline from validation results
+    EstablishBaseline {
+        /// Validation results to use as baseline
+        #[arg(short, long)]
+        results: PathBuf,
+        
+        /// Baseline identifier
+        #[arg(short, long)]
+        baseline_id: String,
+        
+        /// Dataset path for the baseline
+        #[arg(short, long)]
+        dataset_path: PathBuf,
+        
+        /// System information file (JSON)
+        #[arg(long)]
+        system_info: Option<PathBuf>,
+        
+        /// Storage directory for baselines
+        #[arg(long)]
+        storage_dir: Option<PathBuf>,
+    },
+    
+    /// Compare against established baseline
+    CompareBaseline {
+        /// Current validation results
+        #[arg(short, long)]
+        results: PathBuf,
+        
+        /// Baseline identifier to compare against
+        #[arg(short, long)]
+        baseline_id: String,
+        
+        /// Output file for comparison report
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        
+        /// Storage directory for baselines
+        #[arg(long)]
+        storage_dir: Option<PathBuf>,
+    },
+    
+    /// Analyze historical trends across multiple validation runs
+    AnalyzeTrends {
+        /// Dataset path to analyze trends for
+        #[arg(short, long)]
+        dataset_path: PathBuf,
+        
+        /// Analysis period in days
+        #[arg(short, long, default_value = "30")]
+        period_days: i64,
+        
+        /// Output directory for trend analysis
+        #[arg(short, long)]
+        output_dir: PathBuf,
+        
+        /// Storage directory for historical data
+        #[arg(long)]
+        storage_dir: Option<PathBuf>,
+    },
+    
+    /// Generate historical report with trend visualization
+    GenerateHistoricalReport {
+        /// Dataset path for the report
+        #[arg(short, long)]
+        dataset_path: PathBuf,
+        
+        /// Analysis period in days
+        #[arg(short, long, default_value = "30")]
+        period_days: i64,
+        
+        /// Output directory for the report
+        #[arg(short, long)]
+        output_dir: PathBuf,
+        
+        /// Storage directory for historical data
+        #[arg(long)]
+        storage_dir: Option<PathBuf>,
+        
+        /// Export formats
+        #[arg(long, value_enum)]
+        formats: Option<Vec<HistoricalReportFormat>>,
+    },
+    
+    /// List available baselines
+    ListBaselines {
+        /// Storage directory for baselines
+        #[arg(long)]
+        storage_dir: Option<PathBuf>,
+    },
+    
+    /// Delete a baseline
+    DeleteBaseline {
+        /// Baseline identifier to delete
+        #[arg(short, long)]
+        baseline_id: String,
+        
+        /// Storage directory for baselines
+        #[arg(long)]
+        storage_dir: Option<PathBuf>,
+        
+        /// Force deletion without confirmation
+        #[arg(long)]
+        force: bool,
+    },
+    
     /// Generate default configuration file
     InitConfig {
         /// Output path for configuration file
@@ -199,6 +307,14 @@ enum ReportFormat {
     Json,
     Csv,
     Markdown,
+}
+
+#[derive(Clone, ValueEnum)]
+enum HistoricalReportFormat {
+    Html,
+    Json,
+    Csv,
+    Excel,
 }
 
 #[tokio::main]
@@ -302,6 +418,99 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 output,
                 threshold,
                 focus_metrics,
+            ).await?;
+        }
+        
+        Commands::EstablishBaseline {
+            results,
+            baseline_id,
+            dataset_path,
+            system_info,
+            storage_dir,
+        } => {
+            run_establish_baseline(
+                verbose,
+                quiet,
+                results,
+                baseline_id,
+                dataset_path,
+                system_info,
+                storage_dir,
+            ).await?;
+        }
+        
+        Commands::CompareBaseline {
+            results,
+            baseline_id,
+            output,
+            storage_dir,
+        } => {
+            run_compare_baseline(
+                verbose,
+                quiet,
+                output_format,
+                results,
+                baseline_id,
+                output,
+                storage_dir,
+            ).await?;
+        }
+        
+        Commands::AnalyzeTrends {
+            dataset_path,
+            period_days,
+            output_dir,
+            storage_dir,
+        } => {
+            run_analyze_trends(
+                verbose,
+                quiet,
+                dataset_path,
+                period_days,
+                output_dir,
+                storage_dir,
+            ).await?;
+        }
+        
+        Commands::GenerateHistoricalReport {
+            dataset_path,
+            period_days,
+            output_dir,
+            storage_dir,
+            formats,
+        } => {
+            run_generate_historical_report(
+                verbose,
+                quiet,
+                dataset_path,
+                period_days,
+                output_dir,
+                storage_dir,
+                formats,
+            ).await?;
+        }
+        
+        Commands::ListBaselines {
+            storage_dir,
+        } => {
+            run_list_baselines(
+                verbose,
+                quiet,
+                storage_dir,
+            ).await?;
+        }
+        
+        Commands::DeleteBaseline {
+            baseline_id,
+            storage_dir,
+            force,
+        } => {
+            run_delete_baseline(
+                verbose,
+                quiet,
+                baseline_id,
+                storage_dir,
+                force,
             ).await?;
         }
         
@@ -1292,4 +1501,526 @@ fn print_validation_summary(results: &pensieve_validator::ComprehensiveValidatio
             println!("{}", serde_json::to_string_pretty(results).unwrap());
         }
     }
+}/
+// Establish a baseline from validation results
+async fn run_establish_baseline(
+    verbose: bool,
+    quiet: bool,
+    results_path: PathBuf,
+    baseline_id: String,
+    dataset_path: PathBuf,
+    system_info_path: Option<PathBuf>,
+    storage_dir: Option<PathBuf>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if !quiet {
+        println!("📊 Establishing baseline '{}' from: {:?}", baseline_id, results_path);
+    }
+    
+    if !results_path.exists() {
+        eprintln!("❌ Results file does not exist: {:?}", results_path);
+        std::process::exit(1);
+    }
+    
+    if !dataset_path.exists() {
+        eprintln!("❌ Dataset path does not exist: {:?}", dataset_path);
+        std::process::exit(1);
+    }
+    
+    // Load validation results
+    let results = load_validation_results(&results_path)?;
+    
+    // Load or create system info
+    let system_info = if let Some(info_path) = system_info_path {
+        if info_path.exists() {
+            let info_content = std::fs::read_to_string(info_path)?;
+            serde_json::from_str(&info_content)?
+        } else {
+            eprintln!("❌ System info file does not exist: {:?}", info_path);
+            std::process::exit(1);
+        }
+    } else {
+        // Create default system info
+        SystemInfo {
+            cpu_model: "Unknown CPU".to_string(),
+            memory_gb: 8,
+            storage_type: "Unknown Storage".to_string(),
+            os_version: std::env::consts::OS.to_string(),
+        }
+    };
+    
+    // Create comparative analyzer
+    let storage_path = storage_dir.unwrap_or_else(|| PathBuf::from("./validation_storage"));
+    let mut analyzer = ComparativeAnalyzer::new(storage_path);
+    
+    // Establish baseline
+    match analyzer.establish_baseline(baseline_id.clone(), results, dataset_path, system_info).await {
+        Ok(baseline_set) => {
+            if !quiet {
+                println!("✅ Baseline '{}' established successfully!", baseline_id);
+                println!("   Established at: {}", baseline_set.established_at.format("%Y-%m-%d %H:%M:%S UTC"));
+                println!("   Confidence level: {:.1}%", baseline_set.confidence_level * 100.0);
+                println!("   Sample count: {}", baseline_set.sample_count);
+            }
+        }
+        Err(e) => {
+            eprintln!("❌ Failed to establish baseline: {}", e);
+            std::process::exit(1);
+        }
+    }
+    
+    Ok(())
+}
+
+/// Compare current results against established baseline
+async fn run_compare_baseline(
+    verbose: bool,
+    quiet: bool,
+    output_format: OutputFormat,
+    results_path: PathBuf,
+    baseline_id: String,
+    output: Option<PathBuf>,
+    storage_dir: Option<PathBuf>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if !quiet {
+        println!("🔄 Comparing results against baseline '{}'", baseline_id);
+        println!("   Current results: {:?}", results_path);
+    }
+    
+    if !results_path.exists() {
+        eprintln!("❌ Results file does not exist: {:?}", results_path);
+        std::process::exit(1);
+    }
+    
+    // Load validation results
+    let results = load_validation_results(&results_path)?;
+    
+    // Create comparative analyzer
+    let storage_path = storage_dir.unwrap_or_else(|| PathBuf::from("./validation_storage"));
+    let analyzer = ComparativeAnalyzer::new(storage_path);
+    
+    // Compare against baseline
+    match analyzer.compare_against_baseline(&baseline_id, results).await {
+        Ok(comparison) => {
+            if !quiet {
+                print_baseline_comparison(&comparison, &output_format);
+            }
+            
+            // Save comparison if output specified
+            if let Some(output_path) = output {
+                save_baseline_comparison(&comparison, &output_path, &output_format)?;
+                if !quiet {
+                    println!("💾 Comparison results saved to: {:?}", output_path);
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("❌ Failed to compare against baseline: {}", e);
+            std::process::exit(1);
+        }
+    }
+    
+    Ok(())
+}
+
+/// Analyze historical trends
+async fn run_analyze_trends(
+    verbose: bool,
+    quiet: bool,
+    dataset_path: PathBuf,
+    period_days: i64,
+    output_dir: PathBuf,
+    storage_dir: Option<PathBuf>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if !quiet {
+        println!("📈 Analyzing trends for dataset: {:?}", dataset_path);
+        println!("   Analysis period: {} days", period_days);
+    }
+    
+    if !dataset_path.exists() {
+        eprintln!("❌ Dataset path does not exist: {:?}", dataset_path);
+        std::process::exit(1);
+    }
+    
+    // Create output directory
+    std::fs::create_dir_all(&output_dir)?;
+    
+    // Create comparative analyzer
+    let storage_path = storage_dir.unwrap_or_else(|| PathBuf::from("./validation_storage"));
+    let analyzer = ComparativeAnalyzer::new(storage_path);
+    
+    // Analyze trends
+    match analyzer.analyze_historical_trends(&dataset_path, period_days).await {
+        Ok(trend_analysis) => {
+            if !quiet {
+                print_trend_analysis(&trend_analysis);
+            }
+            
+            // Save trend analysis
+            let analysis_path = output_dir.join("trend_analysis.json");
+            let analysis_json = serde_json::to_string_pretty(&trend_analysis)?;
+            std::fs::write(&analysis_path, analysis_json)?;
+            
+            if !quiet {
+                println!("💾 Trend analysis saved to: {:?}", analysis_path);
+            }
+        }
+        Err(e) => {
+            eprintln!("❌ Failed to analyze trends: {}", e);
+            std::process::exit(1);
+        }
+    }
+    
+    Ok(())
+}
+
+/// Generate historical report with trend visualization
+async fn run_generate_historical_report(
+    verbose: bool,
+    quiet: bool,
+    dataset_path: PathBuf,
+    period_days: i64,
+    output_dir: PathBuf,
+    storage_dir: Option<PathBuf>,
+    formats: Option<Vec<HistoricalReportFormat>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if !quiet {
+        println!("📊 Generating historical report for dataset: {:?}", dataset_path);
+        println!("   Analysis period: {} days", period_days);
+    }
+    
+    if !dataset_path.exists() {
+        eprintln!("❌ Dataset path does not exist: {:?}", dataset_path);
+        std::process::exit(1);
+    }
+    
+    // Create output directory
+    std::fs::create_dir_all(&output_dir)?;
+    
+    // Create analyzers
+    let storage_path = storage_dir.unwrap_or_else(|| PathBuf::from("./validation_storage"));
+    let analyzer = ComparativeAnalyzer::new(storage_path);
+    let report_generator = HistoricalReportGenerator::new(output_dir.clone());
+    
+    // Analyze trends
+    let trend_analysis = match analyzer.analyze_historical_trends(&dataset_path, period_days).await {
+        Ok(analysis) => analysis,
+        Err(e) => {
+            eprintln!("❌ Failed to analyze trends: {}", e);
+            std::process::exit(1);
+        }
+    };
+    
+    // Get comparisons and baselines (simplified for now)
+    let comparisons = Vec::new(); // Would load from storage
+    let baselines = Vec::new();   // Would load from storage
+    
+    // Generate historical report
+    match report_generator.generate_historical_report(trend_analysis, comparisons, baselines).await {
+        Ok(report) => {
+            if !quiet {
+                println!("✅ Historical report generated successfully!");
+                println!("   Report ID: {}", report.report_id);
+                println!("   Generated at: {}", report.generated_at.format("%Y-%m-%d %H:%M:%S UTC"));
+                println!("   Report period: {} to {}", 
+                    report.report_period.start_date.format("%Y-%m-%d"),
+                    report.report_period.end_date.format("%Y-%m-%d")
+                );
+                println!("   Data points: {}", report.report_period.total_validation_runs);
+            }
+            
+            // Generate charts
+            let charts = report_generator.generate_trend_charts(&trend_analysis).await?;
+            if !quiet && !charts.is_empty() {
+                println!("📈 Generated {} trend charts", charts.len());
+            }
+        }
+        Err(e) => {
+            eprintln!("❌ Failed to generate historical report: {}", e);
+            std::process::exit(1);
+        }
+    }
+    
+    Ok(())
+}
+
+/// List available baselines
+async fn run_list_baselines(
+    verbose: bool,
+    quiet: bool,
+    storage_dir: Option<PathBuf>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if !quiet {
+        println!("📋 Listing available baselines...");
+    }
+    
+    // Create comparative analyzer
+    let storage_path = storage_dir.unwrap_or_else(|| PathBuf::from("./validation_storage"));
+    let analyzer = ComparativeAnalyzer::new(storage_path);
+    
+    // List baselines
+    match analyzer.list_baselines().await {
+        Ok(baselines) => {
+            if baselines.is_empty() {
+                if !quiet {
+                    println!("📭 No baselines found");
+                }
+            } else {
+                if !quiet {
+                    println!("📊 Found {} baseline(s):", baselines.len());
+                    for baseline_id in &baselines {
+                        println!("   • {}", baseline_id);
+                    }
+                } else {
+                    for baseline_id in &baselines {
+                        println!("{}", baseline_id);
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("❌ Failed to list baselines: {}", e);
+            std::process::exit(1);
+        }
+    }
+    
+    Ok(())
+}
+
+/// Delete a baseline
+async fn run_delete_baseline(
+    verbose: bool,
+    quiet: bool,
+    baseline_id: String,
+    storage_dir: Option<PathBuf>,
+    force: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if !quiet {
+        println!("🗑️  Deleting baseline '{}'...", baseline_id);
+    }
+    
+    // Confirm deletion if not forced
+    if !force && !quiet {
+        print!("Are you sure you want to delete baseline '{}'? (y/N): ", baseline_id);
+        io::stdout().flush()?;
+        
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        
+        if !input.trim().to_lowercase().starts_with('y') {
+            println!("❌ Deletion cancelled");
+            return Ok(());
+        }
+    }
+    
+    // Create comparative analyzer
+    let storage_path = storage_dir.unwrap_or_else(|| PathBuf::from("./validation_storage"));
+    let mut analyzer = ComparativeAnalyzer::new(storage_path);
+    
+    // Delete baseline
+    match analyzer.delete_baseline(&baseline_id).await {
+        Ok(()) => {
+            if !quiet {
+                println!("✅ Baseline '{}' deleted successfully", baseline_id);
+            }
+        }
+        Err(e) => {
+            eprintln!("❌ Failed to delete baseline: {}", e);
+            std::process::exit(1);
+        }
+    }
+    
+    Ok(())
+}
+
+/// Print baseline comparison results
+fn print_baseline_comparison(
+    comparison: &pensieve_validator::ValidationComparison,
+    output_format: &OutputFormat,
+) {
+    match output_format {
+        OutputFormat::Human => {
+            println!("\n🔄 BASELINE COMPARISON RESULTS");
+            println!("═══════════════════════════════");
+            println!("Comparison ID: {}", comparison.comparison_id);
+            println!("Comparison Time: {}", comparison.comparison_timestamp.format("%Y-%m-%d %H:%M:%S UTC"));
+            
+            println!("\n📊 BASELINE RUN");
+            println!("──────────────");
+            println!("Run ID: {}", comparison.baseline_run.run_id);
+            println!("Timestamp: {}", comparison.baseline_run.timestamp.format("%Y-%m-%d %H:%M:%S UTC"));
+            println!("Pensieve Version: {}", comparison.baseline_run.pensieve_version);
+            println!("Duration: {:.2}s", comparison.baseline_run.total_duration_seconds);
+            
+            println!("\n📊 CURRENT RUN");
+            println!("─────────────");
+            println!("Run ID: {}", comparison.current_run.run_id);
+            println!("Timestamp: {}", comparison.current_run.timestamp.format("%Y-%m-%d %H:%M:%S UTC"));
+            println!("Pensieve Version: {}", comparison.current_run.pensieve_version);
+            println!("Duration: {:.2}s", comparison.current_run.total_duration_seconds);
+            
+            println!("\n⚡ PERFORMANCE COMPARISON");
+            println!("───────────────────────");
+            let perf = &comparison.performance_comparison;
+            print_performance_change("Files per Second", &perf.files_per_second_change);
+            print_performance_change("Memory Usage (MB)", &perf.memory_usage_change);
+            print_performance_change("Processing Time (s)", &perf.processing_time_change);
+            
+            println!("\n🔒 RELIABILITY COMPARISON");
+            println!("────────────────────────");
+            let rel = &comparison.reliability_comparison;
+            println!("Crash Count Change: {:+}", rel.crash_count_change);
+            print_performance_change("Error Recovery Rate", &rel.error_recovery_rate_change);
+            print_performance_change("Overall Reliability", &rel.overall_reliability_change);
+            
+            println!("\n👤 UX COMPARISON");
+            println!("───────────────");
+            let ux = &comparison.ux_comparison;
+            print_performance_change("Progress Reporting", &ux.progress_reporting_change);
+            print_performance_change("Error Message Clarity", &ux.error_message_clarity_change);
+            print_performance_change("Completion Feedback", &ux.completion_feedback_change);
+            print_performance_change("Overall UX Score", &ux.overall_ux_change);
+            
+            println!("\n💾 DEDUPLICATION COMPARISON");
+            println!("──────────────────────────");
+            let dedup = &comparison.deduplication_comparison;
+            print_performance_change("Storage Savings (%)", &dedup.storage_savings_change);
+            print_performance_change("Processing Time (s)", &dedup.processing_time_change);
+            println!("ROI Recommendation: {} → {}", 
+                dedup.roi_recommendation_change.baseline_recommendation,
+                dedup.roi_recommendation_change.current_recommendation
+            );
+            
+            println!("\n📈 OVERALL ASSESSMENT");
+            println!("────────────────────");
+            let assessment = &comparison.overall_assessment;
+            println!("Overall Trend: {:?}", assessment.overall_trend);
+            println!("Summary: {}", assessment.summary);
+            
+            if !assessment.key_insights.is_empty() {
+                println!("\n💡 Key Insights:");
+                for insight in &assessment.key_insights {
+                    println!("  • {}", insight);
+                }
+            }
+            
+            if !comparison.regression_alerts.is_empty() {
+                println!("\n🚨 REGRESSION ALERTS");
+                println!("───────────────────");
+                for alert in &comparison.regression_alerts {
+                    println!("  • {:?}: {} ({:.1}% degradation)", 
+                        alert.severity, alert.description, alert.degradation_percentage);
+                }
+            }
+            
+            if !comparison.improvement_highlights.is_empty() {
+                println!("\n🎯 IMPROVEMENT HIGHLIGHTS");
+                println!("────────────────────────");
+                for improvement in &comparison.improvement_highlights {
+                    println!("  • {}: {} ({:.1}% improvement)", 
+                        improvement.category, improvement.description, improvement.improvement_percentage);
+                }
+            }
+        }
+        OutputFormat::Json => {
+            let json = serde_json::to_string_pretty(comparison).unwrap();
+            println!("{}", json);
+        }
+        OutputFormat::Yaml => {
+            // YAML output would be implemented here
+            println!("YAML output not yet implemented");
+        }
+    }
+}
+
+/// Print performance change details
+fn print_performance_change(metric_name: &str, change: &pensieve_validator::comparative_analyzer::PerformanceChange) {
+    let trend_symbol = match change.trend_direction {
+        pensieve_validator::TrendDirection::Improving => "📈",
+        pensieve_validator::TrendDirection::Degrading => "📉",
+        pensieve_validator::TrendDirection::Stable => "➡️",
+        pensieve_validator::TrendDirection::Volatile => "📊",
+    };
+    
+    let significance_color = match change.change_significance {
+        pensieve_validator::comparative_analyzer::ChangeSignificance::Major => "🔴",
+        pensieve_validator::comparative_analyzer::ChangeSignificance::Significant => "🟠",
+        pensieve_validator::comparative_analyzer::ChangeSignificance::Moderate => "🟡",
+        pensieve_validator::comparative_analyzer::ChangeSignificance::Minor => "🟢",
+        pensieve_validator::comparative_analyzer::ChangeSignificance::Negligible => "⚪",
+    };
+    
+    println!("{} {} {}: {:.2} → {:.2} ({:+.1}%) {:?}", 
+        trend_symbol, significance_color, metric_name,
+        change.baseline_value, change.current_value, change.percentage_change,
+        change.change_significance
+    );
+}
+
+/// Print trend analysis summary
+fn print_trend_analysis(analysis: &pensieve_validator::HistoricalTrendAnalysis) {
+    println!("\n📈 HISTORICAL TREND ANALYSIS");
+    println!("═══════════════════════════");
+    println!("Analysis ID: {}", analysis.analysis_id);
+    println!("Dataset: {:?}", analysis.dataset_path);
+    println!("Analysis Period: {} to {} ({} days)", 
+        analysis.analysis_period.start_date.format("%Y-%m-%d"),
+        analysis.analysis_period.end_date.format("%Y-%m-%d"),
+        analysis.analysis_period.duration_days
+    );
+    println!("Data Points: {}", analysis.data_points);
+    
+    println!("\n⚡ PERFORMANCE TRENDS");
+    println!("───────────────────");
+    println!("Overall Direction: {:?}", analysis.performance_trends.overall_performance_trend);
+    
+    println!("\n🔒 RELIABILITY TRENDS");
+    println!("────────────────────");
+    println!("Overall Direction: {:?}", analysis.reliability_trends.overall_reliability_trend);
+    
+    println!("\n👤 UX TRENDS");
+    println!("───────────");
+    println!("Overall Direction: {:?}", analysis.ux_trends.overall_ux_trend);
+    
+    println!("\n🚀 IMPROVEMENT TRAJECTORY");
+    println!("────────────────────────");
+    let trajectory = &analysis.improvement_trajectory;
+    println!("Overall Trajectory: {:?}", trajectory.overall_trajectory);
+    println!("Improvement Velocity: {:.3}/day", trajectory.improvement_velocity);
+    println!("Consistency Score: {:.1}%", trajectory.consistency_score * 100.0);
+    
+    if !analysis.recommendations.is_empty() {
+        println!("\n💡 RECOMMENDATIONS");
+        println!("─────────────────");
+        for recommendation in &analysis.recommendations {
+            println!("  • {:?}: {}", recommendation.priority, recommendation.description);
+        }
+    }
+}
+
+/// Save baseline comparison results
+fn save_baseline_comparison(
+    comparison: &pensieve_validator::ValidationComparison,
+    output_path: &PathBuf,
+    output_format: &OutputFormat,
+) -> Result<(), Box<dyn std::error::Error>> {
+    match output_format {
+        OutputFormat::Json => {
+            let json_content = serde_json::to_string_pretty(comparison)?;
+            std::fs::write(output_path, json_content)?;
+        }
+        OutputFormat::Yaml => {
+            // YAML serialization would be implemented here
+            return Err("YAML output not yet implemented".into());
+        }
+        OutputFormat::Human => {
+            // Human-readable format saved as text
+            let mut content = String::new();
+            content.push_str(&format!("Baseline Comparison Report\n"));
+            content.push_str(&format!("Generated: {}\n", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")));
+            content.push_str(&format!("Comparison ID: {}\n", comparison.comparison_id));
+            // Add more formatted content here
+            std::fs::write(output_path, content)?;
+        }
+    }
+    Ok(())
 }

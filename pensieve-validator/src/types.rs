@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use chrono::{DateTime, Utc};
 
 /// Comprehensive directory analysis results
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -15,7 +16,7 @@ pub struct DirectoryAnalysis {
 }
 
 /// File type processing statistics
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileTypeStats {
     pub count: u64,
     pub total_size_bytes: u64,
@@ -25,7 +26,7 @@ pub struct FileTypeStats {
 }
 
 /// Processing complexity assessment
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ProcessingComplexity {
     Low,    // Plain text, simple formats
     Medium, // Structured data, common formats
@@ -42,7 +43,7 @@ pub enum TechnicalComplexity {
 }
 
 /// File size distribution analysis
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SizeDistribution {
     pub zero_byte_files: u64,
     pub small_files: u64,      // < 1KB
@@ -54,7 +55,7 @@ pub struct SizeDistribution {
 }
 
 /// Directory depth analysis
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepthAnalysis {
     pub max_depth: usize,
     pub average_depth: f64,
@@ -63,7 +64,7 @@ pub struct DepthAnalysis {
 }
 
 /// High-level chaos indicators
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChaosIndicators {
     pub chaos_score: f64, // 0.0 = clean, 1.0 = maximum chaos
     pub problematic_file_count: u64,
@@ -87,7 +88,7 @@ pub struct ChaosReport {
 }
 
 /// File with misleading extension
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MisleadingFile {
     pub path: PathBuf,
     pub claimed_type: String,    // Based on extension
@@ -96,7 +97,7 @@ pub struct MisleadingFile {
 }
 
 /// File with unicode characters in name
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnicodeFile {
     pub path: PathBuf,
     pub unicode_categories: Vec<String>,
@@ -104,14 +105,14 @@ pub struct UnicodeFile {
 }
 
 /// Large file information
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LargeFile {
     pub path: PathBuf,
     pub size_bytes: u64,
     pub size_category: SizeCategory,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SizeCategory {
     Large,      // 100MB - 1GB
     VeryLarge,  // 1GB - 10GB
@@ -119,14 +120,14 @@ pub enum SizeCategory {
 }
 
 /// Permission-related issue
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PermissionIssue {
     pub path: PathBuf,
     pub issue_type: PermissionIssueType,
     pub details: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PermissionIssueType {
     ReadDenied,
     WriteDenied,
@@ -135,7 +136,7 @@ pub enum PermissionIssueType {
 }
 
 /// Symlink chain information
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SymlinkChain {
     pub start_path: PathBuf,
     pub chain: Vec<PathBuf>,
@@ -145,14 +146,14 @@ pub struct SymlinkChain {
 }
 
 /// Corrupted or problematic file
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CorruptedFile {
     pub path: PathBuf,
     pub corruption_type: CorruptionType,
     pub details: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CorruptionType {
     UnreadableContent,
     InvalidEncoding,
@@ -161,7 +162,7 @@ pub enum CorruptionType {
 }
 
 /// File with unusual characters
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnusualCharacterFile {
     pub path: PathBuf,
     pub unusual_chars: Vec<char>,
@@ -169,7 +170,7 @@ pub struct UnusualCharacterFile {
 }
 
 /// Deeply nested file
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeepNestedFile {
     pub path: PathBuf,
     pub depth: usize,
@@ -304,5 +305,235 @@ impl ChaosReport {
 
         // Normalize to 0.0 - 1.0 range
         (weighted_score / total_files_f64).min(1.0)
+    }
+}/
+// Validation phases for the pensieve validation framework
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ValidationPhase {
+    /// Pre-flight directory analysis and chaos detection
+    PreFlight,
+    /// Reliability testing and crash detection
+    Reliability,
+    /// Performance benchmarking and scalability analysis
+    Performance,
+    /// User experience analysis and feedback quality assessment
+    UserExperience,
+    /// Production intelligence and readiness assessment
+    ProductionIntelligence,
+}
+
+impl std::fmt::Display for ValidationPhase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::PreFlight => write!(f, "Pre-Flight Analysis"),
+            Self::Reliability => write!(f, "Reliability Testing"),
+            Self::Performance => write!(f, "Performance Benchmarking"),
+            Self::UserExperience => write!(f, "User Experience Analysis"),
+            Self::ProductionIntelligence => write!(f, "Production Intelligence"),
+        }
+    }
+}
+
+/// Complete validation results structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationResults {
+    pub directory_analysis: DirectoryAnalysis,
+    pub chaos_report: ChaosReport,
+    pub reliability_results: ReliabilityResults,
+    pub performance_results: PerformanceResults,
+    pub user_experience_results: UXResults,
+    pub deduplication_roi: DeduplicationROI,
+    pub production_readiness: ProductionReadinessReport,
+    pub validation_metadata: ValidationMetadata,
+}
+
+/// Reliability testing results
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReliabilityResults {
+    pub crash_count: u32,
+    pub critical_errors: Vec<String>,
+    pub error_recovery_success_rate: f64,
+    pub graceful_interruption_handling: bool,
+    pub resource_limit_handling: ResourceLimitHandling,
+    pub overall_reliability_score: f64,
+}
+
+/// Resource limit handling assessment
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceLimitHandling {
+    pub memory_limit_respected: bool,
+    pub disk_space_limit_respected: bool,
+    pub timeout_handling: bool,
+    pub graceful_degradation: bool,
+}
+
+/// Performance testing results
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PerformanceResults {
+    pub files_per_second: f64,
+    pub memory_usage_mb: f64,
+    pub peak_memory_mb: f64,
+    pub processing_time_seconds: f64,
+    pub performance_consistency: f64,
+    pub scalability_assessment: ScalabilityAssessment,
+    pub bottleneck_analysis: BottleneckAnalysis,
+}
+
+/// Scalability assessment
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScalabilityAssessment {
+    pub linear_scaling: bool,
+    pub performance_degradation_point: Option<u64>,
+    pub recommended_max_files: u64,
+    pub scaling_guidance: String,
+}
+
+/// Bottleneck analysis
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BottleneckAnalysis {
+    pub primary_bottleneck: String,
+    pub cpu_utilization: f64,
+    pub memory_utilization: f64,
+    pub io_utilization: f64,
+    pub optimization_suggestions: Vec<String>,
+}
+
+/// User experience analysis results
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UXResults {
+    pub progress_reporting_quality: f64,
+    pub error_message_clarity: f64,
+    pub completion_feedback_quality: f64,
+    pub interruption_handling_quality: f64,
+    pub overall_ux_score: f64,
+    pub improvement_recommendations: Vec<UXImprovement>,
+}
+
+/// UX improvement recommendation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UXImprovement {
+    pub category: String,
+    pub current_issue: String,
+    pub suggested_improvement: String,
+    pub impact_level: String,
+}
+
+/// Production readiness report
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProductionReadinessReport {
+    pub overall_assessment: ProductionReadiness,
+    pub reliability_score: f64,
+    pub performance_score: f64,
+    pub ux_score: f64,
+    pub critical_issues: Vec<CriticalIssue>,
+    pub improvement_roadmap: Vec<ImprovementItem>,
+    pub scaling_guidance: String,
+    pub deployment_recommendations: Vec<String>,
+}
+
+/// Production readiness assessment levels
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ProductionReadiness {
+    Ready,
+    ReadyWithCaveats,
+    NotReady,
+}
+
+/// Critical issue that blocks production readiness
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CriticalIssue {
+    pub title: String,
+    pub description: String,
+    pub impact: String,
+    pub affected_scenarios: Vec<String>,
+    pub suggested_fix: String,
+}
+
+/// Improvement roadmap item
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImprovementItem {
+    pub title: String,
+    pub description: String,
+    pub priority: Priority,
+    pub estimated_effort: String,
+    pub expected_impact: String,
+}
+
+/// Priority levels for improvements
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Priority {
+    Critical,
+    High,
+    Medium,
+    Low,
+}
+
+/// Validation metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationMetadata {
+    pub validation_start_time: chrono::DateTime<chrono::Utc>,
+    pub validation_end_time: Option<chrono::DateTime<chrono::Utc>>,
+    pub total_duration_seconds: Option<f64>,
+    pub pensieve_version: Option<String>,
+    pub validator_version: String,
+    pub target_directory: PathBuf,
+    pub configuration_used: String,
+    pub partial_validation: bool,
+    pub completed_phases: Vec<ValidationPhase>,
+    pub failed_phases: Vec<ValidationPhase>,
+}
+
+/// Additional types needed for integration tests
+
+impl ChaosReport {
+    /// Get total count of chaos files
+    pub fn total_chaos_files(&self) -> usize {
+        self.files_without_extensions.len()
+            + self.misleading_extensions.len()
+            + self.unicode_filenames.len()
+            + self.extremely_large_files.len()
+            + self.zero_byte_files.len()
+            + self.permission_issues.len()
+            + self.symlink_chains.len()
+            + self.corrupted_files.len()
+            + self.unusual_characters.len()
+            + self.deep_nesting.len()
+    }
+}
+
+impl PerformanceResults {
+    /// Calculate overall performance score (0.0 to 1.0)
+    pub fn overall_performance_score(&self) -> f64 {
+        // Simple scoring based on multiple factors
+        let speed_score = (self.files_per_second / 100.0).min(1.0);
+        let consistency_score = self.performance_consistency;
+        let memory_score = (200.0 / self.peak_memory_mb.max(1.0)).min(1.0);
+        
+        (speed_score + consistency_score + memory_score) / 3.0
+    }
+}
+
+impl ReliabilityResults {
+    /// Calculate overall reliability score (0.0 to 1.0)
+    pub fn overall_reliability_score(&self) -> f64 {
+        if self.crash_count > 0 {
+            return 0.0;
+        }
+        
+        let error_score = if self.critical_errors.is_empty() { 1.0 } else { 0.5 };
+        let recovery_score = self.error_recovery_success_rate;
+        let interruption_score = if self.graceful_interruption_handling { 1.0 } else { 0.0 };
+        
+        (error_score + recovery_score + interruption_score) / 3.0
+    }
+}
+
+impl UXResults {
+    /// Calculate overall UX score (0.0 to 10.0)
+    pub fn overall_ux_score(&self) -> f64 {
+        (self.progress_reporting_quality + 
+         self.error_message_clarity + 
+         self.completion_feedback_quality + 
+         self.interruption_handling_quality) / 4.0
     }
 }

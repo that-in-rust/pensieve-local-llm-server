@@ -4,6 +4,7 @@ use crate::metrics_collector::{
     SystemState, UXEventType, UXQualityScores, DatabaseOperation
 };
 use crate::pensieve_runner::{PensieveRunner, PensieveConfig};
+use crate::performance_benchmarker::{PerformanceBenchmarker, BenchmarkConfig, PerformanceBenchmarkingResults};
 use crate::process_monitor::{ProcessMonitor, MonitoringConfig};
 use crate::reliability_validator::{ReliabilityValidator, ReliabilityConfig, ReliabilityResults};
 use crate::directory_analyzer::DirectoryAnalyzer;
@@ -25,6 +26,7 @@ use uuid::Uuid;
 pub struct ValidationOrchestrator {
     // Core components
     pensieve_runner: PensieveRunner,
+    performance_benchmarker: PerformanceBenchmarker,
     process_monitor: ProcessMonitor,
     reliability_validator: ReliabilityValidator,
     directory_analyzer: DirectoryAnalyzer,
@@ -93,7 +95,7 @@ pub struct ValidationState {
     pub completed_phases: Vec<ValidationPhase>,
     pub failed_phases: Vec<(ValidationPhase, String)>,
     pub phase_results: ValidationPhaseResults,
-    #[serde(skip)]
+    #[serde(skip, default = "Instant::now")]
     pub start_time: Instant,
     pub checkpoint_path: Option<PathBuf>,
     pub can_resume: bool,
@@ -126,6 +128,7 @@ pub struct PerformanceResults {
     pub pensieve_execution_results: crate::pensieve_runner::PensieveExecutionResults,
     pub process_monitoring_results: crate::process_monitor::MonitoringResults,
     pub deduplication_analysis: crate::types::DeduplicationROI,
+    pub performance_benchmarking_results: PerformanceBenchmarkingResults,
     pub scalability_assessment: ScalabilityAssessment,
 }
 
@@ -249,6 +252,7 @@ pub struct ScalingRecommendation {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidationOrchestratorConfig {
     pub pensieve_config: PensieveConfig,
+    pub benchmark_config: BenchmarkConfig,
     pub monitoring_config: MonitoringConfig,
     pub reliability_config: ReliabilityConfig,
     pub metrics_collection_interval_ms: u64,
@@ -289,6 +293,7 @@ impl Default for ValidationOrchestratorConfig {
     fn default() -> Self {
         Self {
             pensieve_config: PensieveConfig::default(),
+            benchmark_config: BenchmarkConfig::default(),
             monitoring_config: MonitoringConfig::default(),
             reliability_config: ReliabilityConfig::default(),
             metrics_collection_interval_ms: 500,
@@ -416,6 +421,7 @@ impl ValidationOrchestrator {
     /// Create a new ValidationOrchestrator with the given configuration
     pub fn new(config: ValidationOrchestratorConfig) -> Self {
         let pensieve_runner = PensieveRunner::new(config.pensieve_config.clone());
+        let performance_benchmarker = PerformanceBenchmarker::with_config(config.benchmark_config.clone());
         let process_monitor = ProcessMonitor::with_config(config.monitoring_config.clone());
         let reliability_validator = ReliabilityValidator::new(
             config.reliability_config.clone(),
@@ -439,6 +445,7 @@ impl ValidationOrchestrator {
 
         Self {
             pensieve_runner,
+            performance_benchmarker,
             process_monitor,
             reliability_validator,
             directory_analyzer,
@@ -794,14 +801,22 @@ impl ValidationOrchestrator {
                 message: e.to_string(),
             })?;
         
-        // Perform scalability assessment
-        let scalability_assessment = self.assess_scalability(&pensieve_results, current_results);
+        // Run comprehensive performance benchmarking
+        let performance_benchmarking_results = self.run_performance_benchmarking(target_directory).await?;
+        
+        // Perform scalability assessment (enhanced with benchmarking data)
+        let scalability_assessment = self.assess_scalability_with_benchmarking(
+            &pensieve_results, 
+            &performance_benchmarking_results,
+            current_results
+        );
         
         // Store results
         let performance_results = PerformanceResults {
             pensieve_execution_results: pensieve_results,
             process_monitoring_results: process_results,
             deduplication_analysis,
+            performance_benchmarking_results,
             scalability_assessment,
         };
         
@@ -2267,6 +2282,103 @@ impl ValidationOrchestrator {
         }
 
         recommendations
+    }
+
+    /// Run comprehensive performance benchmarking
+    async fn run_performance_benchmarking(
+        &self,
+        target_directory: &Path,
+    ) -> Result<PerformanceBenchmarkingResults> {
+        println!("🎯 Running comprehensive performance benchmarking...");
+        
+        // Get pensieve binary path from config
+        let pensieve_binary = &self.config.pensieve_config.binary_path;
+        
+        // Create output database path
+        let output_database = target_directory.join("validation_benchmark.db");
+        
+        // Create a mutable benchmarker for this run
+        let mut benchmarker = PerformanceBenchmarker::with_config(self.config.benchmark_config.clone());
+        
+        // Run comprehensive benchmarking
+        let results = benchmarker.run_comprehensive_benchmark(
+            pensieve_binary,
+            &target_directory.to_path_buf(),
+            &output_database,
+        ).await.map_err(|e| ValidationError::ProcessMonitoring(
+            format!("Performance benchmarking failed: {}", e)
+        ))?;
+        
+        println!("✅ Performance benchmarking completed");
+        Ok(results)
+    }
+
+    /// Assess scalability with enhanced benchmarking data
+    fn assess_scalability_with_benchmarking(
+        &self,
+        pensieve_results: &crate::pensieve_runner::PensieveExecutionResults,
+        benchmarking_results: &PerformanceBenchmarkingResults,
+        _current_results: &ValidationPhaseResults,
+    ) -> ScalabilityAssessment {
+        // Extract scalability insights from benchmarking results
+        let scalability_analysis = &benchmarking_results.scalability_analysis;
+        
+        // Convert benchmarking bottlenecks to validation bottlenecks
+        let bottleneck_analysis: Vec<BottleneckAnalysis> = scalability_analysis
+            .bottleneck_points
+            .iter()
+            .map(|bottleneck| BottleneckAnalysis {
+                component: "Pensieve Processing".to_string(),
+                bottleneck_type: bottleneck.bottleneck_type.clone(),
+                severity: bottleneck.performance_impact,
+                impact_description: format!(
+                    "Bottleneck occurs at {} files with {}% performance impact",
+                    bottleneck.bottleneck_point,
+                    (bottleneck.performance_impact * 100.0) as u32
+                ),
+                resolution_suggestions: bottleneck.mitigation_strategies.clone(),
+            })
+            .collect();
+
+        // Convert scaling recommendations
+        let scaling_recommendations: Vec<ScalingRecommendation> = scalability_analysis
+            .scaling_recommendations
+            .iter()
+            .map(|rec| ScalingRecommendation {
+                scenario: rec.description.clone(),
+                recommended_resources: ResourceRequirements {
+                    estimated_memory_mb: 2048, // Would be calculated from benchmarking
+                    estimated_cpu_cores: 4,
+                    estimated_disk_space_mb: 10240,
+                    estimated_processing_time: Duration::from_secs(3600),
+                },
+                expected_performance: format!("{}% improvement expected", (rec.expected_improvement * 100.0) as u32),
+                cost_implications: match rec.implementation_complexity {
+                    crate::performance_benchmarker::ImplementationEffort::Low => "Low cost".to_string(),
+                    crate::performance_benchmarker::ImplementationEffort::Medium => "Moderate cost".to_string(),
+                    crate::performance_benchmarker::ImplementationEffort::High => "High cost".to_string(),
+                },
+            })
+            .collect();
+
+        // Calculate scaling factors from memory analysis
+        let memory_analysis = &benchmarking_results.memory_analysis;
+        let memory_scaling_factor = if memory_analysis.memory_usage_pattern.baseline_memory_mb > 0 {
+            memory_analysis.memory_usage_pattern.peak_memory_mb as f64 / 
+            memory_analysis.memory_usage_pattern.baseline_memory_mb as f64
+        } else {
+            1.0
+        };
+
+        // Calculate linear scaling factor from overall performance assessment
+        let linear_scaling_factor = benchmarking_results.overall_performance_assessment.scalability_score;
+
+        ScalabilityAssessment {
+            linear_scaling_factor,
+            memory_scaling_factor,
+            bottleneck_analysis,
+            scaling_recommendations,
+        }
     }
 }
 

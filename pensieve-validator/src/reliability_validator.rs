@@ -51,7 +51,7 @@ pub struct ReliabilityResults {
 }
 
 /// Results of crash testing with various problematic inputs
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrashTestResults {
     pub zero_crash_validation_passed: bool,
     pub total_test_scenarios: u32,
@@ -62,7 +62,7 @@ pub struct CrashTestResults {
 }
 
 /// Results of interruption testing (Ctrl+C handling)
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InterruptionTestResults {
     pub graceful_shutdown_works: bool,
     pub cleanup_performed: bool,

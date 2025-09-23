@@ -1,5 +1,5 @@
 use crate::errors::{ValidationError, Result};
-use crate::types::*;
+use crate::types::{TechnicalComplexity, *};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};

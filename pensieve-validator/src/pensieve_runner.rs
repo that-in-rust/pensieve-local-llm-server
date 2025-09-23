@@ -80,7 +80,7 @@ pub struct PensieveExecutionResults {
 }
 
 /// CPU usage statistics
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CpuUsageStats {
     pub peak_cpu_percent: f32,
     pub average_cpu_percent: f32,
@@ -89,7 +89,7 @@ pub struct CpuUsageStats {
 }
 
 /// Analysis of pensieve's stdout/stderr output
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutputAnalysis {
     pub total_lines: u64,
     pub error_lines: u64,
@@ -102,7 +102,7 @@ pub struct OutputAnalysis {
 }
 
 /// Performance metrics extracted from pensieve output
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerformanceMetrics {
     pub files_per_second: f64,
     pub bytes_per_second: u64,
@@ -112,7 +112,7 @@ pub struct PerformanceMetrics {
 }
 
 /// Summary of errors encountered during execution
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ErrorSummary {
     pub total_errors: u64,
     pub error_categories: HashMap<String, u64>,
@@ -122,7 +122,7 @@ pub struct ErrorSummary {
 }
 
 /// Resource usage tracking
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceUsage {
     pub disk_io_read_bytes: u64,
     pub disk_io_write_bytes: u64,

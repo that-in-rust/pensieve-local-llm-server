@@ -48,6 +48,62 @@ pub struct ValidationConfig {
     
     /// Enable performance profiling
     pub enable_performance_profiling: bool,
+    
+    /// Performance benchmarking configuration
+    pub benchmarking: BenchmarkingConfig,
+}
+
+/// Performance benchmarking configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BenchmarkingConfig {
+    /// Enable baseline establishment
+    pub enable_baseline_establishment: bool,
+    
+    /// Enable degradation detection
+    pub enable_degradation_detection: bool,
+    
+    /// Enable scalability testing
+    pub enable_scalability_testing: bool,
+    
+    /// Enable memory analysis
+    pub enable_memory_analysis: bool,
+    
+    /// Enable database profiling
+    pub enable_database_profiling: bool,
+    
+    /// Number of benchmark iterations
+    pub benchmark_iterations: u32,
+    
+    /// Number of warmup iterations
+    pub warmup_iterations: u32,
+    
+    /// Timeout in seconds
+    pub timeout_seconds: u64,
+    
+    /// Memory sampling interval in milliseconds
+    pub memory_sampling_interval_ms: u64,
+    
+    /// Performance degradation thresholds
+    pub degradation_thresholds: DegradationThresholds,
+}
+
+/// Performance degradation thresholds
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DegradationThresholds {
+    /// Maximum allowed files per second degradation (0.2 = 20%)
+    pub max_files_per_second_degradation: f64,
+    
+    /// Maximum memory growth rate in MB per second
+    pub max_memory_growth_rate_mb_per_sec: f64,
+    
+    /// Maximum database operation time in milliseconds
+    pub max_database_operation_time_ms: u64,
+    
+    /// Minimum CPU efficiency score (0.0 - 1.0)
+    pub min_cpu_efficiency_score: f64,
+    
+    /// Maximum memory leak rate in MB per hour
+    pub max_memory_leak_rate_mb_per_hour: f64,
 }
 
 /// Pensieve configuration for TOML serialization
@@ -185,6 +241,36 @@ impl Default for ValidationConfig {
             enable_deduplication_analysis: true,
             enable_ux_analysis: true,
             enable_performance_profiling: true,
+            benchmarking: BenchmarkingConfig::default(),
+        }
+    }
+}
+
+impl Default for BenchmarkingConfig {
+    fn default() -> Self {
+        Self {
+            enable_baseline_establishment: true,
+            enable_degradation_detection: true,
+            enable_scalability_testing: true,
+            enable_memory_analysis: true,
+            enable_database_profiling: true,
+            benchmark_iterations: 3,
+            warmup_iterations: 1,
+            timeout_seconds: 3600, // 1 hour
+            memory_sampling_interval_ms: 100,
+            degradation_thresholds: DegradationThresholds::default(),
+        }
+    }
+}
+
+impl Default for DegradationThresholds {
+    fn default() -> Self {
+        Self {
+            max_files_per_second_degradation: 0.2, // 20%
+            max_memory_growth_rate_mb_per_sec: 10.0,
+            max_database_operation_time_ms: 1000,
+            min_cpu_efficiency_score: 0.6,
+            max_memory_leak_rate_mb_per_hour: 50.0,
         }
     }
 }
@@ -281,6 +367,7 @@ impl CliConfig {
     pub fn to_validation_orchestrator_config(&self) -> ValidationOrchestratorConfig {
         ValidationOrchestratorConfig {
             pensieve_config: self.to_pensieve_config(),
+            benchmark_config: self.to_benchmark_config(),
             monitoring_config: self.to_monitoring_config(),
             reliability_config: ReliabilityConfig::default(),
             metrics_collection_interval_ms: self.validation.metrics_collection_interval_ms,
@@ -331,6 +418,30 @@ impl CliConfig {
             max_cpu_percent: self.performance.max_cpu_percent.unwrap_or(80.0),
             max_error_rate_per_minute: self.performance.max_error_rate_per_minute.unwrap_or(5.0),
             min_ux_score: self.performance.min_ux_score.unwrap_or(7.0),
+        }
+    }
+
+    /// Convert to BenchmarkConfig
+    pub fn to_benchmark_config(&self) -> crate::performance_benchmarker::BenchmarkConfig {
+        use crate::performance_benchmarker::{BenchmarkConfig, PerformanceThresholds as BenchmarkThresholds};
+        
+        BenchmarkConfig {
+            enable_baseline_establishment: self.validation.benchmarking.enable_baseline_establishment,
+            enable_degradation_detection: self.validation.benchmarking.enable_degradation_detection,
+            enable_scalability_testing: self.validation.benchmarking.enable_scalability_testing,
+            enable_memory_analysis: self.validation.benchmarking.enable_memory_analysis,
+            enable_database_profiling: self.validation.benchmarking.enable_database_profiling,
+            benchmark_iterations: self.validation.benchmarking.benchmark_iterations,
+            warmup_iterations: self.validation.benchmarking.warmup_iterations,
+            timeout_seconds: self.validation.benchmarking.timeout_seconds,
+            memory_sampling_interval_ms: self.validation.benchmarking.memory_sampling_interval_ms,
+            performance_thresholds: BenchmarkThresholds {
+                max_files_per_second_degradation: self.validation.benchmarking.degradation_thresholds.max_files_per_second_degradation,
+                max_memory_growth_rate_mb_per_sec: self.validation.benchmarking.degradation_thresholds.max_memory_growth_rate_mb_per_sec,
+                max_database_operation_time_ms: self.validation.benchmarking.degradation_thresholds.max_database_operation_time_ms,
+                min_cpu_efficiency_score: self.validation.benchmarking.degradation_thresholds.min_cpu_efficiency_score,
+                max_memory_leak_rate_mb_per_hour: self.validation.benchmarking.degradation_thresholds.max_memory_leak_rate_mb_per_hour,
+            },
         }
     }
     

@@ -1,27 +1,59 @@
 pub mod chaos_detector;
 pub mod cli_config;
+pub mod comparative_analyzer;
 pub mod deduplication_analyzer;
 pub mod directory_analyzer;
+pub mod error_reporter;
 pub mod errors;
+pub mod graceful_degradation;
+pub mod historical_report_generator;
 pub mod metrics_collector;
 pub mod pensieve_runner;
+pub mod performance_benchmarker;
 pub mod process_monitor;
 pub mod production_readiness_assessor;
 pub mod reliability_validator;
 pub mod report_generator;
+#[cfg(test)]
+pub mod test_error_handling;
 pub mod types;
 pub mod ux_analyzer;
 pub mod validation_orchestrator;
 
 pub use chaos_detector::ChaosDetector;
+pub use comparative_analyzer::{
+    ComparativeAnalyzer, BaselineSet, ValidationComparison, HistoricalTrendAnalysis,
+    TrendDirection, PerformanceComparison, ReliabilityComparison, UXComparison,
+    DeduplicationComparison, RegressionAlert, ImprovementHighlight, AlertSeverity
+};
 pub use deduplication_analyzer::DeduplicationAnalyzer;
 pub use directory_analyzer::DirectoryAnalyzer;
-pub use errors::{ValidationError, Result};
+pub use historical_report_generator::{
+    HistoricalReportGenerator, HistoricalReport, ExecutiveSummary as HistoricalExecutiveSummary,
+    TrendAnalysisSection, RegressionAnalysisSection, ImprovementTrackingSection,
+    BaselineComparisonSection, PredictionsSection, RecommendationsSection,
+    ExportFormat, ChartConfig, ChartTheme, ChartFormat
+};
+pub use error_reporter::{
+    ErrorReporter, ErrorReportConfig, ComprehensiveErrorReport, ReportFormat,
+    ErrorExecutiveSummary, ErrorAnalysis, ImpactAssessment, RecoveryGuidance
+};
+pub use errors::{ValidationError, Result, ErrorRecoveryManager, ErrorAggregator, ErrorDetails, ErrorSummary, RecoveryAction};
+pub use graceful_degradation::{
+    GracefulDegradationManager, DegradationConfig, PhaseResult, PhaseStatus, 
+    DegradationStrategy, DegradationType, DegradationDecision, DegradationReport
+};
 pub use metrics_collector::{
     MetricsCollector, MetricsCollectionResults, PerformanceTracker, ErrorTracker, UXTracker, DatabaseTracker,
     ErrorCategory, ErrorSeverity, ErrorContext, SystemState, UXEventType, UXQualityScores, DatabaseOperation
 };
 pub use pensieve_runner::{PensieveRunner, PensieveConfig, PensieveExecutionResults};
+pub use performance_benchmarker::{
+    PerformanceBenchmarker, BenchmarkConfig, PerformanceThresholds as BenchmarkThresholds,
+    PerformanceBaseline, BaselineMetrics, PerformanceBenchmarkingResults, ScalabilityAnalysisResults,
+    MemoryAnalysisResults, DatabaseProfilingResults, DegradationDetectionResults,
+    OverallPerformanceAssessment, DatasetCharacteristics, MemoryGrowthPattern, ScalingBehavior
+};
 pub use process_monitor::{ProcessMonitor, MonitoringConfig, MonitoringResults};
 pub use production_readiness_assessor::{
     ProductionReadinessAssessor, AssessmentConfig, ProductionReadinessAssessment,
