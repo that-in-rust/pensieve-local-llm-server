@@ -325,7 +325,7 @@ pub enum UXCategory {
 }
 
 /// Improvement priority levels
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ImprovementPriority {
     Critical,  // Blocks good user experience
     High,      // Significantly impacts usability

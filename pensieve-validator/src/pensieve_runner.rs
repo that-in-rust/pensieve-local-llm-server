@@ -66,7 +66,7 @@ impl MemoryReading {
 }
 
 /// Process execution results with comprehensive monitoring data
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PensieveExecutionResults {
     pub exit_code: Option<i32>,
     pub execution_time: Duration,

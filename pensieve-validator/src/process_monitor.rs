@@ -145,7 +145,7 @@ pub struct ComponentInfo {
 }
 
 /// Aggregated monitoring results over time
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MonitoringResults {
     pub snapshots: Vec<SystemSnapshot>,
     pub summary: MonitoringSummary,

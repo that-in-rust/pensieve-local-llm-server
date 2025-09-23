@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Comprehensive directory analysis results
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DirectoryAnalysis {
     pub total_files: u64,
     pub total_directories: u64,
@@ -72,7 +72,7 @@ pub struct ChaosIndicators {
 }
 
 /// Comprehensive directory analysis report
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChaosReport {
     pub files_without_extensions: Vec<PathBuf>,
     pub misleading_extensions: Vec<MisleadingFile>,

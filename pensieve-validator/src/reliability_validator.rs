@@ -38,7 +38,7 @@ impl Default for ReliabilityConfig {
 }
 
 /// Results of reliability validation testing
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReliabilityResults {
     pub overall_reliability_score: f64, // 0.0 - 1.0
     pub crash_test_results: CrashTestResults,

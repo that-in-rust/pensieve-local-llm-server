@@ -1,11 +1,14 @@
 pub mod chaos_detector;
+pub mod cli_config;
 pub mod deduplication_analyzer;
 pub mod directory_analyzer;
 pub mod errors;
 pub mod metrics_collector;
 pub mod pensieve_runner;
 pub mod process_monitor;
+pub mod production_readiness_assessor;
 pub mod reliability_validator;
+pub mod report_generator;
 pub mod types;
 pub mod ux_analyzer;
 pub mod validation_orchestrator;
@@ -20,12 +23,23 @@ pub use metrics_collector::{
 };
 pub use pensieve_runner::{PensieveRunner, PensieveConfig, PensieveExecutionResults};
 pub use process_monitor::{ProcessMonitor, MonitoringConfig, MonitoringResults};
+pub use production_readiness_assessor::{
+    ProductionReadinessAssessor, AssessmentConfig, ProductionReadinessAssessment,
+    ProductionReadinessLevel, FactorScores, CriticalIssue, ProductionBlocker,
+    ScalingGuidance, DeploymentRecommendations, ImprovementRoadmap
+};
 pub use reliability_validator::{
     ReliabilityValidator, ReliabilityConfig, ReliabilityResults, CrashTestResults,
     InterruptionTestResults, ResourceLimitTestResults, CorruptionHandlingResults,
     PermissionHandlingResults, RecoveryTestResults, FailureAnalysis, CrashIncident,
     CrashType, CrashSeverity, GracefulFailure, CriticalFailure, ReliabilityBlocker,
     ReliabilityRecommendation, RiskAssessment
+};
+pub use report_generator::{
+    ReportGenerator, ReportGeneratorConfig, ProductionReadinessReport, OutputFormat,
+    ReportDetailLevel, ExecutiveSummary, OverallRecommendation, PerformanceAnalysisReport,
+    UserExperienceReport, ImprovementRoadmapReport, ScalingGuidanceReport,
+    DeploymentRecommendationsReport
 };
 pub use types::*;
 pub use ux_analyzer::{
