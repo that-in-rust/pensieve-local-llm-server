@@ -1,4 +1,5 @@
 use crate::errors::Result;
+use crate::types::{ChaosReport, PermissionIssue, PermissionIssueType, LargeFile, SizeCategory, MisleadingFile, UnicodeFile, UnusualCharacterFile, DeepNestedFile, CorruptedFile};
 use crate::types::*;
 use std::fs;
 use std::path::Path;

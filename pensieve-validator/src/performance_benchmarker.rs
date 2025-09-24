@@ -937,10 +937,10 @@ impl PerformanceBenchmarker {
         let dataset_chars = self.analyze_dataset_characteristics(target_directory).await?;
         
         // Create prediction models for different scenarios
-        let scenarios = vec![
-            ("2x Dataset Size", 2.0),
-            ("5x Dataset Size", 5.0),
-            ("10x Dataset Size", 10.0),
+let scenarios: Vec<(&str, f64)> = vec![
+            ("2x Dataset Size", 2.0f64),
+            ("5x Dataset Size", 5.0f64),
+            ("10x Dataset Size", 10.0f64),
         ];
 
         for (scenario_name, multiplier) in scenarios {

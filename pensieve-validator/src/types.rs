@@ -178,7 +178,7 @@ pub struct DeepNestedFile {
 }
 
 /// Deduplication return on investment analysis
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeduplicationROI {
     pub file_level_duplicates: u64,
     pub storage_saved_bytes: u64,
@@ -214,7 +214,7 @@ pub struct DuplicateGroup {
 }
 
 /// ROI recommendation levels
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ROIRecommendation {
     HighValue,    // >50% savings
     ModerateValue, // 20-50% savings
@@ -223,7 +223,7 @@ pub enum ROIRecommendation {
 }
 
 /// Logic used for canonical file selection
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CanonicalSelectionLogic {
     pub primary_criteria: String,
     pub secondary_criteria: Vec<String>,
@@ -306,18 +306,24 @@ impl ChaosReport {
         // Normalize to 0.0 - 1.0 range
         (weighted_score / total_files_f64).min(1.0)
     }
-}/
+}
 // Validation phases for the pensieve validation framework
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ValidationPhase {
-    /// Pre-flight directory analysis and chaos detection
+    /// Directory analysis and structure assessment
+    DirectoryAnalysis,
+    /// Chaos detection for problematic files
+    ChaosDetection,
+    /// Pre-flight analysis combining directory and chaos checks
     PreFlight,
     /// Reliability testing and crash detection
-    Reliability,
+    ReliabilityTesting,
     /// Performance benchmarking and scalability analysis
-    Performance,
+    PerformanceBenchmarking,
     /// User experience analysis and feedback quality assessment
     UserExperience,
+    /// Report generation phase
+    ReportGeneration,
     /// Production intelligence and readiness assessment
     ProductionIntelligence,
 }
@@ -325,10 +331,13 @@ pub enum ValidationPhase {
 impl std::fmt::Display for ValidationPhase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+Self::DirectoryAnalysis => write!(f, "Directory Analysis"),
+            Self::ChaosDetection => write!(f, "Chaos Detection"),
             Self::PreFlight => write!(f, "Pre-Flight Analysis"),
-            Self::Reliability => write!(f, "Reliability Testing"),
-            Self::Performance => write!(f, "Performance Benchmarking"),
+            Self::ReliabilityTesting => write!(f, "Reliability Testing"),
+            Self::PerformanceBenchmarking => write!(f, "Performance Benchmarking"),
             Self::UserExperience => write!(f, "User Experience Analysis"),
+            Self::ReportGeneration => write!(f, "Report Generation"),
             Self::ProductionIntelligence => write!(f, "Production Intelligence"),
         }
     }

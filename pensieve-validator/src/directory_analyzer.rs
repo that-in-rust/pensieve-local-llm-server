@@ -1,5 +1,6 @@
 use crate::chaos_detector::ChaosDetector;
 use crate::errors::{ValidationError, Result};
+use crate::types::{DirectoryAnalysis, FileTypeStats, SizeDistribution, DepthAnalysis, ChaosIndicators};
 use crate::types::*;
 use std::collections::HashMap;
 use std::fs;

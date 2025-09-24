@@ -208,7 +208,7 @@ impl MonitoringAlert {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AlertType {
     HighMemoryUsage,
     HighCpuUsage,
@@ -219,7 +219,7 @@ pub enum AlertType {
     SwapUsageHigh,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AlertSeverity {
     Info,
     Warning,
@@ -237,7 +237,7 @@ pub struct PerformanceAnalysis {
 }
 
 /// Identified performance bottlenecks
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerformanceBottleneck {
     pub resource_type: String,
     pub severity: f64, // 0.0 - 1.0

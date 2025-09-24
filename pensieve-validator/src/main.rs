@@ -91,7 +91,12 @@ enum Commands {
         #[arg(long)]
         skip_ux_analysis: bool,
         
-        /// Enable real-time monitoring
+/// Enable real-time monitoring
+        #[arg(long)]
+        real_time: bool,
+        /// Confirm running on large/external dataset
+        #[arg(long)]
+        confirm: bool,
         #[arg(long)]
         real_time: bool,
     },
@@ -334,7 +339,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let progress = cli.progress;
     
     match cli.command {
-        Commands::Validate {
+Commands::Validate {
+            // Require explicit confirmation for external or large datasets
+            if !confirm {
+                let project_root = std::env::current_dir().expect("Failed to get CWD");
+if !directory.starts_with(&project_root) {
+                    eprintln!("Ensure you have a backup of '{}' before validation.", directory.display());
+                    eprintln!("Validation of external directory '{}' requires the --confirm flag.", directory.display());
+                    std::process::exit(1);
+                }
+            }
             directory,
             pensieve_binary,
             output_db,
@@ -346,6 +360,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             skip_ux_analysis,
             real_time,
         } => {
+eprintln!("Starting validation of '{}'...", directory.display());
             run_validation(
                 verbose,
                 quiet,

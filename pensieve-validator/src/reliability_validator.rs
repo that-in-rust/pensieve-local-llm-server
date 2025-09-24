@@ -73,7 +73,7 @@ pub struct InterruptionTestResults {
 }
 
 /// Results of resource limit testing
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceLimitTestResults {
     pub memory_exhaustion_handled: bool,
     pub disk_space_exhaustion_handled: bool,
@@ -85,7 +85,7 @@ pub struct ResourceLimitTestResults {
 }
 
 /// Results of corruption handling testing
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CorruptionHandlingResults {
     pub corrupted_files_handled: bool,
     pub malformed_content_handled: bool,
@@ -97,7 +97,7 @@ pub struct CorruptionHandlingResults {
 }
 
 /// Results of permission handling testing
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PermissionHandlingResults {
     pub read_permission_errors_handled: bool,
     pub write_permission_errors_handled: bool,
@@ -108,7 +108,7 @@ pub struct PermissionHandlingResults {
 }
 
 /// Results of recovery testing
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecoveryTestResults {
     pub partial_completion_recovery: bool,
     pub database_consistency_maintained: bool,
@@ -119,7 +119,7 @@ pub struct RecoveryTestResults {
 }
 
 /// Detailed failure analysis
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FailureAnalysis {
     pub critical_failures: Vec<CriticalFailure>,
     pub reliability_blockers: Vec<ReliabilityBlocker>,
@@ -128,7 +128,7 @@ pub struct FailureAnalysis {
 }
 
 /// Specific crash incident details
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrashIncident {
     pub scenario_name: String,
     pub crash_type: CrashType,
@@ -140,7 +140,7 @@ pub struct CrashIncident {
 }
 
 /// Types of crashes that can occur
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CrashType {
     Panic,
     Segmentation,
@@ -152,7 +152,7 @@ pub enum CrashType {
 }
 
 /// Severity levels for crashes
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CrashSeverity {
     Critical,  // Blocks production use
     High,      // Significant impact
@@ -161,7 +161,7 @@ pub enum CrashSeverity {
 }
 
 /// Graceful failure that was handled properly
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GracefulFailure {
     pub scenario_name: String,
     pub error_type: String,
@@ -171,7 +171,7 @@ pub struct GracefulFailure {
 }
 
 /// Quality assessment of error messages
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ErrorMessageQuality {
     pub is_actionable: bool,
     pub is_user_friendly: bool,
@@ -181,7 +181,7 @@ pub struct ErrorMessageQuality {
 }
 
 /// Critical failure that needs immediate attention
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CriticalFailure {
     pub failure_type: String,
     pub description: String,
@@ -192,7 +192,7 @@ pub struct CriticalFailure {
 }
 
 /// Reliability blocker that prevents production use
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReliabilityBlocker {
     pub blocker_type: String,
     pub description: String,
@@ -203,7 +203,7 @@ pub struct ReliabilityBlocker {
 }
 
 /// Recommendation for improving reliability
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReliabilityRecommendation {
     pub category: RecommendationCategory,
     pub title: String,
@@ -269,7 +269,7 @@ pub enum ExpectedImpact {
 }
 
 /// Overall risk assessment
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RiskAssessment {
     pub production_readiness_risk: ProductionRisk,
     pub data_loss_risk: DataLossRisk,

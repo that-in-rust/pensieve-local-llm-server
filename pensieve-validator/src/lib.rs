@@ -6,7 +6,6 @@ pub mod directory_analyzer;
 pub mod error_reporter;
 pub mod errors;
 pub mod graceful_degradation;
-pub mod historical_report_generator;
 pub mod metrics_collector;
 pub mod pensieve_runner;
 pub mod performance_benchmarker;
@@ -24,16 +23,10 @@ pub use chaos_detector::ChaosDetector;
 pub use comparative_analyzer::{
     ComparativeAnalyzer, BaselineSet, ValidationComparison, HistoricalTrendAnalysis,
     TrendDirection, PerformanceComparison, ReliabilityComparison, UXComparison,
-    DeduplicationComparison, RegressionAlert, ImprovementHighlight, AlertSeverity
+    DeduplicationComparison, RegressionAlert, ImprovementHighlight, AlertSeverity,
 };
 pub use deduplication_analyzer::DeduplicationAnalyzer;
 pub use directory_analyzer::DirectoryAnalyzer;
-pub use historical_report_generator::{
-    HistoricalReportGenerator, HistoricalReport, ExecutiveSummary as HistoricalExecutiveSummary,
-    TrendAnalysisSection, RegressionAnalysisSection, ImprovementTrackingSection,
-    BaselineComparisonSection, PredictionsSection, RecommendationsSection,
-    ExportFormat, ChartConfig, ChartTheme, ChartFormat
-};
 pub use error_reporter::{
     ErrorReporter, ErrorReportConfig, ComprehensiveErrorReport, ReportFormat,
     ErrorExecutiveSummary, ErrorAnalysis, ImpactAssessment, RecoveryGuidance

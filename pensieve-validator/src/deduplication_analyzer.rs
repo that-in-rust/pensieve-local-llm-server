@@ -99,9 +99,8 @@ impl DeduplicationAnalyzer {
     }
 
     /// Scan directory for files and calculate hashes for deduplication analysis
-    fn scan_files_for_deduplication<'a>(&'a self, directory: &'a Path) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<FileInfo>>> + 'a>> {
-        Box::pin(async move {
-            let mut file_infos = Vec::new();
+async fn scan_files_for_deduplication(&self, directory: &Path) -> Result<Vec<FileInfo>> {
+        let mut file_infos = Vec::new();
             let mut entries = tokio::fs::read_dir(directory).await
                 .map_err(|e| ValidationError::FileSystem(e))?;
 
@@ -124,7 +123,6 @@ impl DeduplicationAnalyzer {
             }
 
             Ok(file_infos)
-        })
     }
 
     /// Analyze a single file for deduplication

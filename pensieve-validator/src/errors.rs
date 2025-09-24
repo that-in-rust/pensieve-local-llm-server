@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
+use std::collections::HashMap;
 
 /// Comprehensive error handling for validation framework with structured hierarchy
 #[derive(Error, Debug, Clone, Serialize, Deserialize)]
@@ -181,7 +182,7 @@ pub enum ValidationError {
 }
 
 /// Recovery strategies for different error types
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RecoveryStrategy {
     /// Error is fatal, cannot recover
     FailFast,
@@ -198,7 +199,7 @@ pub enum RecoveryStrategy {
 }
 
 /// Error impact assessment for prioritization
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ErrorImpact {
     /// Blocks all validation functionality
     Blocker,
@@ -211,7 +212,7 @@ pub enum ErrorImpact {
 }
 
 /// Error category for grouping and analysis
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ErrorCategory {
     /// Configuration or setup issues
     Configuration,
@@ -676,6 +677,37 @@ impl ErrorAggregator {
     }
 }
 
+/// Convenience helpers for constructing common ValidationErrors
+impl ValidationError {
+    pub fn fs_io<E: std::fmt::Display>(err: E, path: Option<PathBuf>) -> Self {
+        ValidationError::FileSystem {
+            cause: err.to_string(),
+            path,
+            recovery_strategy: RecoveryStrategy::SkipAndContinue {
+                impact: "File skipped".into(),
+            },
+        }
+    }
+    pub fn cfg(field: &str, msg: &str) -> Self {
+        ValidationError::ConfigurationError {
+            field: field.into(),
+            message: msg.into(),
+            recovery_strategy: RecoveryStrategy::ManualIntervention {
+                steps: vec!["Fix configuration".into()],
+            },
+        }
+    }
+    pub fn proc_mon(msg: &str) -> Self {
+        ValidationError::ProcessMonitoring {
+            cause: msg.into(),
+            recovery_strategy: RecoveryStrategy::Retry {
+                max_attempts: 1,
+                delay: Duration::from_secs(5),
+            },
+        }
+    }
+}
+
 /// Summary of errors for reporting
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ErrorSummary {
@@ -688,8 +720,7 @@ pub struct ErrorSummary {
     pub most_common_category: Option<ErrorCategory>,
     pub critical_errors: Vec<String>,
 }
-//
-/ Helper functions for creating errors with appropriate recovery strategies
+/// Helper functions for creating errors with appropriate recovery strategies
 impl ValidationError {
     pub fn pensieve_binary_not_found(path: PathBuf) -> Self {
         Self::PensieveBinaryNotFound {
