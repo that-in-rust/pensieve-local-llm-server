@@ -102,8 +102,8 @@
     - Write performance tests for large repository handling
     - _Requirements: 7.1, 7.2, 7.4, 7.5 (performance optimization)_
 
-- [-] 5. Query and Analysis Preparation
-  - [-] 5.1 Implement SQL query execution and formatting
+- [x] 5. Query and Analysis Preparation
+  - [x] 5.1 Implement SQL query execution and formatting
     - Create query execution with clean terminal output formatting
     - Add result formatting for LLM consumption (FILE: format)
     - Implement query validation and error handling
@@ -111,7 +111,7 @@
     - Write tests for query execution and formatting
     - _Requirements: 6.2, 8.1, 8.3 (SQL query execution and formatting)_
 
-  - [ ] 5.2 Create temporary file management
+  - [x] 5.2 Create temporary file management
     - Implement query-prepare command with temp file creation
     - Add absolute path handling and validation
     - Create structured output format for LLM processing
@@ -119,7 +119,7 @@
     - Write tests for temp file operations and edge cases
     - _Requirements: 10.2, 10.3 (temporary file workflow)_
 
-  - [ ] 5.3 Implement result storage functionality
+  - [x] 5.3 Implement result storage functionality
     - Create store-result command for LLM analysis results
     - Add QUERYRESULT_* table creation and data insertion
     - Implement metadata tracking (original query, prompt file, timestamp)
@@ -127,8 +127,8 @@
     - Write tests for result storage and retrieval
     - _Requirements: 10.5 (analysis result storage)_
 
-- [ ] 6. Task Generation System
-  - [ ] 6.1 Create task structure and division logic
+- [x] 6. Task Generation System
+  - [x] 6.1 Create task structure and division logic
     - Implement 7-part division algorithm for task distribution
     - Create TaskGroup and Task data structures
     - Add mathematical division with even distribution
@@ -136,7 +136,7 @@
     - Write tests for task division algorithms
     - _Requirements: 11.2, 11.3 (task division and structure)_
 
-  - [ ] 6.2 Implement Kiro-compatible markdown generation
+  - [x] 6.2 Implement Kiro-compatible markdown generation
     - Create structured markdown output with proper numbering (1., 1.1, 1.2)
     - Add task description generation from query results
     - Implement chunk information handling for large files
@@ -144,7 +144,7 @@
     - Write tests for markdown generation and format validation
     - _Requirements: 11.4, 11.5 (Kiro numbering and task structure)_
 
-  - [ ] 6.3 Create generate-tasks command implementation
+  - [x] 6.3 Create generate-tasks command implementation
     - Integrate query execution with task generation
     - Add task file creation at specified absolute paths
     - Implement configuration handling for chunk size and overlap
@@ -152,8 +152,8 @@
     - Write integration tests for complete task generation workflow
     - _Requirements: 11.1 (task generation command)_
 
-- [ ] 7. Utility Commands and Database Exploration
-  - [ ] 7.1 Implement database exploration commands
+- [-] 7. Utility Commands and Database Exploration
+  - [x] 7.1 Implement database exploration commands
     - Create db-info command for connection status and basic info
     - Implement list-tables command with table type filtering
     - Add sample command for data preview with configurable limits
@@ -161,7 +161,7 @@
     - Write tests for all exploration commands
     - _Requirements: 13.1, 13.2, 13.3, 13.4 (database exploration)_
 
-  - [ ] 7.2 Create print-to-md export functionality
+  - [-] 7.2 Create print-to-md export functionality
     - Implement individual file export with sequential naming (PREFIX-00001.md)
     - Add markdown formatting for database row content
     - Create location-based file organization

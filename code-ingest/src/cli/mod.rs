@@ -382,15 +382,188 @@ impl Cli {
         tasks_file: PathBuf,
         db_path: Option<PathBuf>,
     ) -> Result<()> {
-        println!("Generate tasks:");
-        println!("  SQL: {}", sql);
-        println!("  Prompt file: {}", prompt_file.display());
-        println!("  Output table: {}", output_table);
-        println!("  Tasks file: {}", tasks_file.display());
-        if let Some(path) = db_path {
-            println!("  Database path: {}", path.display());
+        use crate::database::{Database, DatabaseOperations};
+        use crate::tasks::{TaskDivider, TaskConfig, MarkdownGenerator, TaskMetadata, TaskStructure, QueryResultRow};
+        use indicatif::{ProgressBar, ProgressStyle};
+        
+        println!("🚀 Generating structured analysis tasks...");
+        println!();
+        
+        // Get database connection
+        let database = if let Some(path) = db_path {
+            Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        // Validate prompt file exists
+        if !prompt_file.exists() {
+            anyhow::bail!("Prompt file not found: {}", prompt_file.display());
         }
-        println!("Implementation pending - Task 6");
+
+        // Create progress bar
+        let progress = ProgressBar::new(100);
+        progress.set_style(
+            ProgressStyle::default_bar()
+                .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos:>7}/{len:7} {msg}")
+                .unwrap()
+                .progress_chars("#>-"),
+        );
+        
+        // Step 1: Execute SQL query to get data
+        progress.set_message("Executing SQL query...");
+        progress.set_position(10);
+        
+        let operations = DatabaseOperations::new(database.pool().clone());
+        let query_result = operations.execute_query(&sql).await?;
+        
+        if query_result.rows.is_empty() {
+            anyhow::bail!("Query returned no results. Cannot generate tasks from empty dataset.");
+        }
+        
+        progress.set_message("Processing query results...");
+        progress.set_position(30);
+        
+        // Convert query results to QueryResultRow format
+        let query_rows: Vec<QueryResultRow> = query_result.rows.into_iter().map(|row| {
+            QueryResultRow {
+                file_id: row.get("file_id").and_then(|s| s.parse().ok()),
+                filepath: row.get("filepath").cloned(),
+                filename: row.get("filename").cloned(),
+                extension: row.get("extension").cloned(),
+                file_size_bytes: row.get("file_size_bytes").and_then(|s| s.parse().ok()),
+                line_count: row.get("line_count").and_then(|s| s.parse().ok()),
+                word_count: row.get("word_count").and_then(|s| s.parse().ok()),
+                token_count: row.get("token_count").and_then(|s| s.parse().ok()),
+                content_text: row.get("content_text").cloned(),
+                file_type: row.get("file_type").cloned(),
+                conversion_command: row.get("conversion_command").cloned(),
+                relative_path: row.get("relative_path").cloned(),
+                absolute_path: row.get("absolute_path").cloned(),
+            }
+        }).collect();
+        
+        // Step 2: Create task configuration
+        let config = TaskConfig {
+            sql_query: sql.clone(),
+            output_table: output_table.clone(),
+            tasks_file: tasks_file.to_string_lossy().to_string(),
+            group_count: 7, // Default to 7 groups as per requirements
+            chunk_size: Some(300), // Default chunk size for large files
+            chunk_overlap: Some(50), // Default overlap
+            prompt_file: Some(prompt_file.to_string_lossy().to_string()),
+        };
+        
+        // Step 3: Create task divider and generate tasks
+        progress.set_message("Creating task structure...");
+        progress.set_position(50);
+        
+        let divider = TaskDivider::new(config.group_count)?;
+        let tasks = divider.create_tasks_from_query_results(&query_rows, &config)?;
+        
+        if tasks.is_empty() {
+            anyhow::bail!("No tasks could be generated from the query results.");
+        }
+        
+        // Adjust group count if we have fewer tasks than groups
+        let actual_group_count = std::cmp::min(config.group_count, tasks.len());
+        let adjusted_divider = if actual_group_count != config.group_count {
+            println!("ℹ️  Adjusting group count from {} to {} (limited by number of tasks)", 
+                config.group_count, actual_group_count);
+            TaskDivider::new(actual_group_count)?
+        } else {
+            divider
+        };
+        
+        // Step 4: Divide tasks into groups
+        progress.set_message("Dividing tasks into groups...");
+        progress.set_position(70);
+        
+        let groups = adjusted_divider.divide_into_groups(tasks.clone())?;
+        
+        // Step 5: Create task structure with metadata
+        let metadata = TaskMetadata {
+            total_tasks: tasks.len(),
+            group_count: actual_group_count,
+            sql_query: sql.clone(),
+            output_table: output_table.clone(),
+            generated_at: chrono::Utc::now(),
+            prompt_file: Some(prompt_file.to_string_lossy().to_string()),
+        };
+        
+        let task_structure = TaskStructure {
+            groups,
+            total_tasks: tasks.len(),
+            metadata,
+        };
+        
+        // Step 6: Generate markdown
+        progress.set_message("Generating markdown...");
+        progress.set_position(90);
+        
+        let generator = MarkdownGenerator::new();
+        generator.write_to_file(&task_structure, &tasks_file.to_string_lossy()).await?;
+        
+        progress.set_message("Complete!");
+        progress.set_position(100);
+        progress.finish_with_message("✅ Task generation complete!");
+        
+        // Display results
+        println!();
+        println!("📊 Task Generation Summary:");
+        println!("   SQL Query: {}", sql);
+        println!("   Data Rows: {}", query_rows.len());
+        println!("   Generated Tasks: {}", tasks.len());
+        println!("   Task Groups: {}", actual_group_count);
+        println!("   Output Table: {}", output_table);
+        println!("   Prompt File: {}", prompt_file.display());
+        println!("   Tasks File: {}", tasks_file.display());
+        
+        // Show task distribution
+        println!();
+        println!("📋 Task Distribution:");
+        for (i, group) in task_structure.groups.iter().enumerate() {
+            println!("   Group {}: {} tasks", i + 1, group.tasks.len());
+        }
+        
+        // Show file statistics if available
+        if let Some(first_row) = query_rows.first() {
+            if first_row.file_type.is_some() {
+                let file_types: std::collections::HashMap<String, usize> = query_rows
+                    .iter()
+                    .filter_map(|row| row.file_type.as_ref())
+                    .fold(std::collections::HashMap::new(), |mut acc, file_type| {
+                        *acc.entry(file_type.clone()).or_insert(0) += 1;
+                        acc
+                    });
+                
+                if !file_types.is_empty() {
+                    println!();
+                    println!("📁 File Type Distribution:");
+                    for (file_type, count) in file_types {
+                        println!("   {}: {} files", file_type, count);
+                    }
+                }
+            }
+        }
+        
+        println!();
+        println!("🎯 Next Steps:");
+        println!("   1. Open the tasks file in your IDE: {}", tasks_file.display());
+        println!("   2. Review the generated task structure");
+        println!("   3. Execute tasks systematically, starting with Group 1");
+        println!("   4. Use the prompt file for analysis guidance: {}", prompt_file.display());
+        println!("   5. Store results using the store-result command when complete");
+        
+        println!();
+        println!("💡 Pro Tips:");
+        println!("   • Tasks are numbered with Kiro-compatible format (1., 1.1, 1.2, etc.)");
+        println!("   • Large files are automatically chunked for manageable analysis");
+        println!("   • Each task includes file metadata and chunk information");
+        println!("   • Complete all sub-tasks in a group before moving to the next group");
+        
         Ok(())
     }
 
@@ -477,11 +650,35 @@ impl Cli {
     }
 
     async fn execute_list_tables(&self, db_path: Option<PathBuf>) -> Result<()> {
-        println!("List tables");
-        if let Some(path) = db_path {
-            println!("Database path: {}", path.display());
+        use crate::database::{Database, DatabaseExplorer};
+        
+        // Get database connection
+        let database = if let Some(path) = db_path {
+            Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        // Create database explorer
+        let explorer = DatabaseExplorer::new(database.pool().clone());
+        
+        // List all tables
+        let tables = explorer.list_tables(None).await?;
+        
+        if tables.is_empty() {
+            println!("No tables found in the database.");
+            println!("\n💡 To get started:");
+            println!("   1. Ingest a repository: code-ingest <repo_url> --db-path <path>");
+            println!("   2. Or check database connection: code-ingest db-info --db-path <path>");
+            return Ok(());
         }
-        println!("Implementation pending - Task 7");
+
+        // Format and display tables
+        let formatted = explorer.format_table_list(&tables, true);
+        println!("{}", formatted);
+        
         Ok(())
     }
 
@@ -491,29 +688,82 @@ impl Cli {
         table: String,
         limit: usize,
     ) -> Result<()> {
-        println!("Sample table: {} (limit: {})", table, limit);
-        if let Some(path) = db_path {
-            println!("Database path: {}", path.display());
+        use crate::database::{Database, DatabaseExplorer};
+        
+        // Get database connection
+        let database = if let Some(path) = db_path {
+            Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        // Create database explorer
+        let explorer = DatabaseExplorer::new(database.pool().clone());
+        
+        // Get sample data
+        let sample = explorer.sample_table(&table, limit).await?;
+        
+        // Format and display sample
+        let formatted = explorer.format_table_sample(&sample);
+        println!("{}", formatted);
+        
+        if sample.total_rows > sample.sample_size as i64 {
+            println!("\n💡 Showing {} of {} total rows. Use --limit to see more.", 
+                    sample.sample_size, sample.total_rows);
         }
-        println!("Implementation pending - Task 7");
+        
         Ok(())
     }
 
     async fn execute_describe(&self, db_path: Option<PathBuf>, table: String) -> Result<()> {
-        println!("Describe table: {}", table);
-        if let Some(path) = db_path {
-            println!("Database path: {}", path.display());
-        }
-        println!("Implementation pending - Task 7");
+        use crate::database::{Database, DatabaseExplorer};
+        
+        // Get database connection
+        let database = if let Some(path) = db_path {
+            Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        // Create database explorer
+        let explorer = DatabaseExplorer::new(database.pool().clone());
+        
+        // Get table schema
+        let schema = explorer.describe_table(&table).await?;
+        
+        // Format and display schema
+        let formatted = explorer.format_table_schema(&schema);
+        println!("{}", formatted);
+        
         Ok(())
     }
 
     async fn execute_db_info(&self, db_path: Option<PathBuf>) -> Result<()> {
-        println!("Database info");
-        if let Some(path) = db_path {
-            println!("Database path: {}", path.display());
-        }
-        println!("Implementation pending - Task 7");
+        use crate::database::{Database, DatabaseExplorer};
+        
+        // Get database connection
+        let database = if let Some(path) = db_path {
+            Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        // Create database explorer
+        let explorer = DatabaseExplorer::new(database.pool().clone());
+        
+        // Get database info
+        let info = explorer.get_database_info().await?;
+        
+        // Format and display info
+        let formatted = explorer.format_database_info(&info);
+        println!("{}", formatted);
+        
         Ok(())
     }
 
