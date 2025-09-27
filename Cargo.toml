@@ -1,12 +1,13 @@
 [workspace]
-members = ["pensieve", "pensieve-validator"]
+members = ["code-ingest"]
+resolver = "2"
 
 [workspace.dependencies]
 # CLI argument parsing
 clap = { version = "4.0", features = ["derive"] }
 
 # Database operations
-sqlx = { version = "0.6", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "migrate"] }
 
 # Async runtime
 tokio = { version = "1.0", features = ["full"] }
@@ -48,5 +49,11 @@ zip = "0.5"
 quick-xml = "0.28"
 serde_yaml = "0.8"
 pdf-extract = "0.6"
+
+# Git operations
+git2 = "0.18"
+
+# Progress reporting
+indicatif = "0.17"
 
 
