@@ -299,10 +299,13 @@ impl TextProcessor {
             conversion_command: None,
             relative_path,
             absolute_path,
+            skipped: false,
+            skip_reason: None,
         })
     }
 }
 
+#[async_trait::async_trait]
 impl FileProcessor for TextProcessor {
     fn can_process(&self, file_path: &Path) -> bool {
         use super::classifier::FileClassifier;

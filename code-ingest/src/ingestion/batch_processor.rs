@@ -82,6 +82,7 @@ pub struct BatchProgress {
 }
 
 /// Batch processor for parallel file processing with controlled concurrency
+#[derive(Clone)]
 pub struct BatchProcessor {
     config: BatchConfig,
     file_processor: Arc<dyn FileProcessor>,
@@ -399,7 +400,9 @@ impl BatchProcessor {
             }
             Err(e) => {
                 debug!("Failed to process file {}: {} - {}", file_index, file_path.display(), e);
-                Err(e)
+                Err(IngestionError::NetworkError {
+                    cause: format!("File processing failed: {}", e),
+                })
             }
         }
     }
@@ -424,10 +427,8 @@ impl BatchProcessor {
     }
 
     /// Create batches from a list of items
-    pub fn create_batches<T>(items: Vec<T>, batch_size: usize) -> Vec<Vec<T>> {
+    pub fn create_batches<T: Clone>(items: Vec<T>, batch_size: usize) -> Vec<Vec<T>> {
         items
-            .into_iter()
-            .collect::<Vec<_>>()
             .chunks(batch_size)
             .map(|chunk| chunk.to_vec())
             .collect()
@@ -457,7 +458,8 @@ impl BatchProcessor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::processing::{FileType, ProcessingError, ProcessingResult};
+    use crate::processing::FileType;
+    use crate::error::{ProcessingError, ProcessingResult};
     use std::path::PathBuf;
     use std::sync::Mutex;
     use tempfile::TempDir;

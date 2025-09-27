@@ -290,11 +290,30 @@ impl Cli {
     }
 
     async fn execute_sql(&self, query: String, db_path: Option<PathBuf>) -> Result<()> {
-        println!("Executing SQL: {}", query);
-        if let Some(path) = db_path {
-            println!("Database path: {}", path.display());
+        use crate::database::{Database, QueryExecutor};
+        
+        // Get database connection
+        let database = if let Some(path) = db_path {
+            Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        // Create query executor
+        let executor = QueryExecutor::new(database.pool().clone());
+        
+        // Execute query and format for terminal
+        let result = executor.execute_query_terminal(&query).await?;
+        
+        // Print results
+        print!("{}", result.content);
+        
+        if result.truncated {
+            println!("Note: Results were truncated");
         }
-        println!("Implementation pending - Task 2");
+        
         Ok(())
     }
 
@@ -306,15 +325,52 @@ impl Cli {
         tasks_file: PathBuf,
         output_table: String,
     ) -> Result<()> {
-        println!("Query prepare:");
-        println!("  Query: {}", query);
-        println!("  Temp path: {}", temp_path.display());
-        println!("  Tasks file: {}", tasks_file.display());
-        println!("  Output table: {}", output_table);
-        if let Some(path) = db_path {
-            println!("  Database path: {}", path.display());
-        }
-        println!("Implementation pending - Task 5");
+        use crate::database::{Database, QueryExecutor, TempFileManager, TempFileConfig, TempFileMetadata};
+        
+        // Get database connection
+        let database = if let Some(path) = db_path {
+            Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        // Create query executor and temp file manager
+        let executor = QueryExecutor::new(database.pool().clone());
+        let temp_manager = TempFileManager::new(executor);
+        
+        // Create metadata for the temporary file
+        let metadata = TempFileMetadata {
+            original_query: query.clone(),
+            output_table: output_table.clone(),
+            prompt_file_path: None, // Will be set when tasks are generated
+            description: Some("Query results prepared for LLM analysis".to_string()),
+        };
+        
+        // Create temporary file with query results
+        let config = TempFileConfig::default();
+        let temp_result = temp_manager
+            .create_structured_temp_file(&query, &temp_path, &metadata, &config)
+            .await?;
+        
+        println!("✅ Query executed successfully");
+        println!("   Rows: {}", temp_result.row_count);
+        println!("   Execution time: {}ms", temp_result.execution_time_ms);
+        println!("   Temporary file: {} ({} bytes)", temp_path.display(), temp_result.bytes_written);
+        
+        // Create a basic task structure for IDE integration
+        let task_content = self.create_basic_task_structure(&query, &temp_path, &output_table);
+        
+        // Write tasks file
+        tokio::fs::write(&tasks_file, task_content).await?;
+        println!("   Tasks file: {}", tasks_file.display());
+        
+        println!("\n📋 Next steps:");
+        println!("   1. Open the tasks file in your IDE: {}", tasks_file.display());
+        println!("   2. Execute the analysis tasks");
+        println!("   3. Store results using: code-ingest store-result --output-table {} --result-file <result_file> --original-query \"{}\"", output_table, query);
+        
         Ok(())
     }
 
@@ -345,14 +401,58 @@ impl Cli {
         result_file: PathBuf,
         original_query: String,
     ) -> Result<()> {
-        println!("Store result:");
-        println!("  Output table: {}", output_table);
-        println!("  Result file: {}", result_file.display());
-        println!("  Original query: {}", original_query);
-        if let Some(path) = db_path {
-            println!("  Database path: {}", path.display());
+        use crate::database::{Database, ResultStorage, StorageConfig, ResultMetadata};
+        
+        // Get database connection
+        let database = if let Some(path) = db_path {
+            Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        // Create result storage manager
+        let storage = ResultStorage::new(database.pool().clone());
+        
+        // Create metadata for the result
+        let metadata = ResultMetadata {
+            original_query: original_query.clone(),
+            prompt_file_path: None, // Could be enhanced to detect this
+            analysis_type: Some("llm_analysis".to_string()),
+            original_file_path: None,
+            chunk_number: None,
+            created_by: Some("code-ingest-cli".to_string()),
+            tags: vec!["analysis".to_string()],
+        };
+        
+        // Store the result
+        let config = StorageConfig::default();
+        let storage_result = storage
+            .store_result_from_file(&output_table, &result_file, &metadata, &config)
+            .await?;
+        
+        println!("✅ Analysis result stored successfully");
+        println!("   Analysis ID: {}", storage_result.analysis_id);
+        println!("   Table: {}", storage_result.table_name);
+        println!("   Size: {} bytes", storage_result.result_size_bytes);
+        println!("   Result file: {}", result_file.display());
+        
+        // Show storage statistics
+        match storage.get_storage_stats(&output_table).await {
+            Ok(stats) => {
+                println!("\n📊 Table statistics:");
+                println!("   Total results: {}", stats.total_results);
+                println!("   Average size: {} bytes", stats.avg_result_size_bytes);
+                if let Some(newest) = stats.newest_result {
+                    println!("   Latest result: {}", newest.format("%Y-%m-%d %H:%M:%S UTC"));
+                }
+            }
+            Err(e) => {
+                println!("Note: Could not retrieve table statistics: {}", e);
+            }
         }
-        println!("Implementation pending - Task 5");
+        
         Ok(())
     }
 
@@ -439,6 +539,47 @@ impl Cli {
         println!("Test connection:");
         println!("  psql $DATABASE_URL");
         Ok(())
+    }
+
+    /// Create a basic task structure for IDE integration
+    fn create_basic_task_structure(&self, query: &str, temp_path: &PathBuf, output_table: &str) -> String {
+        format!(
+            r#"# Analysis Tasks
+
+## Query Information
+- **Query**: `{}`
+- **Data Source**: {}
+- **Output Table**: {}
+- **Generated**: {}
+
+## Tasks
+
+- [ ] 1. Review query results
+  - Open and examine the temporary file: {}
+  - Understand the data structure and content
+  - Identify key patterns or areas of interest
+
+- [ ] 2. Perform analysis
+  - Apply your analysis methodology to the data
+  - Document findings and insights
+  - Prepare structured results
+
+- [ ] 3. Store results
+  - Save analysis results to a file
+  - Use: `code-ingest store-result --output-table {} --result-file <your_result_file> --original-query "{}"`
+
+## Notes
+
+This is a basic task structure. For more sophisticated task generation with automatic division and detailed prompts, use the `generate-tasks` command.
+"#,
+            query,
+            temp_path.display(),
+            output_table,
+            chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC"),
+            temp_path.display(),
+            output_table,
+            query
+        )
     }
 }
 #[cfg(test)]

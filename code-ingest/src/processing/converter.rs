@@ -285,6 +285,8 @@ impl Converter {
             conversion_command: Some(conversion_command),
             relative_path,
             absolute_path,
+            skipped: false,
+            skip_reason: None,
         })
     }
 
@@ -329,6 +331,7 @@ impl Converter {
     }
 }
 
+#[async_trait::async_trait]
 impl FileProcessor for Converter {
     fn can_process(&self, file_path: &Path) -> bool {
         use super::classifier::FileClassifier;

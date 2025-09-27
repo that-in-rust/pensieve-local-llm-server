@@ -81,15 +81,15 @@ impl GitCloner {
         
         // Perform the clone operation in a blocking task
         let config = self.config.clone();
-        let repo_url = repo_url.to_string();
+        let repo_url_clone = repo_url.to_string();
         let target_path_clone = target_path.clone();
         
         let clone_result = task::spawn_blocking(move || {
-            Self::perform_clone(&config, &repo_url, &target_path_clone)
+            Self::perform_clone(&config, &repo_url_clone, &target_path_clone)
         })
         .await
         .map_err(|e| IngestionError::GitCloneFailed {
-            repo_url: repo_url.clone(),
+            repo_url: repo_url.to_string(),
             cause: format!("Task join error: {}", e),
         })??;
         
@@ -209,7 +209,8 @@ impl GitCloner {
                 if allowed_types.contains(CredentialType::SSH_KEY) {
                     Cred::ssh_key_from_agent(username_from_url.unwrap_or("git"))
                 } else if allowed_types.contains(CredentialType::USER_PASS_PLAINTEXT) {
-                    Cred::credential_helper(_url, username_from_url)
+                    // Try default credentials
+                    Cred::default()
                 } else {
                     Cred::default()
                 }
@@ -357,9 +358,11 @@ impl GitCloner {
         // Get remote URL
         let remote = repository
             .find_remote("origin")
-            .or_else(|_| repository.remotes().and_then(|remotes| {
-                remotes.get(0).and_then(|name| repository.find_remote(name))
-            }))
+            .or_else(|_| {
+                repository.remotes().ok().and_then(|remotes| {
+                    remotes.get(0).and_then(|name| repository.find_remote(name).ok())
+                }).ok_or_else(|| git2::Error::from_str("No remote found"))
+            })
             .map_err(|e| IngestionError::GitCloneFailed {
                 repo_url: path.display().to_string(),
                 cause: format!("No remote found: {}", e.message()),

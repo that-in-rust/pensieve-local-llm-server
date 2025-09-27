@@ -58,6 +58,12 @@ tracing = { workspace = true }
 # Gitignore pattern matching
 ignore = { workspace = true }
 
+# CPU detection for concurrency
+num_cpus = "1.16"
+
+# Async trait support
+async-trait = "0.1"
+
 [dev-dependencies]
 tempfile = "3.8"
 tokio-test = "0.4"

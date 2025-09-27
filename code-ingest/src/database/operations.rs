@@ -248,10 +248,9 @@ impl DatabaseOperations {
         &self,
         repo_url: Option<&str>,
         local_path: &str,
+        start_timestamp: u64,
         table_name: &str,
     ) -> DatabaseResult<i64> {
-        let start_timestamp = Utc::now().timestamp();
-        
         let insert_sql = r#"
             INSERT INTO ingestion_meta (repo_url, local_path, start_timestamp_unix, table_name)
             VALUES ($1, $2, $3, $4)
@@ -261,7 +260,7 @@ impl DatabaseOperations {
         let row = sqlx::query(insert_sql)
             .bind(repo_url)
             .bind(local_path)
-            .bind(start_timestamp)
+            .bind(start_timestamp as i64)
             .bind(table_name)
             .fetch_one(&self.pool)
             .await
@@ -280,10 +279,9 @@ impl DatabaseOperations {
     pub async fn complete_ingestion_record(
         &self,
         ingestion_id: i64,
+        end_timestamp: u64,
         total_files_processed: i32,
     ) -> DatabaseResult<()> {
-        let end_timestamp = Utc::now().timestamp();
-        
         let update_sql = r#"
             UPDATE ingestion_meta 
             SET end_timestamp_unix = $1, total_files_processed = $2
@@ -291,7 +289,7 @@ impl DatabaseOperations {
         "#;
 
         sqlx::query(update_sql)
-            .bind(end_timestamp)
+            .bind(end_timestamp as i64)
             .bind(total_files_processed)
             .bind(ingestion_id)
             .execute(&self.pool)
@@ -489,6 +487,191 @@ impl DatabaseOperations {
         }
         
         output
+    }
+
+    /// Insert processed files into the database (wrapper for batch_insert_files)
+    pub async fn insert_processed_files(
+        &self,
+        table_name: &str,
+        files: &[crate::processing::ProcessedFile],
+        ingestion_id: i64,
+    ) -> DatabaseResult<()> {
+        // Convert from processing::ProcessedFile to operations::ProcessedFile
+        let converted_files: Vec<ProcessedFile> = files
+            .iter()
+            .filter(|f| !f.skipped) // Only insert non-skipped files
+            .map(|f| ProcessedFile {
+                filepath: f.filepath.clone(),
+                filename: f.filename.clone(),
+                extension: Some(f.extension.clone()),
+                file_size_bytes: f.file_size_bytes,
+                line_count: f.line_count,
+                word_count: f.word_count,
+                token_count: f.token_count,
+                content_text: f.content_text.clone(),
+                file_type: match f.file_type {
+                    crate::processing::FileType::DirectText => FileType::DirectText,
+                    crate::processing::FileType::Convertible => FileType::Convertible,
+                    crate::processing::FileType::NonText => FileType::NonText,
+                },
+                conversion_command: f.conversion_command.clone(),
+                relative_path: f.relative_path.clone(),
+                absolute_path: f.absolute_path.clone(),
+            })
+            .collect();
+
+        let result = self.batch_insert_files(table_name, ingestion_id, converted_files).await?;
+        
+        if result.failed_count > 0 {
+            warn!("Some files failed to insert: {} failures", result.failed_count);
+        }
+        
+        Ok(())
+    }
+
+    /// Get ingestion statistics (wrapper for get_ingestion_stats)
+    pub async fn get_ingestion_statistics(
+        &self,
+        ingestion_id: i64,
+    ) -> DatabaseResult<crate::ingestion::IngestionStatistics> {
+        let stats = self.get_ingestion_stats(ingestion_id).await?;
+        
+        // Get additional statistics from the ingestion table
+        let table_stats_sql = format!(
+            r#"
+            SELECT 
+                COUNT(*) as total_files,
+                SUM(file_size_bytes) as total_size_bytes,
+                file_type,
+                COUNT(*) as type_count
+            FROM "{}"
+            WHERE ingestion_id = $1
+            GROUP BY file_type
+            "#,
+            stats.table_name
+        );
+
+        let type_rows = sqlx::query(&table_stats_sql)
+            .bind(ingestion_id)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryFailed {
+                query: table_stats_sql,
+                cause: e.to_string(),
+            })?;
+
+        let mut file_type_counts = std::collections::HashMap::new();
+        for row in type_rows {
+            let file_type: String = row.get("file_type");
+            let count: i64 = row.get("type_count");
+            file_type_counts.insert(file_type, count as i32);
+        }
+
+        // Get extension statistics
+        let extension_stats_sql = format!(
+            r#"
+            SELECT 
+                extension,
+                COUNT(*) as ext_count
+            FROM "{}"
+            WHERE ingestion_id = $1
+            GROUP BY extension
+            ORDER BY ext_count DESC
+            LIMIT 20
+            "#,
+            stats.table_name
+        );
+
+        let ext_rows = sqlx::query(&extension_stats_sql)
+            .bind(ingestion_id)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryFailed {
+                query: extension_stats_sql,
+                cause: e.to_string(),
+            })?;
+
+        let mut extension_counts = std::collections::HashMap::new();
+        for row in ext_rows {
+            let extension: Option<String> = row.get("extension");
+            let count: i64 = row.get("ext_count");
+            let ext_key = extension.unwrap_or_else(|| "no_extension".to_string());
+            extension_counts.insert(ext_key, count as i32);
+        }
+
+        let processing_duration = if let Some(end_time) = stats.end_timestamp_unix {
+            std::time::Duration::from_secs((end_time - stats.start_timestamp_unix) as u64)
+        } else {
+            std::time::Duration::ZERO
+        };
+
+        Ok(crate::ingestion::IngestionStatistics {
+            ingestion_id: stats.ingestion_id,
+            table_name: stats.table_name,
+            total_files: stats.total_files_processed.unwrap_or(0),
+            total_size_bytes: 0, // Would need to calculate from table
+            file_type_counts,
+            extension_counts,
+            processing_duration,
+        })
+    }
+
+    /// List all ingestion records
+    pub async fn list_ingestion_records(&self) -> DatabaseResult<Vec<crate::ingestion::IngestionRecord>> {
+        let list_sql = r#"
+            SELECT 
+                ingestion_id,
+                repo_url,
+                local_path,
+                table_name,
+                start_timestamp_unix,
+                end_timestamp_unix,
+                total_files_processed,
+                created_at
+            FROM ingestion_meta
+            ORDER BY created_at DESC
+        "#;
+
+        let rows = sqlx::query(list_sql)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryFailed {
+                query: list_sql.to_string(),
+                cause: e.to_string(),
+            })?;
+
+        let mut records = Vec::new();
+        for row in rows {
+            let start_timestamp: i64 = row.get("start_timestamp_unix");
+            let end_timestamp: Option<i64> = row.get("end_timestamp_unix");
+            let total_files: Option<i32> = row.get("total_files_processed");
+
+            let start_time = std::time::UNIX_EPOCH + std::time::Duration::from_secs(start_timestamp as u64);
+            let end_time = end_timestamp.map(|ts| std::time::UNIX_EPOCH + std::time::Duration::from_secs(ts as u64));
+
+            let status = if end_time.is_some() {
+                if total_files.unwrap_or(0) > 0 {
+                    crate::ingestion::IngestionStatus::Completed
+                } else {
+                    crate::ingestion::IngestionStatus::Failed
+                }
+            } else {
+                crate::ingestion::IngestionStatus::InProgress
+            };
+
+            records.push(crate::ingestion::IngestionRecord {
+                ingestion_id: row.get("ingestion_id"),
+                repo_url: row.get("repo_url"),
+                local_path: row.get("local_path"),
+                table_name: row.get("table_name"),
+                start_time,
+                end_time,
+                total_files_processed: total_files,
+                status,
+            });
+        }
+
+        Ok(records)
     }
 }
 

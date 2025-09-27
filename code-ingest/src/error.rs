@@ -20,7 +20,7 @@ pub enum SystemError {
 }
 
 /// Errors related to repository ingestion and file discovery
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum IngestionError {
     #[error("Git clone failed: {repo_url} - {cause}")]
     GitCloneFailed { repo_url: String, cause: String },
@@ -171,6 +171,18 @@ impl From<walkdir::Error> for ProcessingError {
         ProcessingError::FileReadFailed {
             path: err.path().map_or("unknown".to_string(), |p| p.display().to_string()),
             cause: err.to_string(),
+        }
+    }
+}
+
+impl From<DatabaseError> for IngestionError {
+    fn from(err: DatabaseError) -> Self {
+        match err {
+            DatabaseError::ConnectionFailed { url, cause } => IngestionError::NetworkError { cause },
+            DatabaseError::QueryFailed { query: _, cause } => IngestionError::NetworkError { cause },
+            _ => IngestionError::NetworkError { 
+                cause: format!("Database error: {}", err) 
+            },
         }
     }
 }

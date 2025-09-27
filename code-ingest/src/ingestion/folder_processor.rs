@@ -1,6 +1,6 @@
 use crate::error::{IngestionError, IngestionResult};
 use ignore::{Walk, WalkBuilder};
-use std::collections::HashSet;
+
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use tracing::{debug, info, warn};
@@ -170,8 +170,8 @@ impl FolderProcessor {
                     }
                 }
                 Err(e) => {
-                    let path = e.path().unwrap_or(Path::new("unknown"));
-                    warn!("Error accessing path {}: {}", path.display(), e);
+                    let path = Path::new("unknown"); // ignore::Error doesn't have path() method
+                    warn!("Error accessing path: {}", e);
                     
                     if path.is_dir() {
                         skipped_directories.push((path.to_path_buf(), e.to_string()));
@@ -307,7 +307,7 @@ impl FolderProcessor {
             size_bytes,
             modified_time,
             skipped: final_skipped,
-            skip_reason: final_reason,
+            skip_reason: final_reason.clone(),
         };
 
         if !final_skipped {
@@ -490,7 +490,7 @@ mod tests {
         assert!(!non_skipped_files.is_empty());
         
         // Check that we have some expected files
-        let filenames: HashSet<String> = non_skipped_files
+        let filenames: std::collections::HashSet<String> = non_skipped_files
             .iter()
             .map(|f| f.filename.clone())
             .collect();

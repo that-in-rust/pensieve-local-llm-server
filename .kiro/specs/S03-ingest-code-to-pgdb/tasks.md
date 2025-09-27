@@ -77,8 +77,8 @@
     - Write tests for conversion processes and error scenarios
     - _Requirements: 2.2, 3.3 (convertible file processing)_
 
-- [-] 4. Ingestion Engine Implementation
-  - [-] 4.1 Create Git repository cloning functionality
+- [x] 4. Ingestion Engine Implementation
+  - [x] 4.1 Create Git repository cloning functionality
     - Implement GitHub repository cloning with progress tracking
     - Add authentication support for private repositories
     - Handle branch, tag, and commit hash specification
@@ -86,7 +86,7 @@
     - Write tests for various Git scenarios and error conditions
     - _Requirements: 1.1, 1.2, 1.3 (repository cloning)_
 
-  - [ ] 4.2 Implement local folder processing
+  - [x] 4.2 Implement local folder processing
     - Create recursive directory traversal with symlink safety
     - Add file discovery and filtering logic
     - Implement custom include/exclude pattern support
@@ -94,7 +94,7 @@
     - Write tests for folder processing and edge cases
     - _Requirements: 1.2, 2.1, 2.4, 2.5, 2.6 (local folder processing)_
 
-  - [ ] 4.3 Create batch processing coordination
+  - [x] 4.3 Create batch processing coordination
     - Implement parallel file processing with controlled concurrency
     - Add progress reporting and status updates
     - Create memory management and cleanup logic
@@ -102,8 +102,8 @@
     - Write performance tests for large repository handling
     - _Requirements: 7.1, 7.2, 7.4, 7.5 (performance optimization)_
 
-- [ ] 5. Query and Analysis Preparation
-  - [ ] 5.1 Implement SQL query execution and formatting
+- [-] 5. Query and Analysis Preparation
+  - [-] 5.1 Implement SQL query execution and formatting
     - Create query execution with clean terminal output formatting
     - Add result formatting for LLM consumption (FILE: format)
     - Implement query validation and error handling

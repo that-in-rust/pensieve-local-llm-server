@@ -167,6 +167,62 @@ impl Database {
         Ok(result.rows_affected())
     }
 
+    /// Create an ingestion table with the given name
+    pub async fn create_ingestion_table(&self, table_name: &str) -> DatabaseResult<()> {
+        let schema_manager = crate::database::schema::SchemaManager::new(self.pool.clone());
+        let _table_name = schema_manager.create_ingestion_table(Some(chrono::Utc::now())).await?;
+        Ok(())
+    }
+
+    /// Create an ingestion record and return the ID
+    pub async fn create_ingestion_record(
+        &self,
+        repo_url: Option<String>,
+        local_path: String,
+        start_timestamp: u64,
+        table_name: &str,
+    ) -> DatabaseResult<i64> {
+        let operations = crate::database::operations::DatabaseOperations::new(self.pool.clone());
+        operations.create_ingestion_record(repo_url.as_deref(), &local_path, start_timestamp, table_name).await
+    }
+
+    /// Complete an ingestion record
+    pub async fn complete_ingestion_record(
+        &self,
+        ingestion_id: i64,
+        end_timestamp: u64,
+        total_files: i32,
+    ) -> DatabaseResult<()> {
+        let operations = crate::database::operations::DatabaseOperations::new(self.pool.clone());
+        operations.complete_ingestion_record(ingestion_id, end_timestamp, total_files).await
+    }
+
+    /// Insert processed files into the database
+    pub async fn insert_processed_files(
+        &self,
+        table_name: &str,
+        files: &[crate::processing::ProcessedFile],
+        ingestion_id: i64,
+    ) -> DatabaseResult<()> {
+        let operations = crate::database::operations::DatabaseOperations::new(self.pool.clone());
+        operations.insert_processed_files(table_name, files, ingestion_id).await
+    }
+
+    /// Get ingestion statistics
+    pub async fn get_ingestion_statistics(
+        &self,
+        ingestion_id: i64,
+    ) -> DatabaseResult<crate::ingestion::IngestionStatistics> {
+        let operations = crate::database::operations::DatabaseOperations::new(self.pool.clone());
+        operations.get_ingestion_statistics(ingestion_id).await
+    }
+
+    /// List all ingestion records
+    pub async fn list_ingestion_records(&self) -> DatabaseResult<Vec<crate::ingestion::IngestionRecord>> {
+        let operations = crate::database::operations::DatabaseOperations::new(self.pool.clone());
+        operations.list_ingestion_records().await
+    }
+
     // Private helper methods
 
     fn validate_database_url(url: &str) -> DatabaseResult<()> {

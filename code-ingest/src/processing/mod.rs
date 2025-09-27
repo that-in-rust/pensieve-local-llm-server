@@ -52,10 +52,13 @@ pub struct ProcessedFile {
     pub conversion_command: Option<String>,
     pub relative_path: String,
     pub absolute_path: String,
+    pub skipped: bool,
+    pub skip_reason: Option<String>,
 }
 
 /// Trait for processing different file types
-pub trait FileProcessor {
+#[async_trait::async_trait]
+pub trait FileProcessor: Send + Sync {
     /// Check if this processor can handle the given file
     fn can_process(&self, file_path: &Path) -> bool;
     
@@ -105,11 +108,14 @@ mod tests {
             conversion_command: None,
             relative_path: "src/main.rs".to_string(),
             absolute_path: "/home/user/project/src/main.rs".to_string(),
+            skipped: false,
+            skip_reason: None,
         };
 
         assert_eq!(processed_file.file_type, FileType::DirectText);
         assert_eq!(processed_file.extension, "rs");
         assert!(processed_file.content_text.is_some());
         assert!(processed_file.conversion_command.is_none());
+        assert!(!processed_file.skipped);
     }
 }
