@@ -1,5 +1,0 @@
-This is a sample text file for testing the Pensieve CLI tool.
-
-It contains multiple paragraphs to test the paragraph splitting functionality.
-
-This is the third paragraph with some content that should be processed by the tool.
