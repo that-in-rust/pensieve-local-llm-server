@@ -152,7 +152,7 @@
     - Write integration tests for complete task generation workflow
     - _Requirements: 11.1 (task generation command)_
 
-- [-] 7. Utility Commands and Database Exploration
+- [x] 7. Utility Commands and Database Exploration
   - [x] 7.1 Implement database exploration commands
     - Create db-info command for connection status and basic info
     - Implement list-tables command with table type filtering
@@ -161,7 +161,7 @@
     - Write tests for all exploration commands
     - _Requirements: 13.1, 13.2, 13.3, 13.4 (database exploration)_
 
-  - [-] 7.2 Create print-to-md export functionality
+  - [x] 7.2 Create print-to-md export functionality
     - Implement individual file export with sequential naming (PREFIX-00001.md)
     - Add markdown formatting for database row content
     - Create location-based file organization
@@ -169,7 +169,7 @@
     - Write tests for export functionality and file generation
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5 (print-to-md functionality)_
 
-  - [ ] 7.3 Add PostgreSQL setup guidance
+  - [x] 7.3 Add PostgreSQL setup guidance
     - Create pg-start command with installation instructions
     - Add platform-specific setup guidance (macOS, Linux)
     - Implement database connectivity testing

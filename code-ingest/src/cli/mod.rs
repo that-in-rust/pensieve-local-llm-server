@@ -637,15 +637,77 @@ impl Cli {
         prefix: String,
         location: PathBuf,
     ) -> Result<()> {
-        println!("Print to MD:");
-        println!("  Table: {}", table);
-        println!("  SQL: {}", sql);
-        println!("  Prefix: {}", prefix);
-        println!("  Location: {}", location.display());
-        if let Some(path) = db_path {
-            println!("  Database path: {}", path.display());
+        use crate::database::{Database, DatabaseExporter, ExportConfig};
+        use indicatif::{ProgressBar, ProgressStyle};
+        
+        println!("🚀 Exporting query results to markdown files...");
+        println!();
+        
+        // Get database connection
+        let database = if let Some(path) = db_path {
+            Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        // Create database exporter
+        let exporter = DatabaseExporter::new(database.pool().clone());
+        
+        // Create export configuration
+        let config = ExportConfig {
+            prefix,
+            location: location.clone(),
+            max_files: Some(1000), // Safety limit
+            overwrite_existing: false,
+            markdown_template: None,
+        };
+
+        // Validate location
+        if !location.exists() {
+            println!("📁 Creating output directory: {}", location.display());
+            tokio::fs::create_dir_all(&location).await?;
         }
-        println!("Implementation pending - Task 7");
+
+        // Create progress bar
+        let progress = ProgressBar::new_spinner();
+        progress.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.green} [{elapsed_precise}] {msg}")
+                .unwrap()
+        );
+        progress.set_message("Executing query and exporting files...");
+
+        // Execute export
+        let result = exporter.export_to_markdown_files(&table, &sql, &config).await?;
+        
+        progress.finish_and_clear();
+
+        // Display results
+        let formatted = exporter.format_export_result(&result);
+        println!("{}", formatted);
+        
+        if result.files_created > 0 {
+            println!();
+            println!("📂 Files exported to: {}", location.display());
+            println!("🔍 Example files:");
+            for (i, file_path) in result.created_files.iter().take(3).enumerate() {
+                println!("   {}. {}", i + 1, file_path.display());
+            }
+            
+            if result.created_files.len() > 3 {
+                println!("   ... and {} more files", result.created_files.len() - 3);
+            }
+            
+            println!();
+            println!("💡 Pro Tips:");
+            println!("   • Each file contains one row from your query results");
+            println!("   • Files are numbered sequentially: {}-00001.md, {}-00002.md, etc.", config.prefix, config.prefix);
+            println!("   • Use these files for individual analysis or processing");
+            println!("   • File content is formatted as markdown with syntax highlighting");
+        }
+        
         Ok(())
     }
 
@@ -768,26 +830,105 @@ impl Cli {
     }
 
     async fn execute_pg_start(&self) -> Result<()> {
-        println!("PostgreSQL Setup Instructions");
-        println!("============================");
-        println!();
-        println!("macOS (using Homebrew):");
-        println!("  brew install postgresql");
-        println!("  brew services start postgresql");
-        println!();
-        println!("Ubuntu/Debian:");
-        println!("  sudo apt update");
-        println!("  sudo apt install postgresql postgresql-contrib");
-        println!("  sudo systemctl start postgresql");
-        println!();
-        println!("Create database:");
-        println!("  createdb code_ingest");
-        println!();
-        println!("Set DATABASE_URL environment variable:");
-        println!("  export DATABASE_URL=postgresql://username:password@localhost:5432/code_ingest");
-        println!();
-        println!("Test connection:");
-        println!("  psql $DATABASE_URL");
+        use crate::database::PostgreSQLSetup;
+        use indicatif::{ProgressBar, ProgressStyle};
+        
+        println!("🐘 PostgreSQL Setup Assistant");
+        println!("==============================\n");
+        
+        // Create setup manager
+        let setup = PostgreSQLSetup::new();
+        
+        // Show progress while gathering system info
+        let progress = ProgressBar::new_spinner();
+        progress.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.green} {msg}")
+                .unwrap()
+        );
+        progress.set_message("Analyzing your system...");
+        
+        // Get system information
+        let system_info = setup.get_system_info().await;
+        progress.finish_and_clear();
+        
+        // Generate setup instructions
+        let instructions = setup.generate_setup_instructions().await;
+        
+        // Display formatted instructions
+        let formatted_instructions = setup.format_setup_instructions(&instructions, &system_info);
+        println!("{}", formatted_instructions);
+        
+        // Test connection if PostgreSQL appears to be installed
+        if system_info.has_psql {
+            println!("\n🔍 Testing PostgreSQL Connection");
+            println!("=================================\n");
+            
+            let progress = ProgressBar::new_spinner();
+            progress.set_style(
+                ProgressStyle::default_spinner()
+                    .template("{spinner:.green} {msg}")
+                    .unwrap()
+            );
+            progress.set_message("Testing database connection...");
+            
+            let connection_test = setup.test_connection(None).await;
+            progress.finish_and_clear();
+            
+            let formatted_test = setup.format_connection_test(&connection_test);
+            println!("{}", formatted_test);
+            
+            // If connection successful, show additional options
+            if connection_test.success {
+                println!("\n🚀 Ready to Get Started!");
+                println!("========================\n");
+                println!("Your PostgreSQL setup is working! Here are some next steps:\n");
+                
+                println!("**Try these commands:**");
+                println!("```bash");
+                println!("# Ingest a small repository");
+                println!("code-ingest https://github.com/rust-lang/mdBook");
+                println!();
+                println!("# List your tables");
+                println!("code-ingest list-tables");
+                println!();
+                println!("# Run a simple query");
+                println!("code-ingest sql \"SELECT COUNT(*) FROM ingestion_meta\"");
+                println!("```\n");
+                
+                println!("**Explore your data:**");
+                println!("- `code-ingest db-info` - Show database information");
+                println!("- `code-ingest sample --table <table_name>` - Preview table data");
+                println!("- `code-ingest describe --table <table_name>` - Show table schema");
+                println!();
+                
+                println!("📚 **Documentation**: https://github.com/your-repo/code-ingest");
+                println!("🐛 **Issues**: https://github.com/your-repo/code-ingest/issues");
+            } else {
+                println!("\n🔧 Need Help?");
+                println!("=============\n");
+                println!("If you're still having trouble, try these resources:\n");
+                
+                println!("**Common Solutions:**");
+                println!("1. Make sure PostgreSQL is installed and running");
+                println!("2. Check your DATABASE_URL format");
+                println!("3. Verify database and user permissions");
+                println!("4. Review the troubleshooting tips above");
+                println!();
+                
+                println!("**Get Support:**");
+                println!("- Check the setup guide: https://github.com/your-repo/code-ingest/docs/setup");
+                println!("- Open an issue: https://github.com/your-repo/code-ingest/issues");
+                println!("- Join our community: https://discord.gg/your-discord");
+            }
+        } else {
+            println!("\n📋 Next Steps");
+            println!("=============\n");
+            println!("1. Follow the installation instructions above");
+            println!("2. Run `code-ingest pg-start` again to test your setup");
+            println!("3. Once connected, try ingesting your first repository!");
+        }
+        
         Ok(())
     }
 
