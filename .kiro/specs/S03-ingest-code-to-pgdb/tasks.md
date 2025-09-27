@@ -52,7 +52,7 @@
     - Write comprehensive tests for all database operations
     - _Requirements: 3.2, 3.3, 3.4, 3.7 (file storage and metadata)_
 
-- [-] 3. File Processing and Classification System
+- [x] 3. File Processing and Classification System
   - [x] 3.1 Implement three-type file classification
     - Create FileClassifier with extension-based classification logic
     - Define Type 1 (direct text), Type 2 (convertible), Type 3 (non-text) categories
@@ -61,7 +61,7 @@
     - Write tests for all file type classifications
     - _Requirements: 2.2 (three-type classification)_
 
-  - [-] 3.2 Create direct text file processor (Type 1)
+  - [x] 3.2 Create direct text file processor (Type 1)
     - Implement text file reading with encoding detection
     - Add content analysis: line count, word count, token estimation
     - Handle large files with streaming processing
@@ -69,7 +69,7 @@
     - Write tests for text processing and content analysis
     - _Requirements: 2.1, 2.3, 3.2 (direct text processing)_
 
-  - [ ] 3.3 Implement convertible file processor (Type 2)
+  - [x] 3.3 Implement convertible file processor (Type 2)
     - Create external command execution for file conversion
     - Add support for PDF, DOCX, XLSX conversion commands
     - Implement conversion result validation and error handling
@@ -77,8 +77,8 @@
     - Write tests for conversion processes and error scenarios
     - _Requirements: 2.2, 3.3 (convertible file processing)_
 
-- [ ] 4. Ingestion Engine Implementation
-  - [ ] 4.1 Create Git repository cloning functionality
+- [-] 4. Ingestion Engine Implementation
+  - [-] 4.1 Create Git repository cloning functionality
     - Implement GitHub repository cloning with progress tracking
     - Add authentication support for private repositories
     - Handle branch, tag, and commit hash specification

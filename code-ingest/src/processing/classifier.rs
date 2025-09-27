@@ -65,14 +65,14 @@ impl FileClassifier {
             "env", "dotenv", "editorconfig", "gitignore", "gitattributes", "dockerignore",
             // Documentation
             "md", "markdown", "txt", "rst", "adoc", "asciidoc", "org", "tex", "latex",
-            "rtf", "wiki", "textile",
+            "wiki", "textile",
             // Build and project files
             "makefile", "cmake", "gradle", "sbt", "pom", "build", "proj", "csproj",
             "vcxproj", "pbxproj", "xcodeproj", "package", "lock", "sum", "mod",
             // Database and query files
             "sql", "psql", "mysql", "sqlite", "cypher", "sparql", "graphql", "gql",
             // Logs and data
-            "log", "logs", "csv", "tsv", "jsonl", "ndjson", "ldif",
+            "log", "logs", "tsv", "jsonl", "ndjson", "ldif",
             // Scripts and automation
             "dockerfile", "containerfile", "vagrantfile", "rakefile", "gulpfile",
             "gruntfile", "webpack", "rollup", "vite", "esbuild",
