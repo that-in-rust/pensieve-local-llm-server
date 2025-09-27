@@ -4,17 +4,24 @@
 
 **The Problem:** Developers waste hours trying to understand unfamiliar codebases. Current tools (GitHub search, grep, IDE search) are too slow and shallow for semantic code understanding at scale.
 
-**The Solution:** A Rust-based code ingestion system that clones GitHub repos, intelligently processes all file types, and stores structured data in PostgreSQL for lightning-fast semantic search.
+**The Solution:** A Rust-based code ingestion system that clones GitHub repos, intelligently processes all file types, and stores structured data in a personal PostgreSQL database for lightning-fast semantic search.
 
 **Success Metric:** Reduce time to understand a new codebase from hours to minutes.
 
 ## Core User Journey
 
-1. Developer encounters unfamiliar codebase (new job, open source contribution, debugging)
-2. Runs: `code-ingest https://github.com/user/repo --local-path ./repos`
-3. System clones repo, processes all files, stores in PostgreSQL with full-text search
-4. Developer queries: "How does authentication work?" or "Find all database queries"
-5. Gets instant, contextual results with file paths and line numbers
+### Initial Setup
+1. Developer installs PostgreSQL locally or uses Docker: `brew install postgresql` or `docker run -d postgres`
+2. Sets DATABASE_URL: `export DATABASE_URL=postgresql://postgres@localhost:5432/code_ingest`
+3. Runs setup: `code-ingest setup` (creates database and tables)
+
+### Daily Usage
+4. Developer encounters unfamiliar codebase (new job, open source contribution, debugging)
+5. Runs: `code-ingest https://github.com/user/repo --local-path ./repos`
+6. System clones repo, processes all files, stores in PostgreSQL with full-text search
+7. Developer runs SQL query: `code-ingest sql "SELECT filepath, content_text FROM files_20250927120000 WHERE content_text LIKE '%auth%'"`
+8. Gets clean terminal output that can be piped to LLM: `code-ingest sql "..." | llm -f analyze-code.md`
+9. LLM receives SQL results and analyzes using the provided prompt template
 
 ## Requirements
 
@@ -120,38 +127,62 @@ erDiagram
 4. WHEN new files are added THEN the system SHALL process and store only the new files
 5. WHEN tracking changes THEN the system SHALL maintain a history of file modifications
 
-### Requirement 6: API and CLI Interface
+### Requirement 6: CLI Interface with Direct SQL Access
 
-**User Story:** As a developer, I want both programmatic and command-line interfaces, so that I can integrate the system into various workflows.
-
-#### Acceptance Criteria
-
-1. WHEN using the CLI THEN the system SHALL provide commands for ingesting, searching, and managing repositories
-2. WHEN using the API THEN the system SHALL expose REST endpoints for all major operations
-3. WHEN operations are long-running THEN the system SHALL provide progress feedback and status updates
-4. WHEN errors occur THEN the system SHALL return structured error responses with actionable messages
-5. WHEN querying results THEN the system SHALL support pagination and result limiting
-
-### Requirement 7: Performance and Scalability
-
-**User Story:** As a developer, I want the system to handle large repositories and multiple concurrent operations efficiently, so that it scales with my team's needs.
+**User Story:** As a developer, I want to run SQL queries directly against the ingested code database and get clean terminal output, so that I can pipe results to LLM tools for analysis.
 
 #### Acceptance Criteria
 
-1. WHEN ingesting large repositories THEN the system SHALL complete processing within reasonable time limits
-2. WHEN multiple users access the system THEN the system SHALL handle concurrent operations safely
-3. WHEN storing large amounts of content THEN the system SHALL optimize database storage and query performance
-4. WHEN memory usage grows THEN the system SHALL implement proper cleanup and resource management
+1. WHEN using the CLI THEN the system SHALL provide commands for ingesting and managing repositories
+2. WHEN running SQL queries THEN the system SHALL execute raw SQL against the PostgreSQL database and return results
+3. WHEN outputting query results THEN the system SHALL format results as clean, readable text suitable for terminal display
+4. WHEN operations are long-running THEN the system SHALL provide progress feedback and status updates
+5. WHEN errors occur THEN the system SHALL return structured error responses with actionable messages
+
+### Requirement 7: Performance and Personal Use Optimization
+
+**User Story:** As a developer, I want the system to handle large repositories efficiently on my personal machine, so that I can quickly ingest and search through multiple codebases.
+
+#### Acceptance Criteria
+
+1. WHEN ingesting large repositories THEN the system SHALL complete processing within reasonable time limits for personal use
+2. WHEN running multiple ingestion operations THEN the system SHALL handle concurrent operations safely on a single machine
+3. WHEN storing large amounts of content THEN the system SHALL optimize database storage and query performance for personal PostgreSQL instances
+4. WHEN memory usage grows THEN the system SHALL implement proper cleanup and resource management for desktop environments
 5. WHEN processing fails THEN the system SHALL provide retry mechanisms and graceful degradation
 
-### Requirement 8: Configuration and Extensibility
+### Requirement 8: SQL Query Output for LLM Consumption
 
-**User Story:** As a developer, I want to configure the system for different use cases and extend it with custom processing logic, so that it adapts to various project needs.
+**User Story:** As a developer, I want to run SQL queries against the code database and get terminal output that can be piped directly to LLM tools, so that I can analyze code using custom prompts.
 
 #### Acceptance Criteria
 
-1. WHEN deploying the system THEN the system SHALL support configuration via environment variables and config files
-2. WHEN processing different file types THEN the system SHALL allow custom file type handlers
-3. WHEN integrating with different databases THEN the system SHALL support configurable connection parameters
-4. WHEN extending functionality THEN the system SHALL provide plugin interfaces for custom processors
-5. WHEN monitoring the system THEN the system SHALL expose metrics and health check endpoints
+1. WHEN I run a SQL query THEN the system SHALL output results in clean, readable terminal format
+2. WHEN piping to LLM tools THEN the system SHALL format output without extra formatting or colors that interfere with text processing
+3. WHEN querying file contents THEN the system SHALL output filepath and content in a structured way that LLMs can parse
+4. WHEN results are large THEN the system SHALL support result limiting and pagination through SQL LIMIT clauses
+5. WHEN combining with prompt files THEN the system SHALL produce output that works seamlessly with `llm -f prompt.md` workflows
+
+### Requirement 9: PostgreSQL Database Setup and Connection
+
+**User Story:** As a developer, I want clear instructions and scripts for setting up PostgreSQL and connecting the code ingestion system to my database, so that I can get started quickly without database administration complexity.
+
+#### Acceptance Criteria
+
+1. WHEN setting up the system THEN the system SHALL provide setup scripts or clear documentation for PostgreSQL installation
+2. WHEN connecting to PostgreSQL THEN the system SHALL accept DATABASE_URL environment variable in standard PostgreSQL format: `postgresql://user:password@host:port/database`
+3. WHEN the database doesn't exist THEN the system SHALL provide scripts to create the required database and initial schema
+4. WHEN running for the first time THEN the system SHALL automatically create required tables (`ingestion_meta` and initial schema)
+5. WHEN PostgreSQL is not running THEN the system SHALL provide clear error messages with troubleshooting guidance
+
+### Requirement 10: Personal Configuration and Setup
+
+**User Story:** As a developer, I want to easily configure the system for my personal development environment, so that it works seamlessly with my local PostgreSQL setup.
+
+#### Acceptance Criteria
+
+1. WHEN setting up the system THEN the system SHALL support configuration via environment variables and local config files
+2. WHEN connecting to PostgreSQL THEN the system SHALL work with standard local PostgreSQL installations (localhost:5432)
+3. WHEN processing different file types THEN the system SHALL allow custom file type handlers for personal preferences
+4. WHEN extending functionality THEN the system SHALL provide simple configuration options for common use cases
+5. WHEN monitoring the system THEN the system SHALL provide basic logging and status information for personal debugging
