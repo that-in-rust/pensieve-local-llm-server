@@ -56,4 +56,13 @@ git2 = "0.18"
 # Progress reporting
 indicatif = "0.17"
 
+# URL parsing
+url = "2.4"
+
+# Logging and tracing
+tracing = "0.1"
+
+# Gitignore pattern matching
+ignore = "0.4"
+
 

@@ -1,0 +1,1 @@
+// Placeholder for converter module - will be implemented in task 3.3

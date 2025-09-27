@@ -27,8 +27,8 @@
     - Create help text and usage examples
     - _Requirements: 6.1, 6.2 (CLI interface requirements)_
 
-- [ ] 2. Database Layer Implementation
-  - [ ] 2.1 Implement PostgreSQL connection management
+- [x] 2. Database Layer Implementation
+  - [x] 2.1 Implement PostgreSQL connection management
     - Create Database struct with connection pooling using sqlx
     - Implement connection string parsing and validation
     - Add connection health checks and retry logic
@@ -36,7 +36,7 @@
     - Write tests for connection management and error scenarios
     - _Requirements: 9.2, 9.4, 9.5 (PostgreSQL setup and connection)_
 
-  - [ ] 2.2 Create database schema management
+  - [x] 2.2 Create database schema management
     - Implement table creation for INGEST_YYYYMMDDHHMMSS format
     - Create ingestion_meta table schema and operations
     - Add QUERYRESULT_* table creation with dynamic naming
@@ -44,7 +44,7 @@
     - Write tests for schema creation and validation
     - _Requirements: 3.1, 3.5, 3.6 (PostgreSQL storage schema)_
 
-  - [ ] 2.3 Implement core database operations
+  - [x] 2.3 Implement core database operations
     - Create batch insertion operations for file data
     - Implement query execution with result formatting
     - Add transaction management for data consistency
@@ -52,8 +52,8 @@
     - Write comprehensive tests for all database operations
     - _Requirements: 3.2, 3.3, 3.4, 3.7 (file storage and metadata)_
 
-- [ ] 3. File Processing and Classification System
-  - [ ] 3.1 Implement three-type file classification
+- [-] 3. File Processing and Classification System
+  - [x] 3.1 Implement three-type file classification
     - Create FileClassifier with extension-based classification logic
     - Define Type 1 (direct text), Type 2 (convertible), Type 3 (non-text) categories
     - Implement file type detection and validation
@@ -61,7 +61,7 @@
     - Write tests for all file type classifications
     - _Requirements: 2.2 (three-type classification)_
 
-  - [ ] 3.2 Create direct text file processor (Type 1)
+  - [-] 3.2 Create direct text file processor (Type 1)
     - Implement text file reading with encoding detection
     - Add content analysis: line count, word count, token estimation
     - Handle large files with streaming processing
