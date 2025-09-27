@@ -2,9 +2,19 @@
 
 ## Introduction
 
-This feature implements a code ingestion system that clones GitHub repositories and stores their content in a PostgreSQL database for efficient querying and analysis. The system will enable developers to ingest entire codebases, search through code semantically, and retrieve relevant code snippets for LLM-assisted development.
+**The Problem:** Developers waste hours trying to understand unfamiliar codebases. Current tools (GitHub search, grep, IDE search) are too slow and shallow for semantic code understanding at scale.
 
-The system draws inspiration from GitIngest but focuses on persistent storage in PostgreSQL rather than one-time text generation, enabling incremental updates, version tracking, and advanced querying capabilities.
+**The Solution:** A Rust-based code ingestion system that clones GitHub repos, intelligently processes all file types, and stores structured data in PostgreSQL for lightning-fast semantic search.
+
+**Success Metric:** Reduce time to understand a new codebase from hours to minutes.
+
+## Core User Journey
+
+1. Developer encounters unfamiliar codebase (new job, open source contribution, debugging)
+2. Runs: `code-ingest https://github.com/user/repo --local-path ./repos`
+3. System clones repo, processes all files, stores in PostgreSQL with full-text search
+4. Developer queries: "How does authentication work?" or "Find all database queries"
+5. Gets instant, contextual results with file paths and line numbers
 
 ## Requirements
 
