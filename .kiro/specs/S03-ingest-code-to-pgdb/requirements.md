@@ -122,7 +122,7 @@
 
 1. WHEN I provide a GitHub repository URL THEN the system SHALL clone the repository and wait for download completion before processing
 2. WHEN I provide an absolute folder path THEN the system SHALL process the existing local folder directly
-3. WHEN ingestion starts THEN the system SHALL create a timestamped table `files_YYYYMMDDHHMMSS` and record reference in `ingestion_meta` table
+3. WHEN ingestion starts THEN the system SHALL create a timestamped table `INGEST_YYYYMMDDHHMMSS` and record reference in `ingestion_meta` table
 4. WHEN I specify `--db-path` THEN the system SHALL use that absolute path for the PostgreSQL database location
 5. WHEN processing completes THEN the system SHALL update the `ingestion_meta` record with completion status and file count
 
@@ -290,7 +290,7 @@ erDiagram
 
 #### Acceptance Criteria
 
-1. WHEN I run task generation THEN the system SHALL execute: `code-ingest generate-tasks --sql "SELECT * FROM files_20250927120000" --prompt-file analyze.md --output-table results --tasks-file /abs/path/tasks.md --db-path /abs/path/db`
+1. WHEN I run task generation THEN the system SHALL execute: `code-ingest generate-tasks --sql "SELECT * FROM INGEST_20250927120000" --prompt-file analyze.md --output-table QUERYRESULT_results --tasks-file /abs/path/tasks.md --db-path /abs/path/db`
 2. WHEN generating tasks THEN the system SHALL first create the complete list of all individual file/chunk analysis tasks
 3. WHEN dividing into groups THEN the system SHALL divide the total task count by 7 and distribute evenly (e.g., 35 tasks ÷ 7 = 5 tasks per group)
 4. WHEN structuring with Kiro numbering THEN the system SHALL format as: `- [ ] 1. Task Group 1` (main task) followed by `- [ ] 1.1`, `- [ ] 1.2`, `- [ ] 1.3`, etc. (sub-tasks)
