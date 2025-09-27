@@ -2,279 +2,392 @@
 
 ## Overview
 
-The S03-ingest-code-to-pgdb system is a Rust-based code ingestion and analysis platform that transforms GitHub repositories and local codebases into searchable PostgreSQL databases. The system enables developers to systematically analyze large codebases using structured LLM workflows through IDE integration.
+This design implements a high-performance Rust-based code ingestion system that transforms GitHub repositories into queryable PostgreSQL databases. The system prioritizes developer velocity by providing instant access to structured codebase data through familiar SQL interfaces.
+
+**Core Architecture Principle**: Stream-first processing with zero-copy optimizations wherever possible, leveraging Rust's ownership model for memory safety and performance.
 
 ## Architecture
 
-### High-Level Architecture
+### System Components
 
 ```mermaid
-graph TB
-    subgraph "Input Sources"
-        A[GitHub Repository URL]
-        B[Local Folder Path]
-    end
+graph TD
+    CLI[CLI Interface] --> Core[Core Engine]
+    Core --> Clone[Git Clone Module]
+    Core --> Process[File Processor]
+    Core --> Store[PostgreSQL Store]
+    Core --> Query[Query Engine]
     
-    subgraph "Core System"
-        C[CLI Interface]
-        D[Ingestion Engine]
-        E[File Processor]
-        F[Query Engine]
-        G[Task Generator]
-    end
+    Clone --> FS[File System]
+    Process --> Classify[File Classifier]
+    Process --> Extract[Content Extractor]
+    Store --> PG[(PostgreSQL)]
+    Query --> PG
     
-    subgraph "Storage Layer"
-        H[(PostgreSQL Database)]
-        I[INGEST_* Tables]
-        J[QUERYRESULT_* Tables]
-        K[ingestion_meta Table]
+    subgraph "File Processing Pipeline"
+        Classify --> DirectText[Type 1: Direct Text]
+        Classify --> Convertible[Type 2: Convertible]
+        Classify --> Binary[Type 3: Binary]
+        
+        DirectText --> TextMetrics[Line/Word/Token Count]
+        Convertible --> Convert[External Conversion]
+        Binary --> MetaOnly[Metadata Only]
     end
-    
-    subgraph "Output Layer"
-        L[Temporary Files]
-        M[Task Markdown Files]
-        N[Individual MD Files]
-    end
-    
-    subgraph "IDE Integration"
-        O[Kiro IDE]
-        P[Task Execution]
-        Q[LLM Analysis]
-    end
-    
-    A --> C
-    B --> C
-    C --> D
-    D --> E
-    E --> H
-    H --> I
-    H --> K
-    C --> F
-    F --> H
-    F --> L
-    C --> G
-    G --> M
-    H --> J
-    L --> O
-    M --> O
-    O --> P
-    P --> Q
-    Q --> N
-    N --> C
-###
- System Components
+```
 
-#### 1. CLI Interface (`cli.rs`)
-- **Purpose**: Primary user interaction point
-- **Responsibilities**:
-  - Command parsing and validation
-  - Database path management
-  - Progress reporting
-  - Error handling and user feedback
-- **Key Commands**:
-  - `code-ingest <url|path> --db-path <path>`
-  - `code-ingest query-prepare --sql "..." --temp-path <path> --tasks-file <path> --output-table <name>`
-  - `code-ingest generate-tasks --sql "..." --tasks-file <path> --output-table <name>`
-  - `code-ingest print-to-md --table <name> --sql "..." --prefix <name> --location <path>`
-  - `code-ingest list-tables --db-path <path>`
+### Data Flow
 
-#### 2. Ingestion Engine (`ingestion/mod.rs`)
-- **Purpose**: Handles repository cloning and local folder processing
-- **Responsibilities**:
-  - Git repository cloning with progress tracking
-  - Local folder traversal and file discovery
-  - File classification (Type 1, 2, 3)
-  - Batch processing coordination
-- **Key Modules**:
-  - `git_cloner.rs` - GitHub repository cloning
-  - `folder_processor.rs` - Local folder processing
-  - `file_classifier.rs` - Three-type file classification
-
-#### 3. File Processor (`processing/mod.rs`)
-- **Purpose**: Processes files based on their classification
-- **Responsibilities**:
-  - Type 1: Direct text file reading
-  - Type 2: Text conversion via external commands
-  - Type 3: Metadata extraction only
-  - Content analysis (line count, word count, token estimation)
-- **Key Modules**:
-  - `text_processor.rs` - Direct text file handling
-  - `converter.rs` - External command execution for Type 2 files
-  - `metadata_extractor.rs` - File metadata collection
-
-#### 4. Database Layer (`database/mod.rs`)
-- **Purpose**: PostgreSQL interaction and schema management
-- **Responsibilities**:
-  - Connection management
-  - Table creation and management
-  - Batch insertions for performance
-  - Query execution and result formatting
-- **Key Modules**:
-  - `connection.rs` - Database connection handling
-  - `schema.rs` - Table creation and migration
-  - `operations.rs` - CRUD operations
-  - `query_formatter.rs` - Result formatting for LLM consumption
-
-#### 5. Task Generator (`tasks/mod.rs`)
-- **Purpose**: Creates structured task markdown for IDE integration
-- **Responsibilities**:
-  - Query result analysis
-  - 7-part task division algorithm
-  - Kiro-compatible numbering (1., 1.1, 1.2, etc.)
-  - Markdown generation with proper formatting
-- **Key Modules**:
-  - `task_divider.rs` - Mathematical division into 7 groups
-  - `markdown_generator.rs` - Structured markdown creation
-  - `chunk_analyzer.rs` - File chunking with overlap
+1. **Ingestion Flow**: CLI → Git Clone → File Discovery → Classification → Content Extraction → PostgreSQL Storage
+2. **Query Flow**: CLI → SQL Parser → PostgreSQL Query → Result Formatting → Terminal Output
+3. **IDE Integration Flow**: Query → Temp File → Task Generation → Result Storage
 
 ## Components and Interfaces
 
-### Core Traits
+### 1. CLI Interface (`src/cli/mod.rs`)
 
 ```rust
-/// Main ingestion trait for different source types
-pub trait SourceIngester {
-    async fn ingest(&self, source: &str, db_path: &Path) -> Result<IngestionResult, IngestionError>;
-    async fn validate_source(&self, source: &str) -> Result<(), ValidationError>;
+use clap::{Parser, Subcommand};
+use std::path::PathBuf;
+
+#[derive(Parser)]
+#[command(name = "code-ingest")]
+#[command(about = "Ingest GitHub repositories into PostgreSQL for fast code analysis")]
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: Commands,
 }
 
-/// File processing trait for different file types
-pub trait FileProcessor {
-    fn can_process(&self, file_path: &Path) -> bool;
-    async fn process(&self, file_path: &Path) -> Result<ProcessedFile, ProcessingError>;
-    fn get_file_type(&self) -> FileType;
-}
-
-/// Database operations trait
-pub trait DatabaseOperations {
-    async fn create_ingestion_table(&self, timestamp: &str) -> Result<String, DatabaseError>;
-    async fn insert_files_batch(&self, table_name: &str, files: Vec<ProcessedFile>) -> Result<(), DatabaseError>;
-    async fn execute_query(&self, sql: &str) -> Result<QueryResult, DatabaseError>;
-    async fn store_analysis_result(&self, table_name: &str, result: AnalysisResult) -> Result<(), DatabaseError>;
-}
-
-/// Task generation trait
-pub trait TaskGenerator {
-    async fn generate_tasks(&self, query_result: &QueryResult, config: &TaskConfig) -> Result<TaskStructure, TaskError>;
-    fn divide_into_groups(&self, tasks: Vec<Task>, group_count: usize) -> Vec<TaskGroup>;
+#[derive(Subcommand)]
+pub enum Commands {
+    /// Ingest a GitHub repository
+    Ingest {
+        /// GitHub repository URL
+        repo_url: String,
+        /// Local database path
+        #[arg(long, default_value = "./analysis")]
+        db_path: PathBuf,
+        /// GitHub personal access token
+        #[arg(long, env = "GITHUB_TOKEN")]
+        token: Option<String>,
+        /// Local clone path (temporary)
+        #[arg(long, default_value = "/tmp/code-ingest")]
+        clone_path: PathBuf,
+    },
+    /// Execute SQL query against ingested data
+    Sql {
+        /// SQL query to execute
+        query: String,
+        /// Database path
+        #[arg(long, default_value = "./analysis")]
+        db_path: PathBuf,
+        /// Limit results
+        #[arg(long, default_value = "100")]
+        limit: usize,
+    },
+    /// List available ingestion tables
+    ListTables {
+        #[arg(long, default_value = "./analysis")]
+        db_path: PathBuf,
+    },
+    /// Show sample data from a table
+    Sample {
+        /// Table name to sample
+        #[arg(long)]
+        table: String,
+        #[arg(long, default_value = "./analysis")]
+        db_path: PathBuf,
+        #[arg(long, default_value = "5")]
+        limit: usize,
+    },
+    /// Prepare query results for IDE analysis
+    QueryPrepare {
+        /// SQL query
+        query: String,
+        #[arg(long, default_value = "./analysis")]
+        db_path: PathBuf,
+        /// Temporary file for results
+        #[arg(long)]
+        temp_path: PathBuf,
+        /// Tasks file for IDE
+        #[arg(long)]
+        tasks_file: PathBuf,
+        /// Output table name
+        #[arg(long)]
+        output_table: String,
+    },
+    /// Store analysis results back to database
+    StoreResult {
+        #[arg(long, default_value = "./analysis")]
+        db_path: PathBuf,
+        #[arg(long)]
+        output_table: String,
+        #[arg(long)]
+        result_file: PathBuf,
+        #[arg(long)]
+        original_query: String,
+    },
+    /// Start PostgreSQL setup guide
+    PgStart,
 }
 ```
 
-### Data Models
+### 2. Core Engine (`src/core/mod.rs`)
 
 ```rust
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProcessedFile {
-    pub filepath: String,
-    pub filename: String,
-    pub extension: String,
-    pub file_size_bytes: i64,
-    pub line_count: Option<i32>,
-    pub word_count: Option<i32>,
-    pub token_count: Option<i32>,
-    pub content_text: Option<String>,
-    pub file_type: FileType,
-    pub conversion_command: Option<String>,
-    pub relative_path: String,
-    pub absolute_path: String,
+use anyhow::Result;
+use std::path::Path;
+use tokio::sync::mpsc;
+
+pub struct IngestionEngine {
+    db_pool: sqlx::PgPool,
+    clone_manager: GitCloneManager,
+    file_processor: FileProcessor,
+    progress_tx: mpsc::Sender<IngestionProgress>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
+pub struct IngestionConfig {
+    pub repo_url: String,
+    pub local_clone_path: PathBuf,
+    pub db_path: PathBuf,
+    pub github_token: Option<String>,
+    pub max_file_size: usize,
+}
+
+#[derive(Debug)]
+pub enum IngestionProgress {
+    CloneStarted,
+    CloneCompleted { files_discovered: usize },
+    FileProcessed { path: String, file_type: FileType },
+    IngestionCompleted { 
+        table_name: String, 
+        total_files: usize,
+        duration_seconds: u64,
+    },
+    Error { message: String },
+}
+
+impl IngestionEngine {
+    pub async fn new(db_path: &Path) -> Result<Self> {
+        let db_pool = create_database_pool(db_path).await?;
+        ensure_schema_exists(&db_pool).await?;
+        
+        Ok(Self {
+            db_pool,
+            clone_manager: GitCloneManager::new(),
+            file_processor: FileProcessor::new(),
+            progress_tx: create_progress_channel(),
+        })
+    }
+    
+    pub async fn ingest_repository(&self, config: IngestionConfig) -> Result<IngestionResult> {
+        let ingestion_id = self.start_ingestion_record(&config).await?;
+        let table_name = format!("INGEST_{}", chrono::Utc::now().format("%Y%m%d%H%M%S"));
+        
+        // Create timestamped table
+        self.create_ingestion_table(&table_name).await?;
+        
+        // Clone repository
+        self.progress_tx.send(IngestionProgress::CloneStarted).await?;
+        let repo_path = self.clone_manager.clone_repo(&config).await?;
+        
+        // Process files in parallel
+        let file_stream = discover_files(&repo_path).await?;
+        let processed_files = self.process_files_parallel(file_stream, &table_name).await?;
+        
+        // Complete ingestion record
+        self.complete_ingestion_record(ingestion_id, processed_files.len()).await?;
+        
+        Ok(IngestionResult {
+            table_name,
+            files_processed: processed_files.len(),
+            ingestion_id,
+        })
+    }
+}
+```
+
+### 3. File Classification System (`src/processing/classifier.rs`)
+
+```rust
+use std::path::Path;
+use std::collections::HashSet;
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum FileType {
     DirectText,
     Convertible,
-    NonText,
+    Binary,
 }
 
-#[derive(Debug, Clone)]
-pub struct IngestionResult {
-    pub table_name: String,
-    pub files_processed: i32,
-    pub ingestion_id: i64,
-    pub duration: Duration,
+#[derive(Debug)]
+pub struct FileClassifier {
+    direct_text_extensions: HashSet<&'static str>,
+    convertible_extensions: HashSet<&'static str>,
 }
 
-#[derive(Debug, Clone)]
-pub struct TaskStructure {
-    pub groups: Vec<TaskGroup>,
-    pub total_tasks: usize,
-    pub metadata: TaskMetadata,
+impl FileClassifier {
+    pub fn new() -> Self {
+        let direct_text_extensions = [
+            "rs", "py", "js", "ts", "md", "txt", "json", "yaml", "yml", "toml",
+            "sql", "sh", "bash", "c", "cpp", "cc", "cxx", "h", "hpp", "java",
+            "go", "rb", "php", "html", "css", "xml", "dockerfile", "gitignore",
+            "env", "ini", "cfg", "conf", "log", "csv", "tsv"
+        ].into_iter().collect();
+        
+        let convertible_extensions = [
+            "pdf", "docx", "xlsx", "pptx", "odt", "ods", "odp"
+        ].into_iter().collect();
+        
+        Self {
+            direct_text_extensions,
+            convertible_extensions,
+        }
+    }
+    
+    pub fn classify_file(&self, path: &Path) -> FileType {
+        let extension = path.extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+            
+        if self.direct_text_extensions.contains(extension.as_str()) {
+            FileType::DirectText
+        } else if self.convertible_extensions.contains(extension.as_str()) {
+            FileType::Convertible
+        } else {
+            FileType::Binary
+        }
+    }
 }
 
-#[derive(Debug, Clone)]
-pub struct TaskGroup {
-    pub id: usize,
-    pub title: String,
-    pub tasks: Vec<Task>,
+#[derive(Debug)]
+pub struct FileMetadata {
+    pub path: PathBuf,
+    pub filename: String,
+    pub extension: Option<String>,
+    pub size_bytes: u64,
+    pub file_type: FileType,
 }
 
-#[derive(Debug, Clone)]
-pub struct Task {
-    pub id: String,
-    pub description: String,
-    pub file_path: Option<String>,
-    pub chunk_info: Option<ChunkInfo>,
+#[derive(Debug)]
+pub struct ProcessedFile {
+    pub metadata: FileMetadata,
+    pub content: Option<String>,
+    pub line_count: Option<u32>,
+    pub word_count: Option<u32>,
+    pub token_count: Option<u32>,
+    pub conversion_command: Option<String>,
+}
+```
+
+### 4. Content Extraction Pipeline (`src/processing/extractor.rs`)
+
+```rust
+use tokio::fs;
+use tokio::process::Command;
+use anyhow::{Result, Context};
+
+pub struct ContentExtractor {
+    token_counter: TokenCounter,
 }
 
-#[derive(Debug, Clone)]
-pub struct ChunkInfo {
-    pub start_line: i32,
-    pub end_line: i32,
-    pub chunk_number: i32,
+impl ContentExtractor {
+    pub async fn extract_content(&self, metadata: FileMetadata) -> Result<ProcessedFile> {
+        match metadata.file_type {
+            FileType::DirectText => self.extract_direct_text(metadata).await,
+            FileType::Convertible => self.extract_convertible(metadata).await,
+            FileType::Binary => self.extract_binary_metadata(metadata).await,
+        }
+    }
+    
+    async fn extract_direct_text(&self, metadata: FileMetadata) -> Result<ProcessedFile> {
+        let content = fs::read_to_string(&metadata.path).await
+            .with_context(|| format!("Failed to read file: {:?}", metadata.path))?;
+            
+        let line_count = content.lines().count() as u32;
+        let word_count = content.split_whitespace().count() as u32;
+        let token_count = self.token_counter.count_tokens(&content)?;
+        
+        Ok(ProcessedFile {
+            metadata,
+            content: Some(content),
+            line_count: Some(line_count),
+            word_count: Some(word_count),
+            token_count: Some(token_count),
+            conversion_command: None,
+        })
+    }
+    
+    async fn extract_convertible(&self, metadata: FileMetadata) -> Result<ProcessedFile> {
+        let conversion_result = match metadata.extension.as_deref() {
+            Some("pdf") => self.convert_pdf(&metadata.path).await?,
+            Some("docx") => self.convert_docx(&metadata.path).await?,
+            Some("xlsx") => self.convert_xlsx(&metadata.path).await?,
+            _ => return self.extract_binary_metadata(metadata).await,
+        };
+        
+        let line_count = conversion_result.content.lines().count() as u32;
+        let word_count = conversion_result.content.split_whitespace().count() as u32;
+        let token_count = self.token_counter.count_tokens(&conversion_result.content)?;
+        
+        Ok(ProcessedFile {
+            metadata,
+            content: Some(conversion_result.content),
+            line_count: Some(line_count),
+            word_count: Some(word_count),
+            token_count: Some(token_count),
+            conversion_command: Some(conversion_result.command),
+        })
+    }
+    
+    async fn convert_pdf(&self, path: &Path) -> Result<ConversionResult> {
+        let output = Command::new("pdftotext")
+            .arg(path)
+            .arg("-")
+            .output()
+            .await
+            .context("Failed to execute pdftotext")?;
+            
+        if !output.status.success() {
+            anyhow::bail!("pdftotext failed: {}", String::from_utf8_lossy(&output.stderr));
+        }
+        
+        Ok(ConversionResult {
+            content: String::from_utf8_lossy(&output.stdout).to_string(),
+            command: format!("pdftotext {} -", path.display()),
+        })
+    }
+}
+
+#[derive(Debug)]
+struct ConversionResult {
+    content: String,
+    command: String,
+}
+
+pub struct TokenCounter {
+    // Using tiktoken-rs or similar for token counting
+}
+
+impl TokenCounter {
+    pub fn count_tokens(&self, text: &str) -> Result<u32> {
+        // Implementation using tiktoken-rs
+        // For MVP, could use simple word count * 1.3 approximation
+        Ok((text.split_whitespace().count() as f32 * 1.3) as u32)
+    }
 }
 ```
 
 ## Data Models
 
-### Database Schema Implementation
+### PostgreSQL Schema
 
-#### INGEST_* Tables
 ```sql
-CREATE TABLE INGEST_20250927143022 (
-    file_id BIGSERIAL PRIMARY KEY,
-    ingestion_id BIGINT NOT NULL REFERENCES ingestion_meta(ingestion_id),
-    filepath VARCHAR NOT NULL,
-    filename VARCHAR NOT NULL,
-    extension VARCHAR,
-    file_size_bytes BIGINT NOT NULL,
-    line_count INTEGER,
-    word_count INTEGER,
-    token_count INTEGER,
-    content_text TEXT,
-    file_type VARCHAR NOT NULL CHECK (file_type IN ('direct_text', 'convertible', 'non_text')),
-    conversion_command VARCHAR,
-    relative_path VARCHAR NOT NULL,
-    absolute_path VARCHAR NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Indexes for performance
-CREATE INDEX idx_ingest_filepath ON INGEST_20250927143022(filepath);
-CREATE INDEX idx_ingest_extension ON INGEST_20250927143022(extension);
-CREATE INDEX idx_ingest_file_type ON INGEST_20250927143022(file_type);
-CREATE INDEX idx_ingest_content_text ON INGEST_20250927143022 USING gin(to_tsvector('english', content_text));
-```
-
-#### QUERYRESULT_* Tables
-```sql
-CREATE TABLE QUERYRESULT_auth_analysis (
-    analysis_id BIGSERIAL PRIMARY KEY,
-    sql_query TEXT NOT NULL,
-    prompt_file_path VARCHAR,
-    llm_result TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Index for searching analysis results
-CREATE INDEX idx_queryresult_created_at ON QUERYRESULT_auth_analysis(created_at);
-CREATE INDEX idx_queryresult_prompt ON QUERYRESULT_auth_analysis(prompt_file_path);
-```
-
-#### Metadata Table
-```sql
-CREATE TABLE ingestion_meta (
+-- Metadata table for tracking ingestions
+CREATE TABLE IF NOT EXISTS ingestion_meta (
     ingestion_id BIGSERIAL PRIMARY KEY,
-    repo_url VARCHAR,
+    repo_url VARCHAR NOT NULL,
     local_path VARCHAR NOT NULL,
     start_timestamp_unix BIGINT NOT NULL,
     end_timestamp_unix BIGINT,
@@ -283,23 +396,88 @@ CREATE TABLE ingestion_meta (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_ingestion_meta_table_name ON ingestion_meta(table_name);
-CREATE INDEX idx_ingestion_meta_repo_url ON ingestion_meta(repo_url);
+-- Template for timestamped ingestion tables
+CREATE TABLE IF NOT EXISTS INGEST_TEMPLATE (
+    file_id BIGSERIAL PRIMARY KEY,
+    ingestion_id BIGINT REFERENCES ingestion_meta(ingestion_id),
+    filepath VARCHAR NOT NULL,
+    filename VARCHAR NOT NULL,
+    extension VARCHAR,
+    file_size_bytes BIGINT NOT NULL,
+    line_count INTEGER,
+    word_count INTEGER,
+    token_count INTEGER,
+    content_text TEXT,
+    file_type VARCHAR NOT NULL CHECK (file_type IN ('direct_text', 'convertible', 'binary')),
+    conversion_command VARCHAR,
+    relative_path VARCHAR NOT NULL,
+    absolute_path VARCHAR NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Full-text search index on content
+CREATE INDEX IF NOT EXISTS idx_content_fts ON INGEST_TEMPLATE USING gin(to_tsvector('english', content_text));
+
+-- Query result tables for IDE integration
+CREATE TABLE IF NOT EXISTS QUERYRESULT_TEMPLATE (
+    result_id BIGSERIAL PRIMARY KEY,
+    original_query TEXT NOT NULL,
+    query_timestamp TIMESTAMP DEFAULT NOW(),
+    result_data JSONB,
+    analysis_tasks TEXT,
+    final_insights TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
 ```
 
-### File Processing Pipeline
+### Rust Data Models
 
-```mermaid
-graph LR
-    A[File Discovery] --> B{File Classification}
-    B -->|Type 1| C[Direct Text Processing]
-    B -->|Type 2| D[Conversion Processing]
-    B -->|Type 3| E[Metadata Only]
-    C --> F[Content Analysis]
-    D --> F
-    E --> F
-    F --> G[Database Storage]
-    G --> H[Batch Commit]
+```rust
+use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
+use chrono::{DateTime, Utc};
+
+#[derive(Debug, FromRow, Serialize, Deserialize)]
+pub struct IngestionMeta {
+    pub ingestion_id: i64,
+    pub repo_url: String,
+    pub local_path: String,
+    pub start_timestamp_unix: i64,
+    pub end_timestamp_unix: Option<i64>,
+    pub table_name: String,
+    pub total_files_processed: Option<i32>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, FromRow, Serialize, Deserialize)]
+pub struct IngestedFile {
+    pub file_id: i64,
+    pub ingestion_id: i64,
+    pub filepath: String,
+    pub filename: String,
+    pub extension: Option<String>,
+    pub file_size_bytes: i64,
+    pub line_count: Option<i32>,
+    pub word_count: Option<i32>,
+    pub token_count: Option<i32>,
+    pub content_text: Option<String>,
+    pub file_type: String,
+    pub conversion_command: Option<String>,
+    pub relative_path: String,
+    pub absolute_path: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct QueryResult {
+    pub result_id: i64,
+    pub original_query: String,
+    pub query_timestamp: DateTime<Utc>,
+    pub result_data: serde_json::Value,
+    pub analysis_tasks: Option<String>,
+    pub final_insights: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
 ```
 
 ## Error Handling
@@ -307,226 +485,106 @@ graph LR
 ### Error Hierarchy
 
 ```rust
+use thiserror::Error;
+
 #[derive(Error, Debug)]
-pub enum SystemError {
-    #[error("Ingestion error: {0}")]
-    Ingestion(#[from] IngestionError),
+pub enum CodeIngestError {
+    #[error("Git operation failed: {0}")]
+    Git(#[from] git2::Error),
     
     #[error("Database error: {0}")]
-    Database(#[from] DatabaseError),
+    Database(#[from] sqlx::Error),
     
-    #[error("Processing error: {0}")]
-    Processing(#[from] ProcessingError),
+    #[error("File system error: {0}")]
+    FileSystem(#[from] std::io::Error),
     
-    #[error("Task generation error: {0}")]
-    TaskGeneration(#[from] TaskError),
+    #[error("File processing error: {file_path} - {cause}")]
+    FileProcessing { file_path: String, cause: String },
     
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
+    #[error("Conversion failed: {tool} - {message}")]
+    ConversionFailed { tool: String, message: String },
+    
+    #[error("Configuration error: {0}")]
+    Configuration(String),
+    
+    #[error("GitHub authentication failed: {0}")]
+    Authentication(String),
+    
+    #[error("Repository not found or inaccessible: {url}")]
+    RepositoryNotFound { url: String },
+    
+    #[error("PostgreSQL connection failed: {message}")]
+    DatabaseConnection { message: String },
 }
 
-#[derive(Error, Debug)]
-pub enum IngestionError {
-    #[error("Git clone failed: {repo_url} - {cause}")]
-    GitCloneFailed { repo_url: String, cause: String },
-    
-    #[error("Local path not found: {path}")]
-    LocalPathNotFound { path: String },
-    
-    #[error("Permission denied: {path}")]
-    PermissionDenied { path: String },
-    
-    #[error("Repository too large: {size_mb}MB exceeds limit")]
-    RepositoryTooLarge { size_mb: u64 },
-}
-
-#[derive(Error, Debug)]
-pub enum DatabaseError {
-    #[error("Connection failed: {url} - {cause}")]
-    ConnectionFailed { url: String, cause: String },
-    
-    #[error("Table creation failed: {table_name} - {cause}")]
-    TableCreationFailed { table_name: String, cause: String },
-    
-    #[error("Query execution failed: {query} - {cause}")]
-    QueryFailed { query: String, cause: String },
-    
-    #[error("Transaction failed: {cause}")]
-    TransactionFailed { cause: String },
-}
+pub type Result<T> = std::result::Result<T, CodeIngestError>;
 ```
 
 ## Testing Strategy
 
-### Unit Testing Approach
+### Unit Tests
+- File classification accuracy (100% for known extensions)
+- Content extraction correctness
+- Token counting precision (within 5% of tiktoken)
+- SQL query generation and execution
+
+### Integration Tests
+- End-to-end ingestion workflow
+- PostgreSQL schema creation and migration
+- Git clone with authentication
+- File conversion pipeline
+
+### Performance Tests
+- Ingestion speed: >100 files/second for text files
+- Query response time: <1 second for 10,000 file repositories
+- Memory usage: Constant regardless of repository size
+- Concurrent ingestion handling
+
+### Test Plan for Each Interface
 
 ```rust
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
-    use tokio_test;
-
+    
     #[tokio::test]
-    async fn test_file_classification() {
+    async fn test_file_classification_accuracy() {
         let classifier = FileClassifier::new();
         
-        // Test Type 1 (Direct Text)
-        assert_eq!(classifier.classify_file("test.rs"), FileType::DirectText);
-        assert_eq!(classifier.classify_file("README.md"), FileType::DirectText);
-        
-        // Test Type 2 (Convertible)
-        assert_eq!(classifier.classify_file("doc.pdf"), FileType::Convertible);
-        assert_eq!(classifier.classify_file("sheet.xlsx"), FileType::Convertible);
-        
-        // Test Type 3 (Non-Text)
-        assert_eq!(classifier.classify_file("image.jpg"), FileType::NonText);
-        assert_eq!(classifier.classify_file("binary.exe"), FileType::NonText);
+        assert_eq!(classifier.classify_file(Path::new("main.rs")), FileType::DirectText);
+        assert_eq!(classifier.classify_file(Path::new("doc.pdf")), FileType::Convertible);
+        assert_eq!(classifier.classify_file(Path::new("image.jpg")), FileType::Binary);
     }
-
+    
     #[tokio::test]
-    async fn test_task_division() {
-        let generator = TaskGenerator::new();
-        let tasks = create_test_tasks(35); // 35 test tasks
+    async fn test_ingestion_performance_contract() {
+        let engine = IngestionEngine::new(Path::new("./test_db")).await.unwrap();
+        let start = std::time::Instant::now();
         
-        let groups = generator.divide_into_groups(tasks, 7);
+        let result = engine.ingest_repository(create_test_config()).await.unwrap();
+        let duration = start.elapsed();
         
-        assert_eq!(groups.len(), 7);
-        assert_eq!(groups[0].tasks.len(), 5); // 35 ÷ 7 = 5 tasks per group
-        assert_eq!(groups[6].tasks.len(), 5);
+        // Performance contract: <2 minutes for 100MB repo
+        assert!(duration.as_secs() < 120);
+        assert!(result.files_processed > 0);
     }
-
+    
     #[tokio::test]
-    async fn test_database_operations() {
-        let temp_dir = TempDir::new().unwrap();
-        let db = create_test_database(&temp_dir).await;
+    async fn test_query_response_time_contract() {
+        let engine = setup_test_engine_with_data().await;
+        let start = std::time::Instant::now();
         
-        // Test table creation
-        let table_name = db.create_ingestion_table("20250927143022").await.unwrap();
-        assert_eq!(table_name, "INGEST_20250927143022");
+        let results = engine.execute_sql_query(
+            "SELECT filepath FROM INGEST_TEST WHERE content_text LIKE '%function%'"
+        ).await.unwrap();
         
-        // Test file insertion
-        let files = create_test_files(10);
-        db.insert_files_batch(&table_name, files).await.unwrap();
+        let duration = start.elapsed();
         
-        // Test query execution
-        let result = db.execute_query(&format!("SELECT COUNT(*) FROM {}", table_name)).await.unwrap();
-        assert_eq!(result.row_count, 10);
+        // Performance contract: <1 second query response
+        assert!(duration.as_millis() < 1000);
+        assert!(!results.is_empty());
     }
 }
 ```
 
-### Integration Testing
-
-```rust
-#[tokio::test]
-async fn test_end_to_end_ingestion() {
-    let temp_dir = TempDir::new().unwrap();
-    let db_path = temp_dir.path().join("test.db");
-    
-    // Create test repository structure
-    let repo_dir = create_test_repo(&temp_dir);
-    
-    // Run ingestion
-    let result = ingest_local_folder(repo_dir.path(), &db_path).await.unwrap();
-    
-    // Verify results
-    assert!(result.files_processed > 0);
-    assert!(result.table_name.starts_with("INGEST_"));
-    
-    // Verify database content
-    let db = Database::connect(&db_path).await.unwrap();
-    let query_result = db.execute_query(&format!(
-        "SELECT COUNT(*) FROM {}", 
-        result.table_name
-    )).await.unwrap();
-    
-    assert_eq!(query_result.row_count, result.files_processed as usize);
-}
-
-#[tokio::test]
-async fn test_task_generation_workflow() {
-    let temp_dir = TempDir::new().unwrap();
-    let db_path = temp_dir.path().join("test.db");
-    let tasks_file = temp_dir.path().join("tasks.md");
-    
-    // Setup test data
-    setup_test_ingestion(&db_path).await;
-    
-    // Generate tasks
-    let config = TaskConfig {
-        sql_query: "SELECT * FROM INGEST_20250927143022".to_string(),
-        output_table: "QUERYRESULT_test".to_string(),
-        tasks_file: tasks_file.clone(),
-        group_count: 7,
-    };
-    
-    let task_structure = generate_tasks(&db_path, &config).await.unwrap();
-    
-    // Verify task structure
-    assert_eq!(task_structure.groups.len(), 7);
-    assert!(tasks_file.exists());
-    
-    // Verify markdown format
-    let content = std::fs::read_to_string(&tasks_file).unwrap();
-    assert!(content.contains("- [ ] 1. Task Group 1"));
-    assert!(content.contains("- [ ] 1.1"));
-}
-```
-
-### Performance Testing
-
-```rust
-#[tokio::test]
-async fn test_large_repository_performance() {
-    let temp_dir = TempDir::new().unwrap();
-    let db_path = temp_dir.path().join("perf_test.db");
-    
-    // Create large test repository (1000 files)
-    let repo_dir = create_large_test_repo(&temp_dir, 1000);
-    
-    let start = Instant::now();
-    let result = ingest_local_folder(repo_dir.path(), &db_path).await.unwrap();
-    let duration = start.elapsed();
-    
-    // Performance assertions
-    assert!(duration < Duration::from_secs(30)); // Should complete within 30 seconds
-    assert_eq!(result.files_processed, 1000);
-    
-    // Memory usage should be reasonable
-    let memory_usage = get_current_memory_usage();
-    assert!(memory_usage < 500_000_000); // Less than 500MB
-}
-
-#[tokio::test]
-async fn test_concurrent_operations() {
-    let temp_dir = TempDir::new().unwrap();
-    let db_path = temp_dir.path().join("concurrent_test.db");
-    
-    // Setup database
-    let db = Database::connect(&db_path).await.unwrap();
-    db.create_ingestion_table("20250927143022").await.unwrap();
-    
-    // Run concurrent operations
-    let mut handles = vec![];
-    for i in 0..10 {
-        let db_clone = db.clone();
-        let handle = tokio::spawn(async move {
-            let files = create_test_files(100);
-            db_clone.insert_files_batch("INGEST_20250927143022", files).await
-        });
-        handles.push(handle);
-    }
-    
-    // Wait for all operations to complete
-    for handle in handles {
-        handle.await.unwrap().unwrap();
-    }
-    
-    // Verify final count
-    let result = db.execute_query("SELECT COUNT(*) FROM INGEST_20250927143022").await.unwrap();
-    assert_eq!(result.row_count, 1000); // 10 * 100 files
-}
-```
-
-This design provides a comprehensive foundation for implementing the code ingestion system with proper separation of concerns, robust error handling, and thorough testing coverage.
+This design provides a solid foundation for implementing the Shreyas-level requirements with clear interfaces, performance contracts, and comprehensive error handling.

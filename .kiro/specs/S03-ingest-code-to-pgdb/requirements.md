@@ -44,9 +44,65 @@
 
 **Outcome:** Sarah understands the auth system in 45 minutes instead of 4 hours. She can now focus on the actual bug.
 
-### Journey 2: Code Review Preparation - "I need to systematically analyze this large PR"
+## Requirements (Prioritized by User Impact)
 
-**Context:** Marcus is a senior engineer reviewing a 2,000-line PR that refactors the entire data processing pipeline. He needs to ensure no regressions and understand the new architecture.
+### Requirement 1: MVP - One-Command Codebase Ingestion (P0)
+
+**User Story:** As a developer encountering an unfamiliar codebase, I want to run one command to ingest the entire GitHub repository into a queryable database, so that I can immediately start exploring the code structure.
+
+#### Acceptance Criteria
+
+1. WHEN I run `code-ingest https://github.com/user/repo --db-path ./analysis` THEN the system SHALL clone the repo and ingest all files into PostgreSQL within 2 minutes for repos under 100MB
+2. WHEN ingestion completes THEN the system SHALL output "✅ Ingested X files into table INGEST_YYYYMMDDHHMMSS" with clear next steps
+3. WHEN the repo is private THEN the system SHALL prompt for GitHub token and authenticate successfully
+4. WHEN PostgreSQL is not running THEN the system SHALL provide clear setup instructions with `code-ingest pg-start`
+5. WHEN ingestion fails THEN the system SHALL provide actionable error messages and cleanup instructions
+
+### Requirement 2: Three-File-Type Intelligent Processing (P0)
+
+**User Story:** As a developer, I want the system to extract maximum value from every file type in the repository, so that I don't miss important information stored in documentation or configuration files.
+
+#### Acceptance Criteria
+
+1. WHEN processing files THEN the system SHALL classify into exactly three types:
+   - **Type 1 (Direct Text)**: .rs, .py, .js, .ts, .md, .txt, .json, .yaml, .toml, .sql, .sh, .c, .cpp, .java, .go, .rb, .php, .html, .css, .xml, .dockerfile, .gitignore
+   - **Type 2 (Convertible)**: .pdf (via `pdftotext`), .docx (via `pandoc`), .xlsx (via custom parser)
+   - **Type 3 (Binary/Metadata Only)**: .jpg, .png, .gif, .mp4, .zip, .exe, .bin, .so, .dll, .wasm
+2. WHEN processing Type 1 files THEN the system SHALL store: filepath, filename, extension, file_size_bytes, line_count, word_count, token_count, full content_text
+3. WHEN processing Type 2 files THEN the system SHALL attempt conversion and store both original metadata and converted text
+4. WHEN processing Type 3 files THEN the system SHALL store only metadata (path, size, type) with NULL content_text
+5. WHEN any file exceeds 10MB THEN the system SHALL skip with warning and continue processing
+
+### Requirement 3: PostgreSQL Schema with Timestamped Tables (P0)
+
+**User Story:** As a developer, I want each ingestion to create a separate timestamped table, so that I can track multiple versions of repositories and compare changes over time.
+
+#### Acceptance Criteria
+
+1. WHEN starting ingestion THEN the system SHALL create table `INGEST_YYYYMMDDHHMMSS` with schema:
+   ```sql
+   CREATE TABLE INGEST_YYYYMMDDHHMMSS (
+     file_id BIGSERIAL PRIMARY KEY,
+     ingestion_id BIGINT REFERENCES ingestion_meta(ingestion_id),
+     filepath VARCHAR NOT NULL,
+     filename VARCHAR NOT NULL,
+     extension VARCHAR,
+     file_size_bytes BIGINT NOT NULL,
+     line_count INTEGER,
+     word_count INTEGER,
+     token_count INTEGER,
+     content_text TEXT,
+     file_type VARCHAR NOT NULL CHECK (file_type IN ('direct_text', 'convertible', 'binary')),
+     conversion_command VARCHAR,
+     relative_path VARCHAR NOT NULL,
+     absolute_path VARCHAR NOT NULL,
+     created_at TIMESTAMP DEFAULT NOW()
+   );
+   ```
+2. WHEN ingestion starts THEN the system SHALL record in `ingestion_meta` table: ingestion_id, repo_url, local_path, start_timestamp_unix, table_name
+3. WHEN ingestion completes THEN the system SHALL update `ingestion_meta` with end_timestamp_unix and total_files_processed
+4. WHEN storing content THEN the system SHALL create full-text search index on content_text column
+5. WHEN table creation fails THEN the system SHALL cleanup partial state and provide clear error message
 
 **Current Pain:** Jumping between GitHub files, losing context, missing subtle changes in logic flow.
 
@@ -331,3 +387,58 @@ erDiagram
 3. WHEN processing different file types THEN the system SHALL allow custom file type handlers for personal preferences
 4. WHEN extending functionality THEN the system SHALL provide simple configuration options for common use cases
 5. WHEN monitoring the system THEN the system SHALL provide basic logging and status information for personal debugging
+### Requ
+irement 4: Instant SQL Query Interface (P0)
+
+**User Story:** As a developer, I want to run SQL queries directly against the ingested code, so that I can find exactly what I'm looking for without learning a new query language.
+
+#### Acceptance Criteria
+
+1. WHEN I run `code-ingest sql "SELECT filepath, content_text FROM INGEST_20250927143022 WHERE content_text LIKE '%authenticate%'" --db-path ./analysis` THEN the system SHALL execute the query and return results within 1 second
+2. WHEN query results are large THEN the system SHALL paginate output and provide `--limit` and `--offset` options
+3. WHEN I run `code-ingest list-tables --db-path ./analysis` THEN the system SHALL show all available ingestion tables with metadata
+4. WHEN I run `code-ingest sample --table INGEST_20250927143022 --limit 5 --db-path ./analysis` THEN the system SHALL show sample rows to help me understand the data structure
+5. WHEN SQL query fails THEN the system SHALL provide helpful error messages with query syntax examples
+
+### Requirement 5: IDE Integration Workflow (P1)
+
+**User Story:** As a developer, I want to prepare query results for systematic analysis in my IDE, so that I can leverage AI assistance for complex code understanding tasks.
+
+#### Acceptance Criteria
+
+1. WHEN I run `code-ingest query-prepare "SELECT..." --db-path ./analysis --temp-path ./temp.txt --tasks-file ./tasks.md --output-table QUERYRESULT_analysis` THEN the system SHALL:
+   - Execute the query and write results to temp-path file
+   - Generate structured analysis tasks in tasks-file
+   - Create output-table for storing analysis results
+2. WHEN analysis is complete THEN I can run `code-ingest store-result --db-path ./analysis --output-table QUERYRESULT_analysis --result-file ./result.txt --original-query "SELECT..."` to persist findings
+3. WHEN using tasks-file THEN the system SHALL generate markdown with clear sections for different analysis types (architecture, patterns, dependencies, etc.)
+4. WHEN storing results THEN the system SHALL maintain traceability between original query, analysis tasks, and final insights
+5. WHEN workflow fails at any step THEN the system SHALL provide recovery instructions and cleanup options
+
+### Requirement 6: Performance and Resource Management (P1)
+
+**User Story:** As a developer working with large repositories, I want the system to handle memory and processing efficiently, so that I can ingest substantial codebases without system slowdown.
+
+#### Acceptance Criteria
+
+1. WHEN processing repositories THEN the system SHALL use streaming file processing to maintain constant memory usage regardless of repo size
+2. WHEN ingesting files THEN the system SHALL process in parallel using all available CPU cores
+3. WHEN PostgreSQL operations are slow THEN the system SHALL provide progress indicators and estimated completion time
+4. WHEN system resources are constrained THEN the system SHALL gracefully degrade performance rather than crash
+5. WHEN ingestion is interrupted THEN the system SHALL provide resume capability from last successful file
+
+## Non-Goals (What We're NOT Building)
+
+- **Real-time sync**: This is not a live mirror of GitHub repos
+- **Version control integration**: We store snapshots, not git history
+- **Web UI**: CLI-first tool, no browser interface
+- **Multi-database support**: PostgreSQL only for MVP
+- **Semantic search**: Full-text search only, no embeddings/vector search
+- **Code execution**: Static analysis only, no running code
+- **Collaborative features**: Single-user tool initially
+
+## Success Metrics
+
+- **Primary**: Time to understand unfamiliar codebase reduced from 4+ hours to <1 hour
+- **Secondary**: Query response time <1 second for repos up to 10,000 files
+- **Tertiary**: Ingestion speed >100 files/second for typical text files

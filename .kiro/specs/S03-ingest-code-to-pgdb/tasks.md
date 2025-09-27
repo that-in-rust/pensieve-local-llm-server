@@ -1,200 +1,184 @@
 # Implementation Plan
 
-**Source**: S03-ingest-code-to-pgdb requirements and design  
-**Method**: Test-driven development with incremental feature implementation  
-**Output**: Production-ready Rust CLI tool for code ingestion and analysis
+- [ ] 1. Set up Rust project structure and core dependencies
+  - Create new Rust binary project with Cargo.toml
+  - Add core dependencies: clap, tokio, sqlx, anyhow, thiserror, serde, chrono
+  - Set up basic CLI structure with clap derive macros
+  - Create module structure: cli, core, processing, database, git
+  - _Requirements: 1.1, 1.2_
 
-## Task Breakdown
+- [ ] 2. Implement PostgreSQL database foundation
+- [ ] 2.1 Create database connection and schema management
+  - Implement database pool creation with sqlx::PgPool
+  - Create schema migration system for ingestion_meta table
+  - Add functions to create timestamped INGEST_YYYYMMDDHHMMSS tables
+  - Write tests for database connection and table creation
+  - _Requirements: 3.1, 3.2, 3.3_
 
-- [x] 1. Project Foundation and Core Infrastructure
-  - [x] 1.1 Initialize Rust project with proper structure and dependencies
-    - Create Cargo.toml with required dependencies (tokio, sqlx, clap, serde, thiserror, anyhow)
-    - Set up project structure: src/main.rs, src/lib.rs, src/cli/, src/database/, src/ingestion/, src/processing/, src/tasks/
-    - Configure development tools (clippy, rustfmt, testing framework)
-    - _Requirements: All requirements depend on proper project foundation_
+- [ ] 2.2 Implement core data models and serialization
+  - Define IngestionMeta, IngestedFile, and QueryResult structs with sqlx::FromRow
+  - Add serde serialization for JSON handling
+  - Create database insert/update operations for ingestion tracking
+  - Write unit tests for data model serialization and database operations
+  - _Requirements: 3.1, 3.2_
 
-  - [x] 1.2 Implement core error handling and result types
-    - Define SystemError, IngestionError, DatabaseError, ProcessingError, TaskError enums using thiserror
-    - Create Result type aliases for common operations
-    - Implement error context propagation with anyhow for application-level errors
-    - Write unit tests for error handling and propagation
-    - _Requirements: 1.5, 6.5 (error handling requirements)_
+- [ ] 3. Build file classification system
+- [ ] 3.1 Implement three-type file classifier
+  - Create FileClassifier with hardcoded extension mappings
+  - Implement classify_file method for DirectText, Convertible, Binary types
+  - Add FileMetadata and ProcessedFile data structures
+  - Write comprehensive tests for all file type classifications
+  - _Requirements: 2.1, 2.2, 2.3_
 
-  - [x] 1.3 Create CLI interface structure with clap
-    - Define main command structure and subcommands (ingest, query-prepare, generate-tasks, print-to-md, list-tables, etc.)
-    - Implement argument parsing and validation for all commands
-    - Add --db-path parameter handling and validation
-    - Create help text and usage examples
-    - _Requirements: 6.1, 6.2 (CLI interface requirements)_
+- [ ] 3.2 Create content extraction pipeline
+  - Implement ContentExtractor with extract_content method
+  - Add direct text reading with encoding detection
+  - Create conversion handlers for PDF (pdftotext), DOCX (pandoc), XLSX
+  - Implement line count, word count, and basic token counting
+  - Write tests for each extraction type and error handling
+  - _Requirements: 2.2, 2.3, 2.4_
 
-- [x] 2. Database Layer Implementation
-  - [x] 2.1 Implement PostgreSQL connection management
-    - Create Database struct with connection pooling using sqlx
-    - Implement connection string parsing and validation
-    - Add connection health checks and retry logic
-    - Handle database creation if it doesn't exist
-    - Write tests for connection management and error scenarios
-    - _Requirements: 9.2, 9.4, 9.5 (PostgreSQL setup and connection)_
+- [ ] 4. Implement Git repository cloning
+- [ ] 4.1 Create Git clone manager with authentication
+  - Implement GitCloneManager using git2-rs crate
+  - Add GitHub token authentication support
+  - Create clone_repo method with error handling for network issues
+  - Add cleanup functionality for temporary clone directories
+  - Write tests for public and private repository cloning
+  - _Requirements: 1.1, 1.3_
 
-  - [x] 2.2 Create database schema management
-    - Implement table creation for INGEST_YYYYMMDDHHMMSS format
-    - Create ingestion_meta table schema and operations
-    - Add QUERYRESULT_* table creation with dynamic naming
-    - Implement database migrations and schema validation
-    - Write tests for schema creation and validation
-    - _Requirements: 3.1, 3.5, 3.6 (PostgreSQL storage schema)_
+- [ ] 4.2 Add file discovery and traversal
+  - Implement recursive directory walking with ignore pattern support
+  - Add .gitignore parsing and pattern matching
+  - Create file stream for parallel processing
+  - Handle symlinks safely without infinite loops
+  - Write tests for directory traversal and pattern filtering
+  - _Requirements: 2.1, 2.5, 2.6_
 
-  - [x] 2.3 Implement core database operations
-    - Create batch insertion operations for file data
-    - Implement query execution with result formatting
-    - Add transaction management for data consistency
-    - Create indexes for performance optimization
-    - Write comprehensive tests for all database operations
-    - _Requirements: 3.2, 3.3, 3.4, 3.7 (file storage and metadata)_
+- [ ] 5. Build core ingestion engine
+- [ ] 5.1 Implement parallel file processing pipeline
+  - Create IngestionEngine with async file processing
+  - Add progress reporting with mpsc channels
+  - Implement parallel processing using tokio tasks
+  - Add memory management and resource cleanup
+  - Write integration tests for full ingestion workflow
+  - _Requirements: 1.1, 1.2, 6.1, 6.2_
 
-- [x] 3. File Processing and Classification System
-  - [x] 3.1 Implement three-type file classification
-    - Create FileClassifier with extension-based classification logic
-    - Define Type 1 (direct text), Type 2 (convertible), Type 3 (non-text) categories
-    - Implement file type detection and validation
-    - Add configuration for custom file type mappings
-    - Write tests for all file type classifications
-    - _Requirements: 2.2 (three-type classification)_
+- [ ] 5.2 Add ingestion tracking and metadata management
+  - Implement start_ingestion_record and complete_ingestion_record methods
+  - Add timestamp tracking and file count statistics
+  - Create error recovery and partial ingestion handling
+  - Add ingestion result reporting with table names and metrics
+  - Write tests for ingestion metadata lifecycle
+  - _Requirements: 3.5, 3.6, 1.5_
 
-  - [x] 3.2 Create direct text file processor (Type 1)
-    - Implement text file reading with encoding detection
-    - Add content analysis: line count, word count, token estimation
-    - Handle large files with streaming processing
-    - Implement .gitignore pattern respect
-    - Write tests for text processing and content analysis
-    - _Requirements: 2.1, 2.3, 3.2 (direct text processing)_
+- [ ] 6. Implement CLI commands for ingestion
+- [ ] 6.1 Create ingest command with progress feedback
+  - Implement CLI ingest command with repo URL and database path arguments
+  - Add progress indicators and status updates during ingestion
+  - Create clear success/failure messages with next steps
+  - Add GitHub token handling from environment or CLI argument
+  - Write end-to-end tests for ingest command
+  - _Requirements: 1.1, 1.2, 1.4, 1.5_
 
-  - [x] 3.3 Implement convertible file processor (Type 2)
-    - Create external command execution for file conversion
-    - Add support for PDF, DOCX, XLSX conversion commands
-    - Implement conversion result validation and error handling
-    - Store conversion commands used for audit trail
-    - Write tests for conversion processes and error scenarios
-    - _Requirements: 2.2, 3.3 (convertible file processing)_
+- [ ] 6.2 Add PostgreSQL setup guidance
+  - Implement pg-start command with setup instructions
+  - Add database connection testing and troubleshooting
+  - Create clear error messages for common PostgreSQL issues
+  - Add automatic database creation if it doesn't exist
+  - Write tests for setup guidance and connection validation
+  - _Requirements: 1.4_
 
-- [x] 4. Ingestion Engine Implementation
-  - [x] 4.1 Create Git repository cloning functionality
-    - Implement GitHub repository cloning with progress tracking
-    - Add authentication support for private repositories
-    - Handle branch, tag, and commit hash specification
-    - Implement clone completion detection and validation
-    - Write tests for various Git scenarios and error conditions
-    - _Requirements: 1.1, 1.2, 1.3 (repository cloning)_
+- [ ] 7. Build SQL query interface
+- [ ] 7.1 Implement direct SQL execution
+  - Create sql command that executes raw SQL queries
+  - Add result formatting and pagination for large result sets
+  - Implement query timeout and error handling
+  - Add helpful error messages for common SQL mistakes
+  - Write tests for various SQL query types and edge cases
+  - _Requirements: 4.1, 4.2, 4.5_
 
-  - [x] 4.2 Implement local folder processing
-    - Create recursive directory traversal with symlink safety
-    - Add file discovery and filtering logic
-    - Implement custom include/exclude pattern support
-    - Handle file size limits and skip logic
-    - Write tests for folder processing and edge cases
-    - _Requirements: 1.2, 2.1, 2.4, 2.5, 2.6 (local folder processing)_
+- [ ] 7.2 Add table management commands
+  - Implement list-tables command showing all ingestion tables
+  - Create sample command for exploring table structure
+  - Add table metadata display (row counts, creation dates)
+  - Implement table cleanup and management utilities
+  - Write tests for table listing and sampling functionality
+  - _Requirements: 4.3, 4.4_
 
-  - [x] 4.3 Create batch processing coordination
-    - Implement parallel file processing with controlled concurrency
-    - Add progress reporting and status updates
-    - Create memory management and cleanup logic
-    - Implement graceful shutdown and error recovery
-    - Write performance tests for large repository handling
-    - _Requirements: 7.1, 7.2, 7.4, 7.5 (performance optimization)_
+- [ ] 8. Create IDE integration workflow
+- [ ] 8.1 Implement query-prepare command
+  - Create query-prepare command that executes SQL and writes to temp file
+  - Add structured task generation for IDE analysis workflows
+  - Implement output table creation for storing analysis results
+  - Add clear documentation and examples for IDE integration
+  - Write tests for query preparation and task file generation
+  - _Requirements: 5.1, 5.2, 5.3_
 
-- [x] 5. Query and Analysis Preparation
-  - [x] 5.1 Implement SQL query execution and formatting
-    - Create query execution with clean terminal output formatting
-    - Add result formatting for LLM consumption (FILE: format)
-    - Implement query validation and error handling
-    - Add support for large result sets with streaming
-    - Write tests for query execution and formatting
-    - _Requirements: 6.2, 8.1, 8.3 (SQL query execution and formatting)_
+- [ ] 8.2 Add result storage functionality
+  - Implement store-result command for persisting analysis findings
+  - Add traceability between original queries and analysis results
+  - Create result validation and error handling
+  - Add cleanup options for temporary files and failed workflows
+  - Write tests for result storage and traceability
+  - _Requirements: 5.2, 5.4, 5.5_
 
-  - [x] 5.2 Create temporary file management
-    - Implement query-prepare command with temp file creation
-    - Add absolute path handling and validation
-    - Create structured output format for LLM processing
-    - Implement file cleanup and error handling
-    - Write tests for temp file operations and edge cases
-    - _Requirements: 10.2, 10.3 (temporary file workflow)_
+- [ ] 9. Add performance optimizations and monitoring
+- [ ] 9.1 Implement streaming and memory management
+  - Add streaming file processing to maintain constant memory usage
+  - Implement parallel processing using all available CPU cores
+  - Add progress indicators and estimated completion times
+  - Create graceful degradation for resource-constrained environments
+  - Write performance tests validating memory and CPU usage
+  - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-  - [x] 5.3 Implement result storage functionality
-    - Create store-result command for LLM analysis results
-    - Add QUERYRESULT_* table creation and data insertion
-    - Implement metadata tracking (original query, prompt file, timestamp)
-    - Add result validation and error handling
-    - Write tests for result storage and retrieval
-    - _Requirements: 10.5 (analysis result storage)_
+- [ ] 9.2 Add resume capability and error recovery
+  - Implement ingestion resume from last successful file
+  - Add partial ingestion cleanup and recovery
+  - Create comprehensive error reporting and logging
+  - Add retry mechanisms for transient failures
+  - Write tests for interruption handling and resume functionality
+  - _Requirements: 6.5_
 
-- [x] 6. Task Generation System
-  - [x] 6.1 Create task structure and division logic
-    - Implement 7-part division algorithm for task distribution
-    - Create TaskGroup and Task data structures
-    - Add mathematical division with even distribution
-    - Implement task metadata and configuration handling
-    - Write tests for task division algorithms
-    - _Requirements: 11.2, 11.3 (task division and structure)_
+- [ ] 10. Create comprehensive error handling
+- [ ] 10.1 Implement structured error hierarchy
+  - Create CodeIngestError enum with all error types using thiserror
+  - Add context-rich error messages with actionable suggestions
+  - Implement error recovery strategies for common failure modes
+  - Add error logging and debugging information
+  - Write tests for all error conditions and recovery paths
+  - _Requirements: 1.5, 4.5, 5.5_
 
-  - [x] 6.2 Implement Kiro-compatible markdown generation
-    - Create structured markdown output with proper numbering (1., 1.1, 1.2)
-    - Add task description generation from query results
-    - Implement chunk information handling for large files
-    - Create metadata sections in task files
-    - Write tests for markdown generation and format validation
-    - _Requirements: 11.4, 11.5 (Kiro numbering and task structure)_
+- [ ] 10.2 Add user-friendly error messages and help
+  - Create helpful error messages for common user mistakes
+  - Add troubleshooting guides for setup and configuration issues
+  - Implement command help and usage examples
+  - Add validation for user inputs and configuration
+  - Write tests for error message clarity and helpfulness
+  - _Requirements: 1.4, 1.5_
 
-  - [x] 6.3 Create generate-tasks command implementation
-    - Integrate query execution with task generation
-    - Add task file creation at specified absolute paths
-    - Implement configuration handling for chunk size and overlap
-    - Add progress reporting for task generation
-    - Write integration tests for complete task generation workflow
-    - _Requirements: 11.1 (task generation command)_
+- [ ] 11. Write comprehensive tests and documentation
+- [ ] 11.1 Create unit and integration test suite
+  - Write unit tests for all core components with >90% coverage
+  - Create integration tests for end-to-end workflows
+  - Add performance tests validating speed and memory contracts
+  - Implement property-based tests for file classification accuracy
+  - Set up continuous integration with automated testing
+  - _Requirements: All requirements validation_
 
-- [x] 7. Utility Commands and Database Exploration
-  - [x] 7.1 Implement database exploration commands
-    - Create db-info command for connection status and basic info
-    - Implement list-tables command with table type filtering
-    - Add sample command for data preview with configurable limits
-    - Create describe command for table schema information
-    - Write tests for all exploration commands
-    - _Requirements: 13.1, 13.2, 13.3, 13.4 (database exploration)_
+- [ ] 11.2 Add documentation and examples
+  - Create comprehensive README with installation and usage instructions
+  - Add CLI help documentation and command examples
+  - Create troubleshooting guide for common issues
+  - Add performance benchmarks and system requirements
+  - Write developer documentation for extending the system
+  - _Requirements: User experience and adoption_
 
-  - [x] 7.2 Create print-to-md export functionality
-    - Implement individual file export with sequential naming (PREFIX-00001.md)
-    - Add markdown formatting for database row content
-    - Create location-based file organization
-    - Implement progress reporting and completion statistics
-    - Write tests for export functionality and file generation
-    - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5 (print-to-md functionality)_
-
-  - [x] 7.3 Add PostgreSQL setup guidance
-    - Create pg-start command with installation instructions
-    - Add platform-specific setup guidance (macOS, Linux)
-    - Implement database connectivity testing
-    - Create troubleshooting help and error diagnostics
-    - Write tests for setup guidance and validation
-    - _Requirements: 13.5, 9.1, 9.5 (PostgreSQL setup and guidance)_
-
-## Processing Instructions for Each Task
-
-For each task implementation:
-1. **Start with tests**: Write failing tests that define the expected behavior
-2. **Implement minimal functionality**: Create the simplest implementation that passes tests
-3. **Add error handling**: Implement comprehensive error handling with proper error types
-4. **Add logging and progress**: Include user feedback for long-running operations
-5. **Performance optimization**: Ensure operations meet performance requirements
-6. **Integration testing**: Verify the feature works end-to-end with other components
-7. **Documentation**: Add inline documentation and usage examples
-
-## Key Implementation Notes
-
-- **Database naming**: All ingestion tables use `INGEST_YYYYMMDDHHMMSS` format, analysis results use `QUERYRESULT_*` format
-- **Error handling**: Use `thiserror` for library errors, `anyhow` for application context
-- **Async operations**: Use `tokio` for all I/O operations with proper error propagation
-- **Testing**: Comprehensive unit and integration tests for all functionality
-- **Performance**: Target <30 seconds for large repository ingestion, <500MB memory usage
-- **CLI design**: Clear, consistent command structure with helpful error messages
-
-**Total Tasks**: 21 main tasks covering complete system implementation with test-driven development approach
+- [ ] 12. Package and distribute
+- [ ] 12.1 Create release artifacts
+  - Set up cargo build for optimized release binaries
+  - Create installation scripts for different platforms
+  - Add version management and release automation
+  - Create distribution packages (homebrew, apt, etc.)
+  - Write installation and upgrade documentation
+  - _Requirements: User adoption and deployment_
