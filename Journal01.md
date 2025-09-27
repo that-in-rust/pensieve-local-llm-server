@@ -137,6 +137,15 @@ code-ingest pg-start
 **Target Repository**: https://github.com/tauri-apps/tauri  
 **Database**: `/Users/neetipatni/desktop/PensieveDB01`  
 
+### Database Setup Completed ✅
+
+**PostgreSQL Installation**: Installed via Homebrew (postgresql@14)  
+**Database Created**: `PensieveDB01`  
+**Connection String**: `postgresql://neetipatni@localhost:5432/PensieveDB01`  
+**Status**: ✅ Connected and operational  
+**Server Version**: PostgreSQL 15.14  
+**Connection Time**: 34ms  
+
 ### Ingestion Process
 
 Starting the ingestion of the Tauri repository - a popular Rust-based framework for building desktop applications with web technologies.
@@ -146,6 +155,13 @@ Starting the ingestion of the Tauri repository - a popular Rust-based framework 
 - **Language**: Primarily Rust with TypeScript, JavaScript
 - **Size**: Large repository with extensive codebase
 - **Purpose**: Desktop app framework - good test case for our system
+
+**Ingestion Command**:
+```bash
+export PATH="/opt/homebrew/opt/postgresql@14/bin:$PATH"
+export DATABASE_URL="postgresql://neetipatni@localhost:5432/PensieveDB01"
+cargo run -- ingest https://github.com/tauri-apps/tauri
+```
 
 ---
 
