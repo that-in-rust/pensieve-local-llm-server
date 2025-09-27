@@ -1,36 +1,36 @@
 # Implementation Plan
 
-- [ ] 1. Set up Rust project structure and core dependencies
+- [x] 1. Set up Rust project structure and core dependencies
   - Create new Rust binary project with Cargo.toml
   - Add core dependencies: clap, tokio, sqlx, anyhow, thiserror, serde, chrono
   - Set up basic CLI structure with clap derive macros
   - Create module structure: cli, core, processing, database, git
   - _Requirements: 1.1, 1.2_
 
-- [ ] 2. Implement PostgreSQL database foundation
-- [ ] 2.1 Create database connection and schema management
+- [x] 2. Implement PostgreSQL database foundation
+- [x] 2.1 Create database connection and schema management
   - Implement database pool creation with sqlx::PgPool
   - Create schema migration system for ingestion_meta table
   - Add functions to create timestamped INGEST_YYYYMMDDHHMMSS tables
   - Write tests for database connection and table creation
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 2.2 Implement core data models and serialization
+- [x] 2.2 Implement core data models and serialization
   - Define IngestionMeta, IngestedFile, and QueryResult structs with sqlx::FromRow
   - Add serde serialization for JSON handling
   - Create database insert/update operations for ingestion tracking
   - Write unit tests for data model serialization and database operations
   - _Requirements: 3.1, 3.2_
 
-- [ ] 3. Build file classification system
-- [ ] 3.1 Implement three-type file classifier
+- [x] 3. Build file classification system
+- [x] 3.1 Implement three-type file classifier
   - Create FileClassifier with hardcoded extension mappings
   - Implement classify_file method for DirectText, Convertible, Binary types
   - Add FileMetadata and ProcessedFile data structures
   - Write comprehensive tests for all file type classifications
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [ ] 3.2 Create content extraction pipeline
+- [x] 3.2 Create content extraction pipeline
   - Implement ContentExtractor with extract_content method
   - Add direct text reading with encoding detection
   - Create conversion handlers for PDF (pdftotext), DOCX (pandoc), XLSX
@@ -38,8 +38,8 @@
   - Write tests for each extraction type and error handling
   - _Requirements: 2.2, 2.3, 2.4_
 
-- [ ] 4. Implement Git repository cloning
-- [ ] 4.1 Create Git clone manager with authentication
+- [-] 4. Implement Git repository cloning
+- [-] 4.1 Create Git clone manager with authentication
   - Implement GitCloneManager using git2-rs crate
   - Add GitHub token authentication support
   - Create clone_repo method with error handling for network issues

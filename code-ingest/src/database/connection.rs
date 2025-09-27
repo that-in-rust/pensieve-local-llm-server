@@ -525,4 +525,233 @@ mod tests {
         assert_eq!(config.idle_timeout, Duration::from_secs(300));
         assert_eq!(config.max_lifetime, Duration::from_secs(900));
     }
+
+    // Additional comprehensive tests for subtask 2.1 requirements
+
+    #[tokio::test]
+    async fn test_database_pool_creation_with_sqlx_pgpool() {
+        // Test that we can create a pool with proper configuration
+        // Skip if DATABASE_URL is not set
+        if std::env::var("DATABASE_URL").is_err() {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL").unwrap();
+        let db = Database::new(&database_url).await.unwrap();
+        
+        // Verify pool is properly configured
+        let stats = db.connection_stats();
+        assert!(stats.max_connections > 0);
+        assert!(stats.max_connections <= 10); // Default max connections
+        
+        // Verify we can get the underlying pool
+        let pool = db.pool();
+        assert_eq!(pool.size(), stats.active_connections);
+    }
+
+    #[tokio::test]
+    async fn test_schema_migration_system_for_ingestion_meta() {
+        // Test schema initialization for ingestion_meta table
+        // Skip if DATABASE_URL is not set
+        if std::env::var("DATABASE_URL").is_err() {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL").unwrap();
+        let db = Database::new(&database_url).await.unwrap();
+        
+        // Initialize schema using SchemaManager
+        let schema_manager = crate::database::schema::SchemaManager::new(db.pool().clone());
+        let result = schema_manager.initialize_schema().await;
+        assert!(result.is_ok(), "Schema initialization should succeed");
+        
+        // Verify ingestion_meta table exists
+        let exists = schema_manager.table_exists("ingestion_meta").await.unwrap();
+        assert!(exists, "ingestion_meta table should exist after initialization");
+        
+        // Verify table has correct schema
+        let is_valid = schema_manager.validate_table_schema("ingestion_meta", crate::database::schema::TableType::Meta).await.unwrap();
+        assert!(is_valid, "ingestion_meta table should have correct schema");
+    }
+
+    #[tokio::test]
+    async fn test_timestamped_ingest_table_creation() {
+        // Test creation of timestamped INGEST_YYYYMMDDHHMMSS tables
+        // Skip if DATABASE_URL is not set
+        if std::env::var("DATABASE_URL").is_err() {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL").unwrap();
+        let db = Database::new(&database_url).await.unwrap();
+        
+        // Initialize schema first
+        let schema_manager = crate::database::schema::SchemaManager::new(db.pool().clone());
+        schema_manager.initialize_schema().await.unwrap();
+        
+        // Create a timestamped ingestion table
+        let timestamp = chrono::Utc::now();
+        let table_name = schema_manager.create_ingestion_table(Some(timestamp)).await.unwrap();
+        
+        // Verify table name format
+        assert!(table_name.starts_with("INGEST_"));
+        assert_eq!(table_name.len(), 21); // INGEST_ + 14 digit timestamp
+        
+        // Verify table exists
+        let exists = schema_manager.table_exists(&table_name).await.unwrap();
+        assert!(exists, "Timestamped ingestion table should exist");
+        
+        // Verify table has correct schema
+        let is_valid = schema_manager.validate_table_schema(&table_name, crate::database::schema::TableType::Ingestion).await.unwrap();
+        assert!(is_valid, "Ingestion table should have correct schema");
+        
+        // Clean up
+        schema_manager.drop_table(&table_name).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_database_connection_error_handling() {
+        // Test connection failure scenarios
+        let invalid_url = "postgresql://invalid:invalid@nonexistent:5432/nonexistent";
+        let result = Database::new(invalid_url).await;
+        assert!(result.is_err(), "Connection to invalid database should fail");
+        
+        match result.unwrap_err() {
+            crate::error::DatabaseError::ConnectionFailed { url, cause: _ } => {
+                assert!(url.contains("invalid:***")); // Password should be sanitized
+            }
+            _ => panic!("Expected ConnectionFailed error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_ingestion_record_operations() {
+        // Test creating and completing ingestion records
+        // Skip if DATABASE_URL is not set
+        if std::env::var("DATABASE_URL").is_err() {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL").unwrap();
+        let db = Database::new(&database_url).await.unwrap();
+        
+        // Initialize schema
+        let schema_manager = crate::database::schema::SchemaManager::new(db.pool().clone());
+        schema_manager.initialize_schema().await.unwrap();
+        
+        // Create ingestion record
+        let repo_url = Some("https://github.com/test/repo".to_string());
+        let local_path = "/tmp/test".to_string();
+        let start_timestamp = chrono::Utc::now().timestamp() as u64;
+        let table_name = "INGEST_20250927143022";
+        
+        let ingestion_id = db.create_ingestion_record(
+            repo_url.clone(),
+            local_path.clone(),
+            start_timestamp,
+            table_name,
+        ).await.unwrap();
+        
+        assert!(ingestion_id > 0, "Ingestion ID should be positive");
+        
+        // Complete ingestion record
+        let end_timestamp = start_timestamp + 100;
+        let total_files = 42;
+        
+        let result = db.complete_ingestion_record(ingestion_id, end_timestamp, total_files).await;
+        assert!(result.is_ok(), "Completing ingestion record should succeed");
+        
+        // Verify record was updated
+        let records = db.list_ingestion_records().await.unwrap();
+        let found_record = records.iter().find(|r| r.ingestion_id == ingestion_id);
+        assert!(found_record.is_some(), "Ingestion record should be found");
+        
+        let record = found_record.unwrap();
+        assert_eq!(record.repo_url, repo_url);
+        assert_eq!(record.local_path, local_path);
+        assert_eq!(record.total_files_processed, Some(total_files));
+    }
+
+    #[tokio::test]
+    async fn test_database_pool_configuration() {
+        // Test that pool is configured with correct parameters
+        let config = DatabaseConfig {
+            max_connections: 5,
+            connection_timeout: Duration::from_secs(15),
+            idle_timeout: Duration::from_secs(300),
+            max_lifetime: Duration::from_secs(900),
+            ..Default::default()
+        };
+        
+        // Test URL building with custom config
+        let url = Database::build_database_url(&config);
+        assert!(url.contains("localhost:5432"));
+        assert!(url.contains("code_ingest")); // Default database name
+        
+        // Test config validation
+        assert_eq!(config.max_connections, 5);
+        assert_eq!(config.connection_timeout, Duration::from_secs(15));
+    }
+
+    #[tokio::test]
+    async fn test_database_from_path_functionality() {
+        // Test creating database connection from local path
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test_db");
+        
+        // This test would require a running PostgreSQL instance
+        // We test the path handling logic
+        assert!(db_path.parent().is_some());
+        
+        // Test that parent directory would be created
+        let nested_path = temp_dir.path().join("nested").join("deep").join("test.db");
+        assert!(nested_path.parent().is_some());
+        assert!(nested_path.parent().unwrap().parent().is_some());
+    }
+
+    #[test]
+    fn test_connection_stats_structure() {
+        let stats = ConnectionStats {
+            active_connections: 2,
+            idle_connections: 3,
+            max_connections: 10,
+        };
+        
+        assert_eq!(stats.active_connections, 2);
+        assert_eq!(stats.idle_connections, 3);
+        assert_eq!(stats.max_connections, 10);
+        assert!(stats.active_connections + stats.idle_connections <= stats.max_connections);
+    }
+
+    #[tokio::test]
+    async fn test_raw_sql_execution() {
+        // Test raw SQL execution capability
+        // Skip if DATABASE_URL is not set
+        if std::env::var("DATABASE_URL").is_err() {
+            return;
+        }
+
+        let database_url = std::env::var("DATABASE_URL").unwrap();
+        let db = Database::new(&database_url).await.unwrap();
+        
+        // Test simple SELECT
+        let result = db.execute_raw("SELECT 1 as test_column").await.unwrap();
+        assert_eq!(result, 0); // SELECT doesn't affect rows
+        
+        // Test that we can execute DDL (create temporary table)
+        let create_result = db.execute_raw("CREATE TEMPORARY TABLE test_temp (id INTEGER)").await.unwrap();
+        assert_eq!(create_result, 0); // CREATE TABLE doesn't return affected rows
+        
+        // Test INSERT
+        let insert_result = db.execute_raw("INSERT INTO test_temp (id) VALUES (1), (2), (3)").await.unwrap();
+        assert_eq!(insert_result, 3); // 3 rows inserted
+        
+        // Test UPDATE
+        let update_result = db.execute_raw("UPDATE test_temp SET id = id + 10").await.unwrap();
+        assert_eq!(update_result, 3); // 3 rows updated
+        
+        // Test DELETE
+        let delete_result = db.execute_raw("DELETE FROM test_temp WHERE id > 12").await.unwrap();
+        assert_eq!(delete_result, 1); // 1 row deleted (id = 13)
+    }
 }

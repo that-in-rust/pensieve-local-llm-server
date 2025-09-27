@@ -4,6 +4,9 @@
 
 ALL DIAGRAMS WILL BE IN MERMAID ONLY TO ENSURE EASE WITH GITHUB - DO NOT SKIP THAT
 
+## IMPORTANT TO NAVIGATE LLMs better
+Run tree command constantly for you to know what is the broad direction
+
 ## The Essence: Executable Specifications Drive Everything
 
 **Core Truth**: Traditional user stories fail LLMs because they're designed for human conversation. LLMs need executable blueprints, not ambiguous narratives.

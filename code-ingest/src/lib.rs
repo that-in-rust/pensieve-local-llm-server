@@ -1,6 +1,8 @@
 pub mod cli;
+pub mod core;
 pub mod database;
 pub mod error;
+pub mod git;
 pub mod ingestion;
 pub mod processing;
 pub mod tasks;

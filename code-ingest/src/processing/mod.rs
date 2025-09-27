@@ -1,6 +1,8 @@
 pub mod classifier;
 pub mod text_processor;
 pub mod converter;
+pub mod binary_processor;
+pub mod pipeline;
 
 use serde::{Deserialize, Serialize};
 use std::path::Path;
