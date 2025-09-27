@@ -279,13 +279,92 @@ impl Cli {
         }
     }
 
-    // Placeholder implementations for all commands
     async fn execute_ingest(&self, source: String, db_path: Option<PathBuf>) -> Result<()> {
-        println!("Ingesting source: {}", source);
-        if let Some(path) = db_path {
-            println!("Database path: {}", path.display());
-        }
-        println!("Implementation pending - Task 4");
+        use crate::database::{Database, SchemaManager};
+        use crate::ingestion::{IngestionEngine, IngestionConfig};
+        use crate::processing::text_processor::TextProcessor;
+        use crate::ingestion::batch_processor::BatchProgress;
+        use indicatif::{ProgressBar, ProgressStyle};
+        use std::sync::Arc;
+        
+        println!("🚀 Starting ingestion from: {}", source);
+        println!();
+        
+        // Get database connection
+        let database = if let Some(path) = db_path {
+            Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        // Initialize database schema
+        println!("📋 Initializing database schema...");
+        let schema_manager = SchemaManager::new(database.pool().clone());
+        schema_manager.initialize_schema().await?;
+        
+        // Create progress bar
+        let progress = ProgressBar::new_spinner();
+        progress.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.green} [{elapsed_precise}] {msg}")
+                .unwrap()
+        );
+        
+        // Create ingestion configuration
+        let config = IngestionConfig::default();
+        
+        // Create file processor
+        let file_processor = Arc::new(TextProcessor::new());
+        
+        // Create ingestion engine
+        let engine = IngestionEngine::new(config, Arc::new(database), file_processor);
+        
+        // Start ingestion with progress callback
+        progress.set_message("Starting ingestion...");
+        
+        let progress_callback = {
+            let progress = progress.clone();
+            Box::new(move |batch_progress: BatchProgress| {
+                progress.set_message(format!(
+                    "Processing files: {} processed, {} total", 
+                    batch_progress.files_processed, 
+                    batch_progress.total_files
+                ));
+            })
+        };
+        
+        let result = engine.ingest_source(&source, Some(progress_callback)).await?;
+        
+        progress.finish_and_clear();
+        
+        // Display results
+        println!("✅ Ingestion completed successfully!");
+        println!();
+        println!("📊 Ingestion Summary:");
+        println!("   Repository: {}", source);
+        println!("   Table: {}", result.table_name);
+        println!("   Files processed: {}", result.files_processed);
+        println!("   Processing time: {:.2}s", result.processing_time.as_secs_f64());
+        
+        // Display batch statistics
+        println!();
+        println!("📈 Processing Statistics:");
+        println!("   Files processed: {}", result.files_processed);
+        println!("   Files failed: {}", result.files_failed);
+        println!("   Files skipped: {}", result.files_skipped);
+        println!("   Batches processed: {}", result.batch_stats.batches_processed);
+        println!("   Average file time: {:.2}ms", result.batch_stats.avg_file_duration.as_millis());
+        println!("   Peak memory: {:.2} MB", result.batch_stats.peak_memory_bytes as f64 / (1024.0 * 1024.0));
+        
+        println!();
+        println!("🎯 Next Steps:");
+        println!("   1. Explore your data: cargo run -- list-tables");
+        println!("   2. Sample the data: cargo run -- sample --table {}", result.table_name);
+        println!("   3. Run queries: cargo run -- sql \"SELECT COUNT(*) FROM {}\"", result.table_name);
+        println!("   4. Export files: cargo run -- print-to-md --table {} --sql \"SELECT * FROM {} LIMIT 10\" --prefix tauri --location ./exports", result.table_name, result.table_name);
+        
         Ok(())
     }
 

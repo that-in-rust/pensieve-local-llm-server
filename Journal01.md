@@ -156,20 +156,124 @@ Starting the ingestion of the Tauri repository - a popular Rust-based framework 
 - **Size**: Large repository with extensive codebase
 - **Purpose**: Desktop app framework - good test case for our system
 
-**Ingestion Command**:
+**Ingestion Status**: ⚠️ **BLOCKED - Core ingestion functionality not yet implemented**
+
+**Issue Discovered**: The `ingest` command shows "Implementation pending - Task 4", indicating that while we successfully implemented Task 7 (Utility Commands), the core ingestion engine (Tasks 1-6) still needs to be implemented.
+
+**Current Working Commands**:
+- ✅ `db-info` - Database connection and status
+- ✅ `list-tables` - Table listing (currently empty)
+- ✅ `sample` - Data sampling (when tables exist)
+- ✅ `describe` - Schema inspection (when tables exist)
+- ✅ `print-to-md` - Export functionality (when data exists)
+- ✅ `pg-start` - PostgreSQL setup guidance
+- ❌ `ingest` - **NOT IMPLEMENTED** (placeholder only)
+
+---
+
+## 🐘 PostgreSQL Setup Commands Used
+
+### Complete Command History
+
+**System Check**:
+```bash
+whoami  # Result: neetipatni
+which psql  # Result: psql not found (initially)
+```
+
+**PostgreSQL Installation**:
+```bash
+brew install postgresql
+# Output: Installed postgresql@14 to /opt/homebrew/Cellar/postgresql@14/14.19
+```
+
+**Service Management**:
+```bash
+brew services start postgresql@14
+# Output: Successfully started postgresql@14
+```
+
+**Database Creation**:
+```bash
+export PATH="/opt/homebrew/opt/postgresql@14/bin:$PATH"
+createdb PensieveDB01
+# Created database successfully
+```
+
+**Environment Configuration**:
 ```bash
 export PATH="/opt/homebrew/opt/postgresql@14/bin:$PATH"
 export DATABASE_URL="postgresql://neetipatni@localhost:5432/PensieveDB01"
-cargo run -- ingest https://github.com/tauri-apps/tauri
 ```
+
+**Connection Testing**:
+```bash
+# Test with code-ingest
+cargo run -- db-info
+# Result: ✅ Connected - PostgreSQL 15.14, 34ms connection time
+
+# Test table listing
+cargo run -- list-tables
+# Result: No tables found (expected - no data ingested yet)
+```
+
+### Environment Setup for Future Sessions
+
+**Add to ~/.zshrc**:
+```bash
+# PostgreSQL Setup for Code-Ingest
+export PATH="/opt/homebrew/opt/postgresql@14/bin:$PATH"
+export DATABASE_URL="postgresql://neetipatni@localhost:5432/PensieveDB01"
+```
+
+**Verification Commands**:
+```bash
+# Check PostgreSQL status
+brew services list | grep postgresql
+pg_isready
+
+# Check database exists
+psql -l | grep PensieveDB01
+
+# Test code-ingest connection
+cargo run -- db-info
+```
+
+---
+
+## 🚧 Core Ingestion Engine Implementation - IN PROGRESS
+
+**Date**: September 28, 2025  
+**Status**: 🔄 **IMPLEMENTING TASKS 1-6**
+
+### Implementation Plan
+
+**Task 1**: Project Structure and Core Architecture ✅ (Already exists)
+**Task 2**: Database Connection and Schema Management ✅ (Partially complete)
+**Task 3**: File Processing and Content Extraction 🔄 (Implementing now)
+**Task 4**: Repository Ingestion Engine 🔄 (Implementing now)
+**Task 5**: Query Execution and Result Management ✅ (Already complete)
+**Task 6**: Task Generation and LLM Integration ✅ (Already complete)
+
+### Current Implementation Status
+
+**Implementing**: Core ingestion functionality to enable:
+- Git repository cloning
+- File content extraction and processing
+- Database table creation and population
+- Progress tracking and error handling
+- Integration with existing utility commands
+
+**Target**: Complete Tauri repository ingestion and demonstrate full system capabilities
 
 ---
 
 ## 🔄 Session Status
 
-**Current Status**: Beginning production usage with Tauri repository ingestion  
-**Next Steps**: Ingest → Explore → Analyze → Export  
-**Database Ready**: PensieveDB01 configured and ready for use  
+**Current Status**: Implementing core ingestion engine (Tasks 1-6)  
+**Target**: Complete Tauri repository ingestion  
+**Database Ready**: PensieveDB01 configured and operational  
+**Next**: Test full ingestion → exploration → analysis → export workflow  
 
 ---
 
