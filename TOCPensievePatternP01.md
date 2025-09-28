@@ -2,7 +2,7 @@ go deep into Rust
 go deep into a side of the ecosystem
 
 ``` bash
-./target/release/code-ingest ingest https://github.com/cloudflare/pingora --db-path /Users/neetipatni/desktop/PensieveDB01
+./target/release/code-ingest ingest https://github.com/rails/rails --db-path /Users/neetipatni/desktop/PensieveDB01
 ```
 
 
@@ -11,13 +11,13 @@ go deep into a side of the ecosystem
 
 
 URL | TableName
-https://github.com/sunface/rust-course | INGEST_20250928153948
-https://github.com/cloudflare/pingora | INGEST_20250928154540
+https://github.com/sunface/rust-course
+https://github.com/cloudflare/pingora
+https://github.com/basecamp/once-campfire
 
 
 
 # Yet to be done
-https://github.com/cloudflare/pingora
 https://github.com/basecamp/once-campfire
 https://github.com/rust-lang/rust
 https://github.com/rust-lang/rustlings

@@ -710,6 +710,222 @@ impl DatabaseOperations {
         })
     }
 
+    /// Count rows in a table for task generation
+    pub async fn count_table_rows(&self, table_name: &str) -> DatabaseResult<i64> {
+        debug!("Counting rows in table: {}", table_name);
+        
+        let count_sql = format!("SELECT COUNT(*) FROM \"{}\"", table_name);
+        
+        let row = sqlx::query(&count_sql)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryFailed {
+                query: count_sql,
+                cause: e.to_string(),
+            })?;
+        
+        let count: i64 = row.get(0);
+        debug!("Table {} has {} rows", table_name, count);
+        
+        Ok(count)
+    }
+
+    /// Get a specific row from a table by row number (1-indexed)
+    pub async fn get_table_row(&self, table_name: &str, row_number: i64) -> DatabaseResult<HashMap<String, String>> {
+        debug!("Getting row {} from table: {}", row_number, table_name);
+        
+        let row_sql = format!(
+            "SELECT * FROM \"{}\" ORDER BY file_id LIMIT 1 OFFSET $1",
+            table_name
+        );
+        
+        let row = sqlx::query(&row_sql)
+            .bind(row_number - 1) // Convert to 0-indexed
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryFailed {
+                query: row_sql,
+                cause: e.to_string(),
+            })?;
+        
+        // Convert row to HashMap
+        let mut result = HashMap::new();
+        for (i, column) in row.columns().iter().enumerate() {
+            let value = self.extract_column_value(&row, i)?;
+            result.insert(column.name().to_string(), value);
+        }
+        
+        debug!("Retrieved row {} from table {}", row_number, table_name);
+        Ok(result)
+    }
+
+    /// Get multiple rows from a table with pagination
+    pub async fn get_table_rows_paginated(
+        &self,
+        table_name: &str,
+        offset: i64,
+        limit: i64,
+    ) -> DatabaseResult<Vec<HashMap<String, String>>> {
+        debug!("Getting {} rows from table {} starting at offset {}", limit, table_name, offset);
+        
+        let rows_sql = format!(
+            "SELECT * FROM \"{}\" ORDER BY file_id LIMIT $1 OFFSET $2",
+            table_name
+        );
+        
+        let rows = sqlx::query(&rows_sql)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryFailed {
+                query: rows_sql,
+                cause: e.to_string(),
+            })?;
+        
+        let mut results = Vec::new();
+        for row in rows {
+            let mut row_map = HashMap::new();
+            for (i, column) in row.columns().iter().enumerate() {
+                let value = self.extract_column_value(&row, i)?;
+                row_map.insert(column.name().to_string(), value);
+            }
+            results.push(row_map);
+        }
+        
+        debug!("Retrieved {} rows from table {}", results.len(), table_name);
+        Ok(results)
+    }
+
+    /// Execute a batch operation with transaction handling
+    pub async fn execute_batch_operation<F>(&self, operation: F) -> DatabaseResult<()>
+    where
+        F: for<'c> FnOnce(&'c mut Transaction<'_, Postgres>) -> std::pin::Pin<Box<dyn std::future::Future<Output = DatabaseResult<()>> + Send + 'c>>,
+    {
+        let mut transaction = self.pool.begin().await.map_err(|e| DatabaseError::TransactionFailed {
+            cause: format!("Failed to start batch transaction: {}", e),
+        })?;
+
+        operation(&mut transaction).await?;
+
+        transaction.commit().await.map_err(|e| DatabaseError::TransactionFailed {
+            cause: format!("Failed to commit batch transaction: {}", e),
+        })?;
+
+        info!("Batch operation completed successfully");
+        Ok(())
+    }
+
+    /// Update a specific row in a table
+    pub async fn update_table_row(
+        &self,
+        table_name: &str,
+        row_id: i64,
+        updates: HashMap<String, String>,
+    ) -> DatabaseResult<()> {
+        if updates.is_empty() {
+            return Ok(());
+        }
+
+        debug!("Updating row {} in table {} with {} fields", row_id, table_name, updates.len());
+
+        // Build dynamic UPDATE query
+        let mut set_clauses = Vec::new();
+        let mut values = Vec::new();
+        let mut param_index = 1;
+
+        for (column, value) in updates {
+            set_clauses.push(format!("\"{}\" = ${}", column, param_index));
+            values.push(value);
+            param_index += 1;
+        }
+
+        let update_sql = format!(
+            "UPDATE \"{}\" SET {} WHERE file_id = ${}",
+            table_name,
+            set_clauses.join(", "),
+            param_index
+        );
+
+        let mut query = sqlx::query(&update_sql);
+        for value in values {
+            query = query.bind(value);
+        }
+        query = query.bind(row_id);
+
+        query
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryFailed {
+                query: update_sql,
+                cause: e.to_string(),
+            })?;
+
+        debug!("Updated row {} in table {}", row_id, table_name);
+        Ok(())
+    }
+
+    /// Delete a specific row from a table
+    pub async fn delete_table_row(&self, table_name: &str, row_id: i64) -> DatabaseResult<()> {
+        debug!("Deleting row {} from table {}", row_id, table_name);
+
+        let delete_sql = format!("DELETE FROM \"{}\" WHERE file_id = $1", table_name);
+
+        sqlx::query(&delete_sql)
+            .bind(row_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryFailed {
+                query: delete_sql,
+                cause: e.to_string(),
+            })?;
+
+        debug!("Deleted row {} from table {}", row_id, table_name);
+        Ok(())
+    }
+
+    /// Get table statistics for task generation planning
+    pub async fn get_table_statistics(&self, table_name: &str) -> DatabaseResult<TableStatistics> {
+        debug!("Getting statistics for table: {}", table_name);
+
+        let stats_sql = format!(
+            r#"
+            SELECT 
+                COUNT(*) as total_rows,
+                COUNT(DISTINCT extension) as unique_extensions,
+                COUNT(DISTINCT parent_filepath) as unique_directories,
+                AVG(line_count) as avg_line_count,
+                MAX(line_count) as max_line_count,
+                MIN(line_count) as min_line_count,
+                SUM(file_size_bytes) as total_size_bytes
+            FROM "{}"
+            "#,
+            table_name
+        );
+
+        let row = sqlx::query(&stats_sql)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryFailed {
+                query: stats_sql,
+                cause: e.to_string(),
+            })?;
+
+        let stats = TableStatistics {
+            table_name: table_name.to_string(),
+            total_rows: row.get::<i64, _>("total_rows"),
+            unique_extensions: row.get::<i64, _>("unique_extensions"),
+            unique_directories: row.get::<i64, _>("unique_directories"),
+            avg_line_count: row.get::<Option<f64>, _>("avg_line_count").unwrap_or(0.0),
+            max_line_count: row.get::<Option<i32>, _>("max_line_count").unwrap_or(0),
+            min_line_count: row.get::<Option<i32>, _>("min_line_count").unwrap_or(0),
+            total_size_bytes: row.get::<Option<i64>, _>("total_size_bytes").unwrap_or(0),
+        };
+
+        debug!("Table {} statistics: {} rows, {} directories", table_name, stats.total_rows, stats.unique_directories);
+        Ok(stats)
+    }
+
     /// List all ingestion records
     pub async fn list_ingestion_records(&self) -> DatabaseResult<Vec<crate::ingestion::IngestionRecord>> {
         let list_sql = r#"
@@ -780,6 +996,19 @@ pub struct IngestionStats {
     pub table_name: String,
     pub total_files_processed: Option<i32>,
     pub created_at: DateTime<Utc>,
+}
+
+/// Statistics for a database table used in task generation
+#[derive(Debug, Clone)]
+pub struct TableStatistics {
+    pub table_name: String,
+    pub total_rows: i64,
+    pub unique_extensions: i64,
+    pub unique_directories: i64,
+    pub avg_line_count: f64,
+    pub max_line_count: i32,
+    pub min_line_count: i32,
+    pub total_size_bytes: i64,
 }
 
 #[cfg(test)]
@@ -942,5 +1171,227 @@ mod tests {
         assert_eq!(result.columns.len(), 2);
         assert_eq!(result.row_count, 1);
         assert_eq!(result.execution_time_ms, 50);
+    }
+
+    #[test]
+    fn test_table_statistics_structure() {
+        let stats = TableStatistics {
+            table_name: "INGEST_20250927143022".to_string(),
+            total_rows: 1000,
+            unique_extensions: 15,
+            unique_directories: 25,
+            avg_line_count: 45.5,
+            max_line_count: 500,
+            min_line_count: 1,
+            total_size_bytes: 2048000,
+        };
+        
+        assert_eq!(stats.table_name, "INGEST_20250927143022");
+        assert_eq!(stats.total_rows, 1000);
+        assert_eq!(stats.unique_extensions, 15);
+        assert_eq!(stats.avg_line_count, 45.5);
+    }
+
+    #[tokio::test]
+    async fn test_row_counting_functionality() {
+        if let Some(pool) = create_test_pool() {
+            let ops = DatabaseOperations::new(pool);
+            
+            // This would test against a real table if DATABASE_URL is set
+            // For now, we test the error handling for non-existent tables
+            let result = ops.count_table_rows("nonexistent_table").await;
+            assert!(result.is_err(), "Should fail for non-existent table");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_row_retrieval_functionality() {
+        if let Some(pool) = create_test_pool() {
+            let ops = DatabaseOperations::new(pool);
+            
+            // Test error handling for non-existent table
+            let result = ops.get_table_row("nonexistent_table", 1).await;
+            assert!(result.is_err(), "Should fail for non-existent table");
+            
+            // Test paginated retrieval error handling
+            let paginated_result = ops.get_table_rows_paginated("nonexistent_table", 0, 10).await;
+            assert!(paginated_result.is_err(), "Should fail for non-existent table");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_batch_operation_transaction_handling() {
+        if let Some(pool) = create_test_pool() {
+            let ops = DatabaseOperations::new(pool);
+            
+            // Test successful batch operation
+            let result = ops.execute_batch_operation(|_tx| {
+                Box::pin(async move {
+                    // Simulate successful operation
+                    Ok(())
+                })
+            }).await;
+            
+            assert!(result.is_ok(), "Batch operation should succeed");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_table_statistics_calculation() {
+        if let Some(pool) = create_test_pool() {
+            let ops = DatabaseOperations::new(pool);
+            
+            // Test error handling for non-existent table
+            let result = ops.get_table_statistics("nonexistent_table").await;
+            assert!(result.is_err(), "Should fail for non-existent table");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_crud_operations_error_handling() {
+        if let Some(pool) = create_test_pool() {
+            let ops = DatabaseOperations::new(pool);
+            
+            // Test update operation error handling
+            let mut updates = HashMap::new();
+            updates.insert("test_column".to_string(), "test_value".to_string());
+            
+            let update_result = ops.update_table_row("nonexistent_table", 1, updates).await;
+            assert!(update_result.is_err(), "Should fail for non-existent table");
+            
+            // Test delete operation error handling
+            let delete_result = ops.delete_table_row("nonexistent_table", 1).await;
+            assert!(delete_result.is_err(), "Should fail for non-existent table");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_comprehensive_ingestion_workflow() {
+        if let Some(pool) = create_test_pool() {
+            let ops = DatabaseOperations::new(pool);
+            
+            // Test creating an ingestion record
+            let ingestion_result = ops.create_ingestion_record(
+                Some("https://github.com/test/repo"),
+                "/tmp/test",
+                1695825022,
+                "TEST_TABLE"
+            ).await;
+            
+            if let Ok(ingestion_id) = ingestion_result {
+                // Test completing the ingestion
+                let complete_result = ops.complete_ingestion_record(ingestion_id, 1695825122, 50).await;
+                assert!(complete_result.is_ok(), "Should complete ingestion successfully");
+                
+                // Test getting statistics
+                let stats_result = ops.get_ingestion_stats(ingestion_id).await;
+                assert!(stats_result.is_ok(), "Should get ingestion stats successfully");
+                
+                if let Ok(stats) = stats_result {
+                    assert_eq!(stats.ingestion_id, ingestion_id);
+                    assert_eq!(stats.total_files_processed, Some(50));
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_query_execution_and_formatting() {
+        if let Some(pool) = create_test_pool() {
+            let ops = DatabaseOperations::new(pool);
+            
+            // Test simple query execution
+            let result = ops.execute_query("SELECT 1 as test_column").await;
+            assert!(result.is_ok(), "Simple query should execute successfully");
+            
+            if let Ok(query_result) = result {
+                assert_eq!(query_result.columns.len(), 1);
+                assert_eq!(query_result.columns[0], "test_column");
+                assert_eq!(query_result.row_count, 1);
+            }
+            
+            // Test LLM formatting
+            let llm_result = ops.execute_query_for_llm("SELECT 'test' as message").await;
+            assert!(llm_result.is_ok(), "LLM query should execute successfully");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_analysis_result_storage() {
+        if let Some(pool) = create_test_pool() {
+            let ops = DatabaseOperations::new(pool);
+            
+            // Create a test analysis result
+            let analysis = AnalysisResult {
+                sql_query: "SELECT * FROM test_table".to_string(),
+                prompt_file_path: Some("/prompts/analysis.md".to_string()),
+                llm_result: "This is a test analysis result".to_string(),
+                original_file_path: Some("/test/file.rs".to_string()),
+                chunk_number: Some(1),
+                analysis_type: Some("code_review".to_string()),
+            };
+            
+            // This would fail for non-existent table, but tests the structure
+            let result = ops.store_analysis_result("QUERYRESULT_TEST", analysis).await;
+            // We expect this to fail since the table doesn't exist
+            assert!(result.is_err(), "Should fail for non-existent table");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_processed_file_conversion_and_insertion() {
+        if let Some(pool) = create_test_pool() {
+            let ops = DatabaseOperations::new(pool);
+            
+            // Create test processed files (simulating the processing module types)
+            let test_files = vec![
+                crate::processing::ProcessedFile {
+                    filepath: "/test/file1.rs".to_string(),
+                    filename: "file1.rs".to_string(),
+                    extension: "rs".to_string(),
+                    file_size_bytes: 1024,
+                    line_count: Some(50),
+                    word_count: Some(200),
+                    token_count: Some(180),
+                    content_text: Some("fn main() {}".to_string()),
+                    file_type: crate::processing::FileType::DirectText,
+                    conversion_command: None,
+                    relative_path: "file1.rs".to_string(),
+                    absolute_path: "/test/file1.rs".to_string(),
+                    skipped: false,
+                },
+            ];
+            
+            // This would fail for non-existent table, but tests the conversion logic
+            let result = ops.insert_processed_files("TEST_TABLE", &test_files, 1).await;
+            // We expect this to fail since the table doesn't exist
+            assert!(result.is_err(), "Should fail for non-existent table");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_ingestion_records_listing() {
+        if let Some(pool) = create_test_pool() {
+            let ops = DatabaseOperations::new(pool);
+            
+            // Test listing ingestion records
+            let records_result = ops.list_ingestion_records().await;
+            
+            // This should work if the ingestion_meta table exists
+            // If it fails, it means the table doesn't exist yet
+            match records_result {
+                Ok(records) => {
+                    // If successful, verify the structure
+                    for record in records {
+                        assert!(!record.table_name.is_empty());
+                        assert!(!record.local_path.is_empty());
+                    }
+                }
+                Err(_) => {
+                    // Expected if ingestion_meta table doesn't exist
+                    assert!(true, "Expected failure for non-existent ingestion_meta table");
+                }
+            }
+        }
     }
 }

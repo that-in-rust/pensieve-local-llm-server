@@ -5,6 +5,7 @@ pub mod binary_processor;
 pub mod pipeline;
 pub mod streaming;
 pub mod performance;
+pub mod chunking;
 
 // Re-export main types and traits for convenience
 pub use classifier::{FileClassifier};
@@ -14,6 +15,7 @@ pub use binary_processor::{BinaryProcessor, BinaryProcessorConfig};
 pub use pipeline::{ContentExtractionPipeline, PipelineConfig, ProcessingStats};
 pub use streaming::{StreamingProcessor, StreamingConfig, StreamingProgress, StreamingStats};
 pub use performance::{PerformanceMonitor, PerformanceConfig, PerformanceSnapshot, PerformanceStats, OptimizationRecommendation};
+pub use chunking::{ChunkingEngine, ChunkingConfig, ChunkData, ChunkMetadata, ChunkingResult};
 
 use serde::{Deserialize, Serialize};
 use std::path::Path;

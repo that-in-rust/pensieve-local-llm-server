@@ -10,6 +10,7 @@ pub mod git_cloner;
 pub mod folder_processor;
 pub mod batch_processor;
 pub mod resume;
+pub mod providers;
 
 use crate::database::Database;
 use crate::error::IngestionError;

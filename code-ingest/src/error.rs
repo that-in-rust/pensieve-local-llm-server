@@ -247,6 +247,9 @@ pub enum ProcessingError {
 
     #[error("Content analysis failed: {path} - {cause}")]
     ContentAnalysisFailed { path: String, cause: String },
+
+    #[error("Chunking failed: {reason}")]
+    ChunkingFailed { reason: String },
 }
 
 /// Comprehensive errors for task generation and markdown creation with actionable guidance

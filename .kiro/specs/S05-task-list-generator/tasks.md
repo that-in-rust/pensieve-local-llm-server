@@ -6,46 +6,46 @@
   - Implement basic error types with thiserror for structured error handling
   - _Requirements: 1.1, 2.1, 3.1, 4.1_
 
-- [-] 2. Implement database foundation and schema management
-  - [-] 2.1 Create database connection and migration system
+- [x] 2. Implement database foundation and schema management
+  - [x] 2.1 Create database connection and migration system
     - Write database connection utilities with SQLx connection pooling
     - Implement schema creation for base tables with proper indexing
     - Create migration system for table versioning and updates
     - _Requirements: 1.2, 3.3_
 
-  - [ ] 2.2 Implement base table operations
+  - [x] 2.2 Implement base table operations
     - Write CRUD operations for basic file ingestion tables
     - Implement row counting and querying functionality for task generation
     - Create database transaction handling for batch operations
     - _Requirements: 1.1, 1.2_
 
-  - [ ] 2.3 Implement chunked table creation and management
+  - [x] 2.3 Implement chunked table creation and management
     - Write dynamic table creation for chunked tables with naming pattern `<TableName_ChunkSize>`
     - Implement chunked table schema with additional columns (chunk_number, chunk_start_line, etc.)
     - Create table validation and existence checking utilities
     - _Requirements: 2.1, 2.3_
 
-- [ ] 3. Build ingestion engine for git repositories and local folders
-  - [ ] 3.1 Implement git repository ingestion
+- [x] 3. Build ingestion engine for git repositories and local folders
+  - [x] 3.1 Implement git repository ingestion
     - Create GitIngestionProvider with repository cloning and file extraction
     - Implement file content reading and metadata collection from git repositories
     - Write database insertion logic for git-sourced files
     - _Requirements: 3.3, 4.3_
 
-  - [ ] 3.2 Implement local folder ingestion
+  - [x] 3.2 Implement local folder ingestion
     - Create FolderIngestionProvider with recursive directory traversal
     - Implement absolute path validation and accessibility checking
     - Write file system integration for local file processing with same database schema
     - _Requirements: 3.1, 3.2, 3.3_
 
-  - [ ] 3.3 Create unified ingestion interface
+  - [x] 3.3 Create unified ingestion interface
     - Implement IngestionEngine that coordinates git and folder providers
     - Write source validation logic for both git URLs and local paths
     - Create error handling and recovery strategies for ingestion failures
     - _Requirements: 3.1, 3.4, 4.4_
 
-- [ ] 4. Develop chunking engine for large file processing
-  - [ ] 4.1 Implement core chunking algorithm
+- [-] 4. Develop chunking engine for large file processing
+  - [-] 4.1 Implement core chunking algorithm
     - Write LOC-based file splitting logic with configurable chunk sizes
     - Implement chunk boundary detection that preserves code structure
     - Create ChunkData structures with proper metadata (start_line, end_line, chunk_number)
