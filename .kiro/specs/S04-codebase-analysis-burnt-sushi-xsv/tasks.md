@@ -22,13 +22,33 @@ Ingestion
 ```
 Running SQL Query
 ``` bash
+# 1. Explore your data: 
+./target/release/code-ingest run -- list-tables --db-path /Users/neetipatni/desktop/PensieveDB01
 
+# 2. Sample the data:
+cargo run -- sample --table INGEST_20250928101039 --db-path /Users/neetipatni/desktop/PensieveDB01
+
+# 3. Run queries:
+cargo run -- sql 'SELECT filepath, filename FROM "INGEST_20250928101039" LIMIT 5' --db-path /Users/neetipatni/desktop/PensieveDB01
+
+# 4. Export files:
+cargo run -- print-to-md --table INGEST_20250928101039 --sql 'SELECT * FROM "INGEST_20250928101039" LIMIT 10' --prefix xsv --location ./exports --db-path /Users/neetipatni/desktop/PensieveDB01
+
+# Working SQL Query Examples:
+# Basic file listing
+cargo run -- sql 'SELECT filepath, filename FROM "INGEST_20250928101039" LIMIT 3' --db-path /Users/neetipatni/desktop/PensieveDB01
+
+# Count files by extension
+cargo run -- sql 'SELECT extension, COUNT(*) FROM "INGEST_20250928101039" GROUP BY extension ORDER BY COUNT(*) DESC' --db-path /Users/neetipatni/desktop/PensieveDB01
+
+# Find Rust files with specific patterns
+cargo run -- sql 'SELECT filepath FROM "INGEST_20250928101039" WHERE extension = '\''rs'\'' AND content_text LIKE '\''%unsafe%'\''' --db-path /Users/neetipatni/desktop/PensieveDB01
 ```
 
 
 ## Phase 1: Database Setup and Verification
 
-- [ ] 1. Do a fresh ingestion of - the repo - https://github.com/BurntSushi/xsv + Ingest PG Database to be stored at - /Users/neetipatni/desktop/PensieveDB01 + Result PG database to be stored at -  /Users/neetipatni/desktop/PensieveDB01
+- [x] 1. Do a fresh ingestion of - the repo - https://github.com/BurntSushi/xsv + Ingest PG Database to be stored at - /Users/neetipatni/desktop/PensieveDB01 + Result PG database to be stored at -  /Users/neetipatni/desktop/PensieveDB01
   - Run
   ``` bash
   ./target/release/code-ingest ingest https://github.com/BurntSushi/xsv --db-path /Users/neetipatni/desktop/PensieveDB01
