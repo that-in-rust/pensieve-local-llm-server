@@ -2,60 +2,142 @@
 
 ## Overview
 
-The Task List Generator creates systematic codebase analysis workflows by transforming database rows into hierarchical analysis tasks with multi-layered contextual content files. The system enables knowledge arbitrage through structured L1-L8 analysis of mature codebases.
+The S05 Task List Generator is a sophisticated codebase analysis system that transforms database-stored code into structured analysis workflows. The system supports both basic file-level analysis and advanced chunked processing for large files, with flexible ingestion from git repositories or local folders.
+
+The core innovation is the hierarchical task generation that creates systematic analysis workflows, enabling deep codebase understanding through the L1-L8 extraction hierarchy defined in the steering documents.
 
 ## Architecture
 
-### Core Components
+### High-Level Architecture
 
-1. **ContentExtractor** - Extracts and contextualizes database content into A/B/C files
-2. **HierarchicalTaskDivider** - Creates 4-level task hierarchies with 7 groups per level
-3. **DatabaseQueryEngine** - Handles SQL operations for row counting and content extraction
-4. **L1L8MarkdownGenerator** - Generates analysis tasks with L1-L8 methodology references
+```mermaid
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#F5F5F5",
+    "secondaryColor": "#E0E0E0",
+    "lineColor": "#616161",
+    "textColor": "#212121",
+    "fontSize": "16px",
+    "fontFamily": "Helvetica, Arial, sans-serif"
+  },
+  "flowchart": {
+    "nodeSpacing": 70,
+    "rankSpacing": 80,
+    "wrappingWidth": 160,
+    "curve": "basis"
+  },
+  "useMaxWidth": false
+}}%%
 
-### Data Flow
-
+flowchart TD
+    subgraph "Ingestion Layer"
+        A[Git Repository] --> C[Ingestion Engine]
+        B[Local Folder] --> C
+        C --> D[(Database)]
+    end
+    
+    subgraph "Processing Layer"
+        D --> E[Table Analyzer]
+        E --> F{File Size Check}
+        F -->|Small Files| G[Direct Processing]
+        F -->|Large Files| H[Chunking Engine]
+        G --> I[Content Generator]
+        H --> J[Chunked Table Creator]
+        J --> I
+    end
+    
+    subgraph "Generation Layer"
+        I --> K[Task Generator]
+        K --> L[Hierarchical Builder]
+        L --> M[Markdown Writer]
+    end
+    
+    subgraph "Output Layer"
+        M --> N[Task Lists]
+        M --> O[Content Files]
+        M --> P[Analysis Outputs]
+    end
 ```
-Database Table → ContentExtractor → A/B/C Files → HierarchicalTaskDivider → 4-Level Tasks → Markdown Output
-```
+
+### Component Architecture
+
+The system follows a layered architecture with clear separation of concerns:
+
+1. **Ingestion Layer**: Handles both git repositories and local folder processing
+2. **Processing Layer**: Manages database operations, chunking logic, and content preparation
+3. **Generation Layer**: Creates hierarchical task structures and markdown output
+4. **Output Layer**: Produces final analysis artifacts
 
 ## Components and Interfaces
 
-### ContentExtractor
+### 1. Ingestion Engine
+
+**Purpose**: Unified interface for processing both git repositories and local folders
 
 ```rust
-pub struct ContentExtractor {
-    db_pool: Arc<sqlx::PgPool>,
-    output_dir: PathBuf,
+pub trait IngestionProvider {
+    async fn ingest(&self, source: IngestionSource, db_path: &Path) -> Result<String, IngestionError>;
+    async fn validate_source(&self, source: &IngestionSource) -> Result<(), ValidationError>;
 }
 
-impl ContentExtractor {
-    pub async fn extract_all_rows(&self, table_name: &str) -> TaskResult<Vec<ContentTriple>>;
-    pub async fn create_content_files(&self, row: &QueryResultRow, row_num: usize) -> TaskResult<ContentTriple>;
-    fn generate_l1_context(&self, content: &str, metadata: &RowMetadata) -> String;
-    fn generate_l2_context(&self, content: &str, metadata: &RowMetadata) -> String;
+pub enum IngestionSource {
+    GitRepository(String),
+    LocalFolder { path: PathBuf, recursive: bool },
 }
 
-pub struct ContentTriple {
-    pub content_a: PathBuf,    // Raw content
-    pub content_b: PathBuf,    // L1 context
-    pub content_c: PathBuf,    // L2 context
-    pub row_number: usize,
+pub struct IngestionEngine {
+    git_provider: GitIngestionProvider,
+    folder_provider: FolderIngestionProvider,
 }
 ```
 
-### HierarchicalTaskDivider
+**Key Responsibilities**:
+- Source validation (URL accessibility, folder existence)
+- Unified database schema creation
+- File content extraction and metadata collection
+- Error handling for network/filesystem issues
+
+### 2. Chunking Engine
+
+**Purpose**: Intelligent file splitting for large codebases
 
 ```rust
-pub struct HierarchicalTaskDivider {
-    levels: usize,
-    groups_per_level: usize,
+pub struct ChunkingEngine {
+    chunk_size: usize,
+    overlap_strategy: OverlapStrategy,
 }
 
-impl HierarchicalTaskDivider {
-    pub fn new(levels: usize, groups_per_level: usize) -> Self;
-    pub fn create_hierarchy(&self, content_triples: Vec<ContentTriple>) -> TaskResult<TaskHierarchy>;
-    fn distribute_across_levels(&self, items: Vec<ContentTriple>, current_level: usize) -> Vec<TaskLevel>;
+pub struct ChunkMetadata {
+    pub chunk_number: u32,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub context_before: Option<String>,
+    pub context_after: Option<String>,
+}
+
+impl ChunkingEngine {
+    pub async fn create_chunked_table(&self, table_name: &str, chunk_size: usize) -> Result<String, ChunkingError>;
+    pub fn chunk_content(&self, content: &str, metadata: &FileMetadata) -> Vec<ChunkData>;
+    pub fn generate_context(&self, chunks: &[ChunkData], current_index: usize, level: ContextLevel) -> String;
+}
+```
+
+**Key Features**:
+- LOC-based chunking with configurable size
+- Context preservation (L1: ±1 chunk, L2: ±2 chunks)
+- Maintains file relationships and metadata
+- Handles edge cases (small files, boundary conditions)
+
+### 3. Task Generator
+
+**Purpose**: Creates hierarchical task structures with configurable depth and grouping
+
+```rust
+pub struct TaskGenerator {
+    levels: u8,
+    groups_per_level: u8,
+    prompt_file: PathBuf,
 }
 
 pub struct TaskHierarchy {
@@ -64,145 +146,239 @@ pub struct TaskHierarchy {
 }
 
 pub struct TaskLevel {
-    pub level: usize,
-    pub groups: Vec<HierarchicalTaskGroup>,
+    pub level: u8,
+    pub tasks: Vec<Task>,
 }
 
-pub struct HierarchicalTaskGroup {
-    pub id: String,           // e.g., "1.2.3"
-    pub title: String,
-    pub tasks: Vec<AnalysisTask>,
-    pub sub_groups: Vec<HierarchicalTaskGroup>,
-}
-```
-
-### DatabaseQueryEngine
-
-```rust
-pub struct DatabaseQueryEngine {
-    pool: Arc<sqlx::PgPool>,
-}
-
-impl DatabaseQueryEngine {
-    pub async fn count_rows(&self, table_name: &str) -> TaskResult<usize>;
-    pub async fn get_all_rows(&self, table_name: &str) -> TaskResult<Vec<QueryResultRow>>;
-    pub async fn validate_table_exists(&self, table_name: &str) -> TaskResult<bool>;
+pub struct Task {
+    pub id: String,
+    pub description: String,
+    pub content_files: Vec<PathBuf>,
+    pub prompt_reference: String,
+    pub output_path: PathBuf,
+    pub subtasks: Vec<Task>,
 }
 ```
 
-### L1L8MarkdownGenerator
+**Algorithm**:
+1. Query database for row count
+2. Calculate optimal task distribution across hierarchy
+3. Generate task IDs with proper numbering (1.1, 1.2, 2.1, etc.)
+4. Create content file references for each task
+5. Build markdown structure with checkboxes
+
+### 4. Content Generator
+
+**Purpose**: Creates the three-tier content files (A, L1, L2) for analysis
 
 ```rust
-pub struct L1L8MarkdownGenerator {
-    prompt_file: PathBuf,
+pub struct ContentGenerator {
     output_dir: PathBuf,
+    table_name: String,
 }
 
-impl L1L8MarkdownGenerator {
-    pub fn generate_hierarchical_markdown(&self, hierarchy: &TaskHierarchy, table_name: &str) -> TaskResult<String>;
-    fn create_analysis_task(&self, content_triple: &ContentTriple, task_id: &str, table_name: &str) -> String;
-    fn format_l1l8_analysis_instructions(&self) -> String;
+pub struct ContentSet {
+    pub content_a: PathBuf,    // Primary content
+    pub content_l1: PathBuf,   // L1 context
+    pub content_l2: PathBuf,   // L2 context
+}
+
+impl ContentGenerator {
+    pub async fn generate_content_files(&self, row_data: &RowData) -> Result<ContentSet, ContentError>;
+    pub async fn generate_chunked_content(&self, chunk_data: &ChunkData) -> Result<ContentSet, ContentError>;
 }
 ```
 
 ## Data Models
 
-### AnalysisTask
+### Database Schema
 
-```rust
-pub struct AnalysisTask {
-    pub id: String,                    // e.g., "1.2.3.4"
-    pub table_name: String,
-    pub row_number: usize,
-    pub content_files: ContentTriple,
-    pub prompt_file: PathBuf,
-    pub output_file: PathBuf,
-    pub analysis_stages: Vec<AnalysisStage>,
-}
-
-pub enum AnalysisStage {
-    AnalyzeA,                         // A alone
-    AnalyzeAInContextB,               // A in context of B
-    AnalyzeBInContextC,               // B in context of C
-    AnalyzeAInContextBC,              // A in context of B & C
-}
+**Base Table Structure**:
+```sql
+CREATE TABLE IF NOT EXISTS {table_name} (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id TEXT NOT NULL,
+    filepath TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    extension TEXT,
+    line_count INTEGER,
+    content TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
-### CLI Commands
+**Chunked Table Structure**:
+```sql
+CREATE TABLE IF NOT EXISTS {table_name}_{chunk_size} (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id TEXT NOT NULL,
+    filepath TEXT NOT NULL,
+    parent_filepath TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    extension TEXT,
+    chunk_number INTEGER NOT NULL,
+    chunk_start_line INTEGER NOT NULL,
+    chunk_end_line INTEGER NOT NULL,
+    line_count INTEGER,
+    content TEXT,
+    content_l1 TEXT,
+    content_l2 TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Configuration Models
 
 ```rust
-pub enum TaskCommand {
-    CountRows { table_name: String },
-    ExtractContent { 
-        table_name: String, 
-        output_dir: PathBuf 
-    },
-    GenerateHierarchicalTasks { 
-        table_name: String, 
-        levels: usize, 
-        groups_per_level: usize,
-        output_file: PathBuf 
-    },
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenerationConfig {
+    pub table_name: String,
+    pub levels: u8,
+    pub groups: u8,
+    pub output_file: PathBuf,
+    pub prompt_file: Option<PathBuf>,
+    pub chunk_size: Option<usize>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IngestionConfig {
+    pub source: IngestionSource,
+    pub db_path: PathBuf,
+    pub file_filters: Vec<String>,
+    pub max_file_size: Option<usize>,
 }
 ```
 
 ## Error Handling
 
+### Error Hierarchy
+
 ```rust
 #[derive(Error, Debug)]
-pub enum TaskError {
-    #[error("Table {table_name} not found")]
-    TableNotFound { table_name: String },
+pub enum TaskGeneratorError {
+    #[error("Database error: {0}")]
+    Database(#[from] sqlx::Error),
     
-    #[error("Content extraction failed for row {row}: {cause}")]
-    ContentExtractionFailed { row: usize, cause: String },
+    #[error("Ingestion failed: {source} - {cause}")]
+    Ingestion { source: String, cause: String },
     
-    #[error("Hierarchical division failed: {cause}")]
-    HierarchicalDivisionFailed { cause: String },
+    #[error("Chunking error: {0}")]
+    Chunking(#[from] ChunkingError),
     
-    #[error("L1/L2 context generation failed: {cause}")]
-    ContextGenerationFailed { cause: String },
+    #[error("File system error: {0}")]
+    FileSystem(#[from] std::io::Error),
+    
+    #[error("Invalid configuration: {field} - {reason}")]
+    Configuration { field: String, reason: String },
+}
+
+#[derive(Error, Debug)]
+pub enum ChunkingError {
+    #[error("Invalid chunk size: {size} (must be > 0)")]
+    InvalidChunkSize { size: usize },
+    
+    #[error("Table creation failed: {table_name}")]
+    TableCreation { table_name: String },
+    
+    #[error("Context generation failed for chunk {chunk_id}")]
+    ContextGeneration { chunk_id: u32 },
 }
 ```
 
+### Error Recovery Strategies
+
+1. **Database Errors**: Retry with exponential backoff, fallback to read-only mode
+2. **File System Errors**: Skip problematic files, log warnings, continue processing
+3. **Network Errors**: Retry git operations, provide offline mode suggestions
+4. **Chunking Errors**: Fall back to whole-file processing for problematic files
+
 ## Testing Strategy
 
-### Unit Tests
-- ContentExtractor: Test A/B/C file generation with mock database rows
-- HierarchicalTaskDivider: Test 4-level distribution with various row counts
-- DatabaseQueryEngine: Test SQL operations with test database
-- L1L8MarkdownGenerator: Test markdown format compliance
+### Unit Testing
 
-### Integration Tests
-- End-to-end workflow: Database → Content → Tasks → Markdown
-- CLI command execution with real database tables
-- File system operations and directory creation
+1. **Chunking Algorithm Tests**:
+   - Verify correct LOC-based splitting
+   - Test context generation for L1/L2 levels
+   - Edge cases: empty files, single-line files, exact chunk boundaries
 
-### Performance Tests
-- Large table processing (10,000+ rows)
-- Memory usage during hierarchical task creation
-- File I/O performance for content extraction
+2. **Task Generation Tests**:
+   - Hierarchical structure validation
+   - Proper numbering sequences
+   - Content file reference accuracy
 
-## Implementation Notes
+3. **Database Operations Tests**:
+   - Table creation and schema validation
+   - Data insertion and retrieval
+   - Chunked table generation
 
-### Context Generation Strategy
+### Integration Testing
 
-**L1 Context (Immediate):**
-- Same directory files
-- Import/include relationships
-- Module-level dependencies
+1. **End-to-End Workflows**:
+   - Git repository ingestion → task generation
+   - Local folder ingestion → chunked analysis
+   - Complete pipeline with real codebases
 
-**L2 Context (Architectural):**
-- Package/crate structure
-- Cross-module relationships
-- Architectural patterns and constraints
+2. **Performance Testing**:
+   - Large repository processing (>10k files)
+   - Memory usage during chunking operations
+   - Database query performance with large datasets
 
-### Hierarchical Distribution Algorithm
+### Property-Based Testing
 
-For N rows and 7 groups per level across 4 levels:
-- Level 1: 7 main groups
-- Level 2: 7 sub-groups per main group (49 total)
-- Level 3: 7 sub-sub-groups per sub-group (343 total)
-- Level 4: Individual tasks distributed across leaf groups
+```rust
+proptest! {
+    #[test]
+    fn chunking_preserves_content(
+        content in ".*",
+        chunk_size in 1usize..1000
+    ) {
+        let chunks = chunk_content(&content, chunk_size);
+        let reconstructed = chunks.iter().map(|c| &c.content).collect::<String>();
+        prop_assert_eq!(content, reconstructed);
+    }
+    
+    #[test]
+    fn task_hierarchy_is_valid(
+        levels in 1u8..8,
+        groups in 1u8..20
+    ) {
+        let hierarchy = generate_task_hierarchy(levels, groups);
+        prop_assert_eq!(hierarchy.levels.len(), levels as usize);
+        for level in &hierarchy.levels {
+            prop_assert!(level.tasks.len() <= groups as usize);
+        }
+    }
+}
+```
 
-Mathematical distribution ensures even task allocation while maintaining the 7-group structure at each level.
+## Performance Considerations
+
+### Optimization Strategies
+
+1. **Database Optimization**:
+   - Indexed queries on filepath and file_id
+   - Batch insertions for chunked data
+   - Connection pooling for concurrent operations
+
+2. **Memory Management**:
+   - Streaming file processing for large files
+   - Lazy loading of content data
+   - Configurable chunk size limits
+
+3. **Concurrency**:
+   - Parallel file processing during ingestion
+   - Concurrent chunk generation
+   - Async I/O for file operations
+
+### Performance Targets
+
+- **Ingestion**: Process 1000 files/minute for typical codebases
+- **Chunking**: Handle files up to 100k LOC with <2GB memory usage
+- **Task Generation**: Generate hierarchical tasks for 10k+ files in <30 seconds
+
+## Security Considerations
+
+1. **Path Validation**: Prevent directory traversal attacks in local folder ingestion
+2. **Resource Limits**: Configurable limits on file sizes and processing time
+3. **Database Security**: Parameterized queries to prevent SQL injection
+4. **File System Access**: Restricted to specified directories and database paths
