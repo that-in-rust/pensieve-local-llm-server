@@ -7,6 +7,7 @@ pub mod database_query_engine;
 pub mod content_extractor;
 pub mod hierarchical_task_divider;
 pub mod l1l8_markdown_generator;
+pub mod models;
 
 pub use database_query_engine::{DatabaseQueryEngine, TableValidation, DatabaseConnectionStats};
 pub use content_extractor::{ContentExtractor, ContentTriple, RowMetadata};
@@ -15,6 +16,14 @@ pub use hierarchical_task_divider::{
     AnalysisTask, AnalysisStage
 };
 pub use l1l8_markdown_generator::L1L8MarkdownGenerator;
+
+// Re-export the new core data models
+pub use models::{
+    IngestionSource, ChunkMetadata, TaskHierarchy as NewTaskHierarchy, 
+    Task as NewTask, TaskMetadata as NewTaskMetadata, ContentFileReference, 
+    ContentFileType, GenerationConfig, GenerationConfigMetadata,
+    TaskHierarchyMetadata, TaskHierarchyStatistics
+};
 
 use crate::error::{TaskError, TaskResult};
 use serde::{Deserialize, Serialize};

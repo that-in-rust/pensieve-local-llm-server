@@ -1,8 +1,21 @@
 go deep into Rust
 go deep into a side of the ecosystem
 
+``` bash
+./target/release/code-ingest ingest https://github.com/sunface/rust-course --db-path /Users/neetipatni/desktop/PensieveDB01
+```
 
-https://github.com/sunface/rust-course
+
+# Ingested Done
+
+
+
+URL | TableName
+https://github.com/sunface/rust-course | INGEST_20250928153948
+
+
+
+# Yet to be done
 https://github.com/cloudflare/pingora
 https://github.com/basecamp/once-campfire
 https://github.com/rust-lang/rust

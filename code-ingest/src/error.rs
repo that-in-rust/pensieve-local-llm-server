@@ -401,6 +401,37 @@ pub enum TaskError {
         #[source] 
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
+
+    #[error("Ingestion source validation failed: {source_name} - {cause}\n💡 Suggestion: {suggestion}")]
+    IngestionSourceValidationFailed {
+        source_name: String,
+        cause: String,
+        suggestion: String,
+    },
+
+    #[error("Chunk metadata creation failed: {filepath} - {cause}\n💡 Suggestion: {suggestion}")]
+    ChunkMetadataCreationFailed {
+        filepath: String,
+        cause: String,
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("Task hierarchy validation failed: levels={levels}, groups={groups} - {cause}\n💡 Suggestion: {suggestion}")]
+    TaskHierarchyValidationFailed {
+        levels: u8,
+        groups: u8,
+        cause: String,
+        suggestion: String,
+    },
+
+    #[error("Generation config validation failed: {field} - {cause}\n💡 Suggestion: {suggestion}")]
+    GenerationConfigValidationFailed {
+        field: String,
+        cause: String,
+        suggestion: String,
+    },
 }
 
 /// Result type aliases for common operations
@@ -648,6 +679,119 @@ impl TaskError {
             Self::StreamingFailed { .. } => 5,
             Self::BatchProcessingFailed { .. } => 2,
             _ => 1,
+        }
+    }
+
+    /// Create an ingestion source validation error
+    pub fn ingestion_source_validation_failed(
+        source_name: impl Into<String>,
+        cause: impl Into<String>
+    ) -> Self {
+        let source_name = source_name.into();
+        let cause = cause.into();
+        
+        let suggestion = if cause.contains("URL") {
+            "Check the Git repository URL format and ensure it's accessible".to_string()
+        } else if cause.contains("path") || cause.contains("directory") {
+            "Verify the local folder path exists and is readable".to_string()
+        } else if cause.contains("permission") {
+            "Check file and directory permissions".to_string()
+        } else {
+            "Validate the ingestion source configuration".to_string()
+        };
+
+        error!("Ingestion source validation failed for '{}': {}", source_name, cause);
+        
+        Self::IngestionSourceValidationFailed { 
+            source_name, 
+            cause, 
+            suggestion 
+        }
+    }
+
+    /// Create a chunk metadata creation error
+    pub fn chunk_metadata_creation_failed(
+        filepath: impl Into<String>,
+        cause: impl Into<String>,
+        source: Option<Box<dyn std::error::Error + Send + Sync>>
+    ) -> Self {
+        let filepath = filepath.into();
+        let cause = cause.into();
+        
+        let suggestion = if cause.contains("encoding") {
+            "Check file encoding and ensure it's UTF-8 compatible".to_string()
+        } else if cause.contains("size") {
+            "File may be too large, consider adjusting chunk size".to_string()
+        } else if cause.contains("lines") {
+            "Verify file line count and chunk boundaries".to_string()
+        } else {
+            "Check file accessibility and format".to_string()
+        };
+
+        error!("Chunk metadata creation failed for '{}': {}", filepath, cause);
+        debug!("Chunk metadata creation error source: {:?}", source);
+        
+        Self::ChunkMetadataCreationFailed { 
+            filepath, 
+            cause, 
+            suggestion, 
+            source 
+        }
+    }
+
+    /// Create a task hierarchy validation error
+    pub fn task_hierarchy_validation_failed(
+        levels: u8,
+        groups: u8,
+        cause: impl Into<String>
+    ) -> Self {
+        let cause = cause.into();
+        
+        let suggestion = if levels == 0 {
+            "Hierarchy levels must be at least 1".to_string()
+        } else if groups == 0 {
+            "Groups per level must be at least 1".to_string()
+        } else if levels > 10 {
+            "Consider reducing hierarchy levels (recommended: 2-4 levels)".to_string()
+        } else if groups > 20 {
+            "Consider reducing groups per level (recommended: 5-10 groups)".to_string()
+        } else {
+            "Check hierarchy configuration parameters".to_string()
+        };
+
+        error!("Task hierarchy validation failed: levels={}, groups={} - {}", levels, groups, cause);
+        
+        Self::TaskHierarchyValidationFailed { 
+            levels, 
+            groups, 
+            cause, 
+            suggestion 
+        }
+    }
+
+    /// Create a generation config validation error
+    pub fn generation_config_validation_failed(
+        field: impl Into<String>,
+        cause: impl Into<String>
+    ) -> Self {
+        let field = field.into();
+        let cause = cause.into();
+        
+        let suggestion = match field.as_str() {
+            "table_name" => "Provide a valid database table name".to_string(),
+            "levels" => "Set hierarchy levels to a value between 1 and 10".to_string(),
+            "groups" => "Set groups per level to a value between 1 and 20".to_string(),
+            "chunk_size" => "Set chunk size to a positive integer".to_string(),
+            "output_file" => "Provide a valid output file path".to_string(),
+            _ => "Check the configuration parameter value".to_string(),
+        };
+
+        error!("Generation config validation failed for field '{}': {}", field, cause);
+        
+        Self::GenerationConfigValidationFailed { 
+            field, 
+            cause, 
+            suggestion 
         }
     }
 
