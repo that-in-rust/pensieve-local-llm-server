@@ -467,10 +467,10 @@ impl Cli {
         
         println!();
         println!("🎯 Next Steps:");
-        println!("   1. Explore your data: cargo run -- list-tables");
-        println!("   2. Sample the data: cargo run -- sample --table {}", result.table_name);
-        println!("   3. Run queries: cargo run -- sql \"SELECT COUNT(*) FROM {}\"", result.table_name);
-        println!("   4. Export files: cargo run -- print-to-md --table {} --sql \"SELECT * FROM {} LIMIT 10\" --prefix tauri --location ./exports", result.table_name, result.table_name);
+        println!("   1. Explore your data: ./target/release/code-ingest list-tables --db-path <DB_PATH>");
+        println!("   2. Sample the data: ./target/release/code-ingest sample --table {} --db-path <DB_PATH>", result.table_name);
+        println!("   3. Run queries: ./target/release/code-ingest sql 'SELECT filepath, filename FROM \"{}\" LIMIT 5' --db-path <DB_PATH>", result.table_name);
+        println!("   4. Export files: ./target/release/code-ingest print-to-md --table {} --sql 'SELECT * FROM \"{}\" LIMIT 10' --prefix analysis --location ./exports --db-path <DB_PATH>", result.table_name, result.table_name);
         
         Ok(())
     }

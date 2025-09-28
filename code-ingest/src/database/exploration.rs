@@ -897,55 +897,66 @@ Status: ✅ Connected and operational"#,
         let column = &row.columns()[column_index];
         let column_name = column.name();
 
-        // Handle different PostgreSQL types
-        let type_name = format!("{:?}", column.type_info());
-        let value = if type_name.contains("TEXT") || type_name.contains("VARCHAR") || type_name.contains("CHAR") {
-            row.try_get::<Option<String>, _>(column_index)
-                .map_err(|e| DatabaseError::QueryFailed {
-                    query: format!("extract column {}", column_name),
-                    cause: e.to_string(),
-                })?
-                .unwrap_or_default()
-        } else if type_name.contains("INT4") || type_name.contains("INTEGER") {
-            row.try_get::<Option<i32>, _>(column_index)
-                .map_err(|e| DatabaseError::QueryFailed {
-                    query: format!("extract column {}", column_name),
-                    cause: e.to_string(),
-                })?
-                .map(|v| v.to_string())
-                .unwrap_or_default()
-        } else if type_name.contains("INT8") || type_name.contains("BIGINT") {
-            row.try_get::<Option<i64>, _>(column_index)
-                .map_err(|e| DatabaseError::QueryFailed {
-                    query: format!("extract column {}", column_name),
-                    cause: e.to_string(),
-                })?
-                .map(|v| v.to_string())
-                .unwrap_or_default()
-        } else if type_name.contains("TIMESTAMP") {
-            row.try_get::<Option<DateTime<Utc>>, _>(column_index)
-                .map_err(|e| DatabaseError::QueryFailed {
-                    query: format!("extract column {}", column_name),
-                    cause: e.to_string(),
-                })?
-                .map(|v| v.to_rfc3339())
-                .unwrap_or_default()
-        } else if type_name.contains("BOOL") {
-            row.try_get::<Option<bool>, _>(column_index)
-                .map_err(|e| DatabaseError::QueryFailed {
-                    query: format!("extract column {}", column_name),
-                    cause: e.to_string(),
-                })?
-                .map(|v| v.to_string())
-                .unwrap_or_default()
-        } else {
-            // Fallback: try to get as string
-            row.try_get::<Option<String>, _>(column_index)
-                .map_err(|e| DatabaseError::QueryFailed {
-                    query: format!("extract column {}", column_name),
-                    cause: e.to_string(),
-                })?
-                .unwrap_or_else(|| format!("[{}]", type_name))
+        // Handle different PostgreSQL types using the actual type info
+        use sqlx::postgres::PgTypeInfo;
+        use sqlx::TypeInfo;
+        
+        let type_info = column.type_info();
+        let type_name = type_info.name();
+        
+        let value = match type_name {
+            "TEXT" | "VARCHAR" | "CHAR" => {
+                row.try_get::<Option<String>, _>(column_index)
+                    .map_err(|e| DatabaseError::QueryFailed {
+                        query: format!("extract column {}", column_name),
+                        cause: e.to_string(),
+                    })?
+                    .unwrap_or_default()
+            }
+            "INT4" => {
+                row.try_get::<Option<i32>, _>(column_index)
+                    .map_err(|e| DatabaseError::QueryFailed {
+                        query: format!("extract column {}", column_name),
+                        cause: e.to_string(),
+                    })?
+                    .map(|v| v.to_string())
+                    .unwrap_or_default()
+            }
+            "INT8" => {
+                row.try_get::<Option<i64>, _>(column_index)
+                    .map_err(|e| DatabaseError::QueryFailed {
+                        query: format!("extract column {}", column_name),
+                        cause: e.to_string(),
+                    })?
+                    .map(|v| v.to_string())
+                    .unwrap_or_default()
+            }
+            "TIMESTAMPTZ" | "TIMESTAMP" => {
+                row.try_get::<Option<DateTime<Utc>>, _>(column_index)
+                    .map_err(|e| DatabaseError::QueryFailed {
+                        query: format!("extract column {}", column_name),
+                        cause: e.to_string(),
+                    })?
+                    .map(|v| v.to_rfc3339())
+                    .unwrap_or_default()
+            }
+            "BOOL" => {
+                row.try_get::<Option<bool>, _>(column_index)
+                    .map_err(|e| DatabaseError::QueryFailed {
+                        query: format!("extract column {}", column_name),
+                        cause: e.to_string(),
+                    })?
+                    .map(|v| v.to_string())
+                    .unwrap_or_default()
+            }
+            _ => {
+                // For unknown types, try to get as string first, then fallback to type name
+                match row.try_get::<Option<String>, _>(column_index) {
+                    Ok(Some(s)) => s,
+                    Ok(None) => String::new(),
+                    Err(_) => format!("[{}]", type_name),
+                }
+            }
         };
 
         Ok(value)

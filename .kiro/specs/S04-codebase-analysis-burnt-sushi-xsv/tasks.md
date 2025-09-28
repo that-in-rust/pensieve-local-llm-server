@@ -12,7 +12,8 @@ extension          | character varying
 file_size_bytes    | bigint                  
 line_count         | integer   
 
-- the repo - https://github.com/BurntSushi/xsv
+- the repo : https://github.com/BurntSushi/xsv
+- the prompt file : /Users/neetipatni/Desktop/Game20250927/pensieve/.kiro/steering/spec-S04-steering-doc-analysis.md
 
 
 
@@ -20,29 +21,19 @@ Ingestion
 ``` bash
 ./target/release/code-ingest ingest https://github.com/BurntSushi/xsv --db-path /Users/neetipatni/desktop/PensieveDB01
 ```
+INGEST_20250928101039
+
 Running SQL Query
 ``` bash
-# 1. Explore your data: 
-./target/release/code-ingest run -- list-tables --db-path /Users/neetipatni/desktop/PensieveDB01
+# 1. List tables - WORKING ✅
+./target/release/code-ingest list-tables --db-path /Users/neetipatni/desktop/PensieveDB01
 
-# 2. Sample the data:
-cargo run -- sample --table INGEST_20250928101039 --db-path /Users/neetipatni/desktop/PensieveDB01
+# 2. Sample data - WORKING ✅  
+./target/release/code-ingest sample --table INGEST_20250928101039 --db-path /Users/neetipatni/desktop/PensieveDB01
 
-# 3. Run queries:
-cargo run -- sql 'SELECT filepath, filename FROM "INGEST_20250928101039" LIMIT 5' --db-path /Users/neetipatni/desktop/PensieveDB01
+# 3. SQL queries - WORKING ✅
+./target/release/code-ingest sql 'SELECT filepath, filename FROM "INGEST_20250928101039" LIMIT 5' --db-path /Users/neetipatni/desktop/PensieveDB01
 
-# 4. Export files:
-cargo run -- print-to-md --table INGEST_20250928101039 --sql 'SELECT * FROM "INGEST_20250928101039" LIMIT 10' --prefix xsv --location ./exports --db-path /Users/neetipatni/desktop/PensieveDB01
-
-# Working SQL Query Examples:
-# Basic file listing
-cargo run -- sql 'SELECT filepath, filename FROM "INGEST_20250928101039" LIMIT 3' --db-path /Users/neetipatni/desktop/PensieveDB01
-
-# Count files by extension
-cargo run -- sql 'SELECT extension, COUNT(*) FROM "INGEST_20250928101039" GROUP BY extension ORDER BY COUNT(*) DESC' --db-path /Users/neetipatni/desktop/PensieveDB01
-
-# Find Rust files with specific patterns
-cargo run -- sql 'SELECT filepath FROM "INGEST_20250928101039" WHERE extension = '\''rs'\'' AND content_text LIKE '\''%unsafe%'\''' --db-path /Users/neetipatni/desktop/PensieveDB01
 ```
 
 
@@ -57,7 +48,10 @@ cargo run -- sql 'SELECT filepath FROM "INGEST_20250928101039" WHERE extension =
 
 
 - [ ] 4. Generate systematic analysis tasks using code-ingest
-  - Run: `code-ingest generate-tasks --sql "SELECT * FROM INGEST_20250928062949" --prompt-file ./xsv-l1-l8-analysis-prompt.md --output-table QUERYRESULT_xsv_knowledge_arbitrage --tasks-file ./xsv-analysis-tasks.md --db-path /Users/neetipatni/desktop/PensieveDB01`
+  - Run
+  ``` bash
+  ./target/release/code-ingest generate-tasks --sql "SELECT * FROM INGEST_20250928062949" --prompt-file ./xsv-l1-l8-analysis-prompt.md --output-table QUERYRESULT_xsv_$%Y%M%D%H%S --tasks-file ./xsv-analysis-tasks.md --db-path /Users/neetipatni/desktop/PensieveDB01
+  ``
   - Verify generated tasks.md file contains systematic analysis prompts for all 59 files
   - Confirm tasks are structured for chunked processing with 300-500 line segments and 10-20 line overlap
   - _Requirements: 6.1, 7.1, 7.2, 7.3, 7.4_

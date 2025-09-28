@@ -149,13 +149,13 @@ code-ingest ingest /path/to/your/project --db-path ./analysis
 #### Basic SQL Queries
 ```bash
 # List all Rust files
-code-ingest sql "SELECT filepath, line_count FROM INGEST_20240928143022 WHERE extension = 'rs'" --db-path ./analysis
+code-ingest sql 'SELECT filepath, line_count FROM "INGEST_20240928143022" WHERE extension = '\''rs'\''' --db-path ./analysis
 
 # Search for authentication code
-code-ingest sql "SELECT filepath, content_text FROM INGEST_20240928143022 WHERE content_text LIKE '%authenticate%'" --db-path ./analysis
+code-ingest sql 'SELECT filepath, content_text FROM "INGEST_20240928143022" WHERE content_text LIKE '\''%authenticate%'\''' --db-path ./analysis
 
 # Full-text search
-code-ingest sql "SELECT filepath FROM INGEST_20240928143022 WHERE to_tsvector('english', content_text) @@ plainto_tsquery('english', 'database connection')" --db-path ./analysis
+code-ingest sql 'SELECT filepath FROM "INGEST_20240928143022" WHERE to_tsvector('\''english'\'', content_text) @@ plainto_tsquery('\''english'\'', '\''database connection'\'')' --db-path ./analysis
 ```
 
 #### Table Management

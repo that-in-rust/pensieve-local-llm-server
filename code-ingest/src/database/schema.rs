@@ -150,7 +150,7 @@ impl SchemaManager {
         "#;
 
         let exists: (bool,) = sqlx::query_as(exists_query)
-            .bind(table_name.to_lowercase())
+            .bind(table_name)  // Don't convert to lowercase - PostgreSQL table names are case-sensitive
             .fetch_one(&self.pool)
             .await
             .map_err(|e| DatabaseError::QueryFailed {
