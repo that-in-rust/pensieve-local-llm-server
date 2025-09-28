@@ -47,18 +47,40 @@ The analysis serves the strategic objective of becoming one of the top 5 Rust pr
 3. WHEN examining historical context THEN the system SHALL document hardware constraints, team constraints, deadline pressures, and ecosystem maturity factors that influenced design decisions
 4. WHEN generating evolution insights THEN the system SHALL produce recommendations for Rust language evolution and ecosystem development with clear justification from historical analysis
 
-### Requirement 4: Systematic Chunked Processing with Multi-Perspective Analysis
+### Requirement 4: Multi-Scale Context Window Database Enhancement
+
+**User Story:** As a knowledge extraction specialist, I want to enhance the ingested database with hierarchical context windows and multi-scale content aggregation, so that I can perform systematic triple-comparison analysis at individual, module, and system levels.
+
+#### Acceptance Criteria
+
+1. WHEN enhancing the database schema THEN the system SHALL add parent_filepath column using simple rule: go back by 1 backslash/slash, if no slash then parent_filepath equals filepath
+2. WHEN populating hierarchical content THEN the system SHALL add l1_window_content column containing concatenated content of all files within the same parent_filepath, ordered alphabetically by filepath
+3. WHEN creating system-level context THEN the system SHALL add l2_window_content column containing concatenated content of all files within the same grandfather_filepath (parent of parent_filepath), ordered by parent_filepath then filepath
+4. WHEN storing analytical data THEN the system SHALL accept redundancy in favor of analytics-ready single-query access, enabling immediate multi-scale context without JOINs
+
+### Requirement 5: Triple-Comparison Analysis Framework
+
+**User Story:** As a systematic analyst, I want to perform three-way comparative analysis between individual files, module context, and system context, so that I can identify patterns that emerge only through multi-scale examination.
+
+#### Acceptance Criteria
+
+1. WHEN analyzing individual files THEN the system SHALL compare content_text against l1_window_content to identify how individual patterns compose within modules
+2. WHEN examining system relationships THEN the system SHALL compare content_text against l2_window_content to understand how individual files relate to overall architecture
+3. WHEN identifying scaling patterns THEN the system SHALL compare l1_window_content against l2_window_content to reveal how module patterns scale to system-wide architectural principles
+4. WHEN processing any single file THEN the system SHALL have immediate access to all three context levels (individual, module, system) within a single database row for efficient analysis
+
+### Requirement 6: Systematic Chunked Processing with Multi-Perspective Analysis
 
 **User Story:** As a knowledge extraction specialist, I want to process xsv codebase using systematic chunked analysis with multi-persona expert council, so that I can ensure comprehensive coverage and challenge assumptions through diverse perspectives.
 
 #### Acceptance Criteria
 
-1. WHEN processing code chunks THEN the system SHALL segment the codebase into 300-500 line chunks with 10-20 line overlap to maintain context continuity and track progress systematically
+1. WHEN processing code chunks THEN the system SHALL segment the enhanced database content into 300-500 line chunks with 10-20 line overlap to maintain context continuity and track progress systematically
 2. WHEN applying multi-persona analysis THEN the system SHALL activate Domain Expert, Strategic Analyst, Implementation Specialist, User Experience Advocate, and mandatory Skeptical Engineer personas for each chunk
 3. WHEN conducting expert council process THEN the system SHALL require Skeptical Engineer challenges to primary assertions, expert responses to challenges, and synthesis of refined insights into cohesive conclusions
-4. WHEN generating verification questions THEN the system SHALL produce 5-10 fact-checkable questions per major insight and validate claims against available evidence
+4. WHEN generating verification questions THEN the system SHALL produce 5-10 fact-checkable questions per major insight and validate claims against available evidence from the multi-scale context
 
-### Requirement 5: Knowledge Arbitrage Output Generation
+### Requirement 7: Knowledge Arbitrage Output Generation
 
 **User Story:** As a Rust mastery strategist, I want to generate structured knowledge arbitrage outputs from xsv analysis, so that I can build specialized repositories and contribute to The Horcrux Codex LLM training dataset.
 
@@ -69,7 +91,7 @@ The analysis serves the strategic objective of becoming one of the top 5 Rust pr
 3. WHEN building the unsafe compendium THEN the system SHALL document all unsafe usage patterns, safety invariants, and alternative safe approaches with risk-benefit analysis
 4. WHEN contributing to Horcrux Codex THEN the system SHALL format insights as structured training data with context, rationale, and verification metadata for LLM fine-tuning
 
-### Requirement 6: Mermaid Visualization and Export Capabilities
+### Requirement 8: Mermaid Visualization and Export Capabilities
 
 **User Story:** As a knowledge synthesizer, I want to generate comprehensive mermaid diagrams and export capabilities for xsv analysis, so that I can visualize architectural insights and share knowledge effectively.
 
