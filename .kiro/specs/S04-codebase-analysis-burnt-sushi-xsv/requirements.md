@@ -2,72 +2,74 @@
 
 ## Introduction
 
-This feature enables comprehensive analysis of the burnt-sushi/xsv codebase, a high-performance CSV command-line toolkit written in Rust. The analysis will focus on understanding the architecture, performance patterns, error handling strategies, and CLI design patterns that make xsv one of the most efficient CSV processing tools available. This analysis will serve as a reference implementation study for building high-performance command-line tools in Rust.
+This feature implements the L1-L8 Knowledge Arbitrage extraction methodology to systematically analyze the burnt-sushi/xsv codebase. xsv is a high-performance CSV command-line toolkit that represents decades of systems programming wisdom applied to data processing. Our analysis will extract tactical implementations (L1-L3), strategic architecture (L4-L6), and foundational evolution insights (L7-L8) to identify paradigm-market fit opportunities for the Rust ecosystem.
+
+The analysis serves the strategic objective of becoming one of the top 5 Rust programmers in history by synthesizing engineering wisdom from mature, high-performance codebases and identifying where that wisdom has not yet permeated Rust.
 
 ## Requirements
 
-### Requirement 1
+### Requirement 1: L1-L3 Tactical Implementation Extraction
 
-**User Story:** As a developer studying Rust CLI tools, I want to analyze the xsv codebase architecture, so that I can understand how to build high-performance command-line applications.
-
-#### Acceptance Criteria
-
-1. WHEN I run the codebase analysis on xsv THEN the system SHALL extract and categorize all Rust modules, functions, and their relationships
-2. WHEN analyzing the CLI structure THEN the system SHALL identify all subcommands, their arguments, and validation patterns
-3. WHEN processing the codebase THEN the system SHALL complete analysis of the entire xsv repository (approximately 15,000 lines) in less than 10 seconds
-4. IF the analysis encounters parsing errors THEN the system SHALL log specific file locations and continue processing remaining files
-
-### Requirement 2
-
-**User Story:** As a performance engineer, I want to identify performance optimization patterns in xsv, so that I can apply similar techniques in my own projects.
+**User Story:** As a systems programming strategist, I want to extract L1 idiomatic patterns, L2 design patterns, and L3 micro-library opportunities from xsv, so that I can identify high-leverage optimization techniques and reusable components.
 
 #### Acceptance Criteria
 
-1. WHEN analyzing performance-critical code THEN the system SHALL identify memory allocation patterns, zero-copy operations, and streaming implementations
-2. WHEN examining CSV processing logic THEN the system SHALL extract buffer management strategies and I/O optimization techniques
-3. WHEN processing benchmark code THEN the system SHALL identify performance test patterns and measurement methodologies
-4. WHEN analyzing concurrent operations THEN the system SHALL document thread safety patterns and parallel processing strategies
+1. WHEN analyzing L1 patterns THEN the system SHALL identify mechanical sympathy optimizations including memory allocation patterns, cache alignment strategies, SIMD usage, and zero-copy operations with specific code examples
+2. WHEN extracting L2 meta-patterns THEN the system SHALL document abstraction boundaries, API ergonomics patterns, RAII variants, advanced trait usage, and composition strategies with measurable performance impacts
+3. WHEN identifying L3 micro-libraries THEN the system SHALL extract high-utility components under 2000 LOC that could become standalone crates with clear PMF justification
+4. WHEN processing the entire xsv codebase THEN the system SHALL complete L1-L3 extraction in less than 30 seconds and generate structured output with code references and performance metrics
 
-### Requirement 3
+### Requirement 2: L4-L6 Strategic Architecture Analysis
 
-**User Story:** As a CLI tool designer, I want to understand xsv's command structure and error handling, so that I can design intuitive and robust command-line interfaces.
-
-#### Acceptance Criteria
-
-1. WHEN analyzing CLI commands THEN the system SHALL extract all subcommand definitions, their parameters, and help text patterns
-2. WHEN examining error handling THEN the system SHALL identify error types, propagation patterns, and user-facing error messages
-3. WHEN processing configuration logic THEN the system SHALL document how xsv handles different input formats and output options
-4. WHEN analyzing validation code THEN the system SHALL extract input validation patterns and constraint checking mechanisms
-
-### Requirement 4
-
-**User Story:** As a Rust developer, I want to study xsv's use of external crates and dependency management, so that I can make informed decisions about crate selection for CSV processing.
+**User Story:** As an ecosystem architect, I want to analyze L4 macro-library opportunities, L5 low-level design decisions, and L6 domain-specific architecture patterns in xsv, so that I can identify platform-level opportunities and hardware interaction strategies.
 
 #### Acceptance Criteria
 
-1. WHEN analyzing dependencies THEN the system SHALL extract all external crates used, their versions, and usage patterns
-2. WHEN examining CSV parsing logic THEN the system SHALL identify how xsv leverages the csv crate and any custom extensions
-3. WHEN processing serialization code THEN the system SHALL document serde usage patterns and custom serialization implementations
-4. WHEN analyzing testing infrastructure THEN the system SHALL extract testing patterns, mock strategies, and integration test approaches
+1. WHEN analyzing L4 macro-opportunities THEN the system SHALL identify ecosystem-level gaps where xsv's patterns could enable new platform capabilities or ecosystem dominance opportunities
+2. WHEN extracting L5 LLD decisions THEN the system SHALL document concurrency models, state management invariants, internal modularity patterns, and correctness guarantees with architectural rationale
+3. WHEN examining L6 domain architecture THEN the system SHALL analyze CSV processing pipelines, streaming architectures, memory management strategies, and I/O optimization patterns specific to data processing domains
+4. WHEN generating strategic insights THEN the system SHALL produce actionable recommendations for Rust ecosystem improvements with clear implementation paths
 
-### Requirement 5
+### Requirement 3: L7-L8 Foundational Evolution and Intent Archaeology
 
-**User Story:** As a software architect, I want to generate architectural insights from xsv's codebase, so that I can understand scalable design patterns for data processing tools.
-
-#### Acceptance Criteria
-
-1. WHEN generating architectural analysis THEN the system SHALL produce module dependency graphs showing component relationships
-2. WHEN analyzing data flow THEN the system SHALL trace how CSV data moves through the processing pipeline
-3. WHEN examining abstraction layers THEN the system SHALL identify trait usage, generic programming patterns, and code reuse strategies
-4. WHEN processing the complete analysis THEN the system SHALL generate a comprehensive report with code metrics, complexity analysis, and architectural recommendations
-
-### Requirement 6
-
-**User Story:** As a code reviewer, I want to export analysis results in multiple formats, so that I can share insights with different stakeholders.
+**User Story:** As a language evolution strategist, I want to perform L7 language capability analysis and L8 meta-context archaeology on xsv, so that I can identify Rust language limitations and understand the historical constraints that shaped design decisions.
 
 #### Acceptance Criteria
 
-1. WHEN exporting analysis results THEN the system SHALL support JSON format for programmatic access
-2. WHEN generating reports THEN the system SHALL produce markdown format for documentation and review
-3. WHEN creating visualizations THEN the system SHALL generate mermaid diagrams for architectural overviews
-4. WHEN saving results THEN the system SHALL include metadata about analysis timestamp, xsv version analyzed, and analysis tool version
+1. WHEN analyzing L7 language capabilities THEN the system SHALL identify borrow checker limitations, missing type system features, and areas where xsv works around Rust constraints with specific examples and proposed language improvements
+2. WHEN performing L8 intent archaeology THEN the system SHALL analyze commit history, issue discussions, and PR comments to extract the "why" behind architectural decisions, rejected alternatives, and constraint-driven trade-offs
+3. WHEN examining historical context THEN the system SHALL document hardware constraints, team constraints, deadline pressures, and ecosystem maturity factors that influenced design decisions
+4. WHEN generating evolution insights THEN the system SHALL produce recommendations for Rust language evolution and ecosystem development with clear justification from historical analysis
+
+### Requirement 4: Systematic Chunked Processing with Multi-Perspective Analysis
+
+**User Story:** As a knowledge extraction specialist, I want to process xsv codebase using systematic chunked analysis with multi-persona expert council, so that I can ensure comprehensive coverage and challenge assumptions through diverse perspectives.
+
+#### Acceptance Criteria
+
+1. WHEN processing code chunks THEN the system SHALL segment the codebase into 300-500 line chunks with 10-20 line overlap to maintain context continuity and track progress systematically
+2. WHEN applying multi-persona analysis THEN the system SHALL activate Domain Expert, Strategic Analyst, Implementation Specialist, User Experience Advocate, and mandatory Skeptical Engineer personas for each chunk
+3. WHEN conducting expert council process THEN the system SHALL require Skeptical Engineer challenges to primary assertions, expert responses to challenges, and synthesis of refined insights into cohesive conclusions
+4. WHEN generating verification questions THEN the system SHALL produce 5-10 fact-checkable questions per major insight and validate claims against available evidence
+
+### Requirement 5: Knowledge Arbitrage Output Generation
+
+**User Story:** As a Rust mastery strategist, I want to generate structured knowledge arbitrage outputs from xsv analysis, so that I can build specialized repositories and contribute to The Horcrux Codex LLM training dataset.
+
+#### Acceptance Criteria
+
+1. WHEN generating optimization arbitrage THEN the system SHALL produce categorized micro-optimizations, performance patterns, and mechanical sympathy techniques with benchmarking data and applicability analysis
+2. WHEN creating cross-paradigm translations THEN the system SHALL identify patterns from other ecosystems (C, C++, Haskell, Erlang) that xsv implements or could benefit from with specific translation strategies
+3. WHEN building the unsafe compendium THEN the system SHALL document all unsafe usage patterns, safety invariants, and alternative safe approaches with risk-benefit analysis
+4. WHEN contributing to Horcrux Codex THEN the system SHALL format insights as structured training data with context, rationale, and verification metadata for LLM fine-tuning
+
+### Requirement 6: Mermaid Visualization and Export Capabilities
+
+**User Story:** As a knowledge synthesizer, I want to generate comprehensive mermaid diagrams and export capabilities for xsv analysis, so that I can visualize architectural insights and share knowledge effectively.
+
+#### Acceptance Criteria
+
+1. WHEN generating architectural diagrams THEN the system SHALL produce mermaid flowcharts showing module dependencies, data flow pipelines, and component relationships with clear hierarchical organization
+2. WHEN creating performance visualizations THEN the system SHALL generate mermaid graphs showing optimization opportunities, bottleneck analysis, and performance improvement paths
+3. WHEN exporting analysis results THEN the system SHALL support JSON format for programmatic access, markdown for documentation, and structured formats for The Horcrux Codex dataset
+4. WHEN saving results THEN the system SHALL include complete metadata about analysis methodology, xsv version, commit hash, analysis timestamp, and L1-L8 extraction completeness metrics
