@@ -3,8 +3,8 @@
 ## Scope
 Ingestion, task creation and task driven code-base analysis as per SOP below for
 - the repo - https://github.com/BurntSushi/xsv
-- Ingest PG Database to be stored at - 
-- Result PG database to be stored at -  
+- Ingest PG Database to be stored at - /Users/neetipatni/desktop/PensieveDB01
+- Result PG database to be stored at -  /Users/neetipatni/desktop/PensieveDB01
 
 ## Introduction
 
@@ -23,7 +23,7 @@ The analysis serves the strategic objective of becoming one of the top 5 Rust pr
 1. WHEN analyzing L1 patterns THEN the system SHALL identify mechanical sympathy optimizations including memory allocation patterns, cache alignment strategies, SIMD usage, and zero-copy operations with specific code examples
 2. WHEN extracting L2 meta-patterns THEN the system SHALL document abstraction boundaries, API ergonomics patterns, RAII variants, advanced trait usage, and composition strategies with measurable performance impacts
 3. WHEN identifying L3 micro-libraries THEN the system SHALL extract high-utility components under 2000 LOC that could become standalone crates with clear PMF justification
-4. WHEN processing the entire xsv codebase THEN the system SHALL complete L1-L3 extraction in less than 30 seconds and generate structured output with code references and performance metrics
+4. WHEN processing the entire xsv codebase (26 core Rust files, 59 total files) THEN the system SHALL complete L1-L3 extraction in less than 30 seconds and generate structured output with code references and performance metrics from the ingested database table INGEST_20250928062949
 
 ### Requirement 2: L4-L6 Strategic Architecture Analysis
 
@@ -78,4 +78,4 @@ The analysis serves the strategic objective of becoming one of the top 5 Rust pr
 1. WHEN generating architectural diagrams THEN the system SHALL produce mermaid flowcharts showing module dependencies, data flow pipelines, and component relationships with clear hierarchical organization
 2. WHEN creating performance visualizations THEN the system SHALL generate mermaid graphs showing optimization opportunities, bottleneck analysis, and performance improvement paths
 3. WHEN exporting analysis results THEN the system SHALL support JSON format for programmatic access, markdown for documentation, and structured formats for The Horcrux Codex dataset
-4. WHEN saving results THEN the system SHALL include complete metadata about analysis methodology, xsv version, commit hash, analysis timestamp, and L1-L8 extraction completeness metrics
+4. WHEN saving results THEN the system SHALL include complete metadata about analysis methodology, xsv version, commit hash, analysis timestamp, L1-L8 extraction completeness metrics, and reference the source database at /Users/neetipatni/desktop/PensieveDB01 with table INGEST_20250928062949
