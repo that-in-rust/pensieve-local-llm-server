@@ -6,6 +6,7 @@
 pub mod database_query_engine;
 pub mod content_extractor;
 pub mod hierarchical_task_divider;
+pub mod l1l8_markdown_generator;
 
 pub use database_query_engine::{DatabaseQueryEngine, TableValidation, DatabaseConnectionStats};
 pub use content_extractor::{ContentExtractor, ContentTriple, RowMetadata};
@@ -13,6 +14,7 @@ pub use hierarchical_task_divider::{
     HierarchicalTaskDivider, TaskHierarchy, TaskLevel, HierarchicalTaskGroup, 
     AnalysisTask, AnalysisStage
 };
+pub use l1l8_markdown_generator::L1L8MarkdownGenerator;
 
 use crate::error::{TaskError, TaskResult};
 use serde::{Deserialize, Serialize};

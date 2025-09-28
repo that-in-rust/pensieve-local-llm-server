@@ -45,11 +45,21 @@ code-ingest generate-hierarchical-tasks INGEST_20250928101039 --levels 4 --group
 
 ## Moving one step ahead
 
-Current generate-hierarchical-tasks has following format
+### Current generate-hierarchical-tasks has following format
 
 code-ingest generate-hierarchical-tasks <TableName> --levels <UserOptionLevels> --groups <UserOptionGroupCount> --output TableName_tasks.md --prompt-file <UserOptionPromptFilePathFileName>
+
+### Advanced command
+
+code-ingest generate-hierarchical-tasks <TableName> --chunks <UserOptionChunkSizeInLOC> --levels <UserOptionLevels> --groups <UserOptionGroupCount> --output TableName_tasks.md --prompt-file <UserOptionPromptFilePathFileName>
+
+When User sends the above command, following things happen
+- 
+
 
 
 
 # Ultra Pro Max Scope - Ultra Pro Max Task Generator
+
+
 

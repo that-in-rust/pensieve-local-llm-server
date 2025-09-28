@@ -48,7 +48,7 @@ impl HierarchicalTaskDivider {
         }
 
         let total_tasks = content_triples.len();
-        let levels = self.distribute_across_levels(content_triples, 1)?;
+        let levels = self.distribute_across_levels_with_ids(content_triples, 1, String::new())?;
 
         Ok(TaskHierarchy {
             levels,
@@ -56,47 +56,72 @@ impl HierarchicalTaskDivider {
         })
     }
 
-    /// Distribute content triples across hierarchy levels recursively
-    fn distribute_across_levels(
+    /// Distribute content triples across hierarchy levels with proper ID generation
+    /// 
+    /// This method implements mathematical distribution with remainder handling and
+    /// generates hierarchical IDs in the format 1.2.3.4:
+    /// - Level 1: 1, 2, 3, ...
+    /// - Level 2: 1.1, 1.2, 1.3, ..., 2.1, 2.2, ...
+    /// - Level 3: 1.1.1, 1.1.2, ..., 1.2.1, 1.2.2, ...
+    /// - Level 4: 1.1.1.1, 1.1.1.2, ..., (leaf tasks)
+    fn distribute_across_levels_with_ids(
         &self,
         items: Vec<ContentTriple>,
         current_level: usize,
+        parent_id: String,
     ) -> TaskResult<Vec<TaskLevel>> {
         if items.is_empty() {
             return Ok(vec![]);
         }
 
         // If we've reached the maximum level, create leaf tasks
-        if current_level >= self.levels {
-            let groups = self.create_leaf_groups(items, current_level)?;
+        if current_level > self.levels {
+            let groups = self.create_leaf_groups_with_ids(items, current_level, &parent_id)?;
             return Ok(vec![TaskLevel {
                 level: current_level,
                 groups,
             }]);
         }
 
-        // Calculate items per group at this level
-        let items_per_group = (items.len() + self.groups_per_level - 1) / self.groups_per_level;
+        // Mathematical distribution with remainder handling
+        let total_items = items.len();
+        let base_items_per_group = total_items / self.groups_per_level;
+        let remainder = total_items % self.groups_per_level;
+        
         let mut groups = Vec::new();
         let mut item_index = 0;
 
         for group_id in 1..=self.groups_per_level {
-            let end_index = std::cmp::min(item_index + items_per_group, items.len());
-            
-            if item_index >= items.len() {
+            // First 'remainder' groups get one extra item
+            let items_in_this_group = if group_id <= remainder {
+                base_items_per_group + 1
+            } else {
+                base_items_per_group
+            };
+
+            // Break if no more items to distribute
+            if items_in_this_group == 0 || item_index >= total_items {
                 break;
             }
 
+            let end_index = std::cmp::min(item_index + items_in_this_group, total_items);
             let group_items: Vec<ContentTriple> = items[item_index..end_index].to_vec();
-            
-            if group_items.is_empty() {
-                break;
-            }
+
+            // Generate hierarchical ID
+            let hierarchical_id = if parent_id.is_empty() {
+                group_id.to_string()
+            } else {
+                format!("{}.{}", parent_id, group_id)
+            };
 
             // Create hierarchical task group
-            let group = if current_level < self.levels - 1 {
-                // Intermediate level - create sub-groups
-                let sub_levels = self.distribute_across_levels(group_items, current_level + 1)?;
+            let group = if current_level < self.levels {
+                // Intermediate level - create sub-groups recursively
+                let sub_levels = self.distribute_across_levels_with_ids(
+                    group_items, 
+                    current_level + 1, 
+                    hierarchical_id.clone()
+                )?;
                 let sub_groups = if let Some(next_level) = sub_levels.first() {
                     next_level.groups.clone()
                 } else {
@@ -104,35 +129,17 @@ impl HierarchicalTaskDivider {
                 };
 
                 HierarchicalTaskGroup {
-                    id: group_id.to_string(),
-                    title: format!("Task Group {} (Level {})", group_id, current_level),
+                    id: hierarchical_id.clone(),
+                    title: format!("Task Group {} (Level {})", hierarchical_id, current_level),
                     tasks: vec![], // Intermediate groups don't have direct tasks
                     sub_groups,
                 }
             } else {
                 // Leaf level - create actual analysis tasks
-                let tasks = group_items
-                    .into_iter()
-                    .enumerate()
-                    .map(|(idx, content_triple)| AnalysisTask {
-                        id: format!("{}.{}", group_id, idx + 1),
-                        table_name: "UNKNOWN".to_string(), // Will be set by caller
-                        row_number: content_triple.row_number,
-                        content_files: content_triple,
-                        prompt_file: std::path::PathBuf::from(".kiro/steering/spec-S04-steering-doc-analysis.md"),
-                        output_file: std::path::PathBuf::from(format!("gringotts/WorkArea/task_{}.md", group_id)),
-                        analysis_stages: vec![
-                            AnalysisStage::AnalyzeA,
-                            AnalysisStage::AnalyzeAInContextB,
-                            AnalysisStage::AnalyzeBInContextC,
-                            AnalysisStage::AnalyzeAInContextBC,
-                        ],
-                    })
-                    .collect();
-
+                let tasks = self.create_analysis_tasks_with_ids(group_items, &hierarchical_id)?;
                 HierarchicalTaskGroup {
-                    id: group_id.to_string(),
-                    title: format!("Analysis Group {} (Level {})", group_id, current_level),
+                    id: hierarchical_id.clone(),
+                    title: format!("Analysis Group {} (Level {})", hierarchical_id, current_level),
                     tasks,
                     sub_groups: vec![],
                 }
@@ -148,51 +155,62 @@ impl HierarchicalTaskDivider {
         }])
     }
 
-    /// Create leaf groups for the final level
-    fn create_leaf_groups(
+    /// Legacy method for backward compatibility
+    fn distribute_across_levels(
         &self,
         items: Vec<ContentTriple>,
-        level: usize,
+        current_level: usize,
+    ) -> TaskResult<Vec<TaskLevel>> {
+        self.distribute_across_levels_with_ids(items, current_level, String::new())
+    }
+
+    /// Create leaf groups for the final level using mathematical distribution with hierarchical IDs
+    fn create_leaf_groups_with_ids(
+        &self,
+        items: Vec<ContentTriple>,
+        _level: usize,
+        parent_id: &str,
     ) -> TaskResult<Vec<HierarchicalTaskGroup>> {
-        let items_per_group = (items.len() + self.groups_per_level - 1) / self.groups_per_level;
+        if items.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // Mathematical distribution with remainder handling
+        let total_items = items.len();
+        let base_items_per_group = total_items / self.groups_per_level;
+        let remainder = total_items % self.groups_per_level;
+        
         let mut groups = Vec::new();
         let mut item_index = 0;
 
         for group_id in 1..=self.groups_per_level {
-            let end_index = std::cmp::min(item_index + items_per_group, items.len());
-            
-            if item_index >= items.len() {
+            // First 'remainder' groups get one extra item
+            let items_in_this_group = if group_id <= remainder {
+                base_items_per_group + 1
+            } else {
+                base_items_per_group
+            };
+
+            // Break if no more items to distribute
+            if items_in_this_group == 0 || item_index >= total_items {
                 break;
             }
 
+            let end_index = std::cmp::min(item_index + items_in_this_group, total_items);
             let group_items: Vec<ContentTriple> = items[item_index..end_index].to_vec();
-            
-            if group_items.is_empty() {
-                break;
-            }
 
-            let tasks = group_items
-                .into_iter()
-                .enumerate()
-                .map(|(idx, content_triple)| AnalysisTask {
-                    id: format!("{}.{}", group_id, idx + 1),
-                    table_name: "UNKNOWN".to_string(),
-                    row_number: content_triple.row_number,
-                    content_files: content_triple,
-                    prompt_file: std::path::PathBuf::from(".kiro/steering/spec-S04-steering-doc-analysis.md"),
-                    output_file: std::path::PathBuf::from(format!("gringotts/WorkArea/task_{}_{}.md", group_id, idx + 1)),
-                    analysis_stages: vec![
-                        AnalysisStage::AnalyzeA,
-                        AnalysisStage::AnalyzeAInContextB,
-                        AnalysisStage::AnalyzeBInContextC,
-                        AnalysisStage::AnalyzeAInContextBC,
-                    ],
-                })
-                .collect();
+            // Generate hierarchical ID
+            let hierarchical_id = if parent_id.is_empty() {
+                group_id.to_string()
+            } else {
+                format!("{}.{}", parent_id, group_id)
+            };
+
+            let tasks = self.create_analysis_tasks_with_ids(group_items, &hierarchical_id)?;
 
             let group = HierarchicalTaskGroup {
-                id: group_id.to_string(),
-                title: format!("Analysis Group {}", group_id),
+                id: hierarchical_id.clone(),
+                title: format!("Analysis Group {}", hierarchical_id),
                 tasks,
                 sub_groups: vec![],
             };
@@ -202,6 +220,55 @@ impl HierarchicalTaskDivider {
         }
 
         Ok(groups)
+    }
+
+    /// Legacy method for backward compatibility
+    fn create_leaf_groups(
+        &self,
+        items: Vec<ContentTriple>,
+        level: usize,
+    ) -> TaskResult<Vec<HierarchicalTaskGroup>> {
+        self.create_leaf_groups_with_ids(items, level, "")
+    }
+
+    /// Create analysis tasks from content triples with hierarchical ID generation
+    fn create_analysis_tasks_with_ids(
+        &self,
+        items: Vec<ContentTriple>,
+        group_id: &str,
+    ) -> TaskResult<Vec<AnalysisTask>> {
+        let tasks = items
+            .into_iter()
+            .enumerate()
+            .map(|(idx, content_triple)| {
+                let task_id = format!("{}.{}", group_id, idx + 1);
+                AnalysisTask {
+                    id: task_id.clone(),
+                    table_name: "UNKNOWN".to_string(), // Will be set by caller
+                    row_number: content_triple.row_number,
+                    content_files: content_triple,
+                    prompt_file: std::path::PathBuf::from(".kiro/steering/spec-S04-steering-doc-analysis.md"),
+                    output_file: std::path::PathBuf::from(format!("gringotts/WorkArea/task_{}.md", task_id.replace('.', "_"))),
+                    analysis_stages: vec![
+                        AnalysisStage::AnalyzeA,
+                        AnalysisStage::AnalyzeAInContextB,
+                        AnalysisStage::AnalyzeBInContextC,
+                        AnalysisStage::AnalyzeAInContextBC,
+                    ],
+                }
+            })
+            .collect();
+
+        Ok(tasks)
+    }
+
+    /// Legacy method for backward compatibility
+    fn create_analysis_tasks_from_items(
+        &self,
+        items: Vec<ContentTriple>,
+        group_id: &str,
+    ) -> TaskResult<Vec<AnalysisTask>> {
+        self.create_analysis_tasks_with_ids(items, group_id)
     }
 }
 
@@ -406,5 +473,464 @@ mod tests {
         let serialized = serde_json::to_string(&stages).unwrap();
         let deserialized: Vec<AnalysisStage> = serde_json::from_str(&serialized).unwrap();
         assert_eq!(stages.len(), deserialized.len());
+    }
+
+    #[test]
+    fn test_mathematical_distribution_35_rows() {
+        // Test case: 35 rows with 7 groups per level, 4 levels
+        let divider = HierarchicalTaskDivider::new(4, 7).unwrap();
+        let content_triples = create_test_content_triples(35);
+        
+        let hierarchy = divider.create_hierarchy(content_triples).unwrap();
+        assert_eq!(hierarchy.total_tasks, 35);
+        
+        // Verify first level has proper distribution
+        assert!(!hierarchy.levels.is_empty());
+        let first_level = &hierarchy.levels[0];
+        assert_eq!(first_level.level, 1);
+        
+        // 35 ÷ 7 = 5 remainder 0, so each group should have 5 items
+        let total_items_in_groups: usize = first_level.groups.iter()
+            .map(|g| count_items_in_group(g))
+            .sum();
+        assert_eq!(total_items_in_groups, 35);
+    }
+
+    #[test]
+    fn test_mathematical_distribution_100_rows() {
+        // Test case: 100 rows with 7 groups per level, 4 levels
+        let divider = HierarchicalTaskDivider::new(4, 7).unwrap();
+        let content_triples = create_test_content_triples(100);
+        
+        let hierarchy = divider.create_hierarchy(content_triples).unwrap();
+        assert_eq!(hierarchy.total_tasks, 100);
+        
+        // Verify distribution
+        assert!(!hierarchy.levels.is_empty());
+        let first_level = &hierarchy.levels[0];
+        
+        // 100 ÷ 7 = 14 remainder 2
+        // First 2 groups should have 15 items, remaining 5 groups should have 14 items
+        let group_sizes: Vec<usize> = first_level.groups.iter()
+            .map(|g| count_items_in_group(g))
+            .collect();
+        
+        // Verify total items
+        let total_items: usize = group_sizes.iter().sum();
+        assert_eq!(total_items, 100);
+        
+        // Verify remainder distribution (first groups get extra items)
+        if group_sizes.len() >= 2 {
+            assert!(group_sizes[0] >= group_sizes[2]); // First group >= third group
+            assert!(group_sizes[1] >= group_sizes[2]); // Second group >= third group
+        }
+    }
+
+    #[test]
+    fn test_mathematical_distribution_1000_rows() {
+        // Test case: 1000 rows with 7 groups per level, 4 levels
+        let divider = HierarchicalTaskDivider::new(4, 7).unwrap();
+        let content_triples = create_test_content_triples(1000);
+        
+        let hierarchy = divider.create_hierarchy(content_triples).unwrap();
+        assert_eq!(hierarchy.total_tasks, 1000);
+        
+        // Verify distribution
+        assert!(!hierarchy.levels.is_empty());
+        let first_level = &hierarchy.levels[0];
+        
+        // 1000 ÷ 7 = 142 remainder 6
+        // First 6 groups should have 143 items, last group should have 142 items
+        let group_sizes: Vec<usize> = first_level.groups.iter()
+            .map(|g| count_items_in_group(g))
+            .collect();
+        
+        // Verify total items
+        let total_items: usize = group_sizes.iter().sum();
+        assert_eq!(total_items, 1000);
+        
+        // Verify remainder distribution
+        if group_sizes.len() == 7 {
+            // First 6 groups should have 143 items each
+            for i in 0..6 {
+                assert_eq!(group_sizes[i], 143);
+            }
+            // Last group should have 142 items
+            assert_eq!(group_sizes[6], 142);
+        }
+    }
+
+    #[test]
+    fn test_groups_per_level_constraint() {
+        // Test that we never exceed groups_per_level at any level
+        let divider = HierarchicalTaskDivider::new(3, 5).unwrap(); // 3 levels, 5 groups per level
+        let content_triples = create_test_content_triples(73); // Prime number for interesting distribution
+        
+        let hierarchy = divider.create_hierarchy(content_triples).unwrap();
+        
+        // Check each level respects the constraint
+        for level in &hierarchy.levels {
+            assert!(level.groups.len() <= 5, "Level {} has {} groups, expected <= 5", level.level, level.groups.len());
+            
+            // Check sub-groups recursively
+            for group in &level.groups {
+                check_group_constraint(group, 5);
+            }
+        }
+    }
+
+    #[test]
+    fn test_remainder_distribution_edge_cases() {
+        let divider = HierarchicalTaskDivider::new(2, 7).unwrap();
+        
+        // Test with exactly divisible number
+        let content_triples = create_test_content_triples(14); // 14 ÷ 7 = 2 remainder 0
+        let hierarchy = divider.create_hierarchy(content_triples).unwrap();
+        
+        if let Some(first_level) = hierarchy.levels.first() {
+            let group_sizes: Vec<usize> = first_level.groups.iter()
+                .map(|g| count_items_in_group(g))
+                .collect();
+            
+            // All groups should have equal size (2 items each)
+            for size in &group_sizes {
+                assert_eq!(*size, 2);
+            }
+        }
+        
+        // Test with remainder
+        let content_triples = create_test_content_triples(16); // 16 ÷ 7 = 2 remainder 2
+        let hierarchy = divider.create_hierarchy(content_triples).unwrap();
+        
+        if let Some(first_level) = hierarchy.levels.first() {
+            let group_sizes: Vec<usize> = first_level.groups.iter()
+                .map(|g| count_items_in_group(g))
+                .collect();
+            
+            // First 2 groups should have 3 items, remaining should have 2 items
+            if group_sizes.len() >= 3 {
+                assert_eq!(group_sizes[0], 3); // First group gets extra
+                assert_eq!(group_sizes[1], 3); // Second group gets extra
+                assert_eq!(group_sizes[2], 2); // Third group gets base amount
+            }
+        }
+    }
+
+    // Helper function to count items in a group recursively
+    fn count_items_in_group(group: &HierarchicalTaskGroup) -> usize {
+        if !group.tasks.is_empty() {
+            // Leaf group - count tasks
+            group.tasks.len()
+        } else {
+            // Intermediate group - count items in sub-groups
+            group.sub_groups.iter()
+                .map(|sub_group| count_items_in_group(sub_group))
+                .sum()
+        }
+    }
+
+    // Helper function to check group constraint recursively
+    fn check_group_constraint(group: &HierarchicalTaskGroup, max_groups: usize) {
+        assert!(group.sub_groups.len() <= max_groups, 
+                "Group {} has {} sub-groups, expected <= {}", 
+                group.id, group.sub_groups.len(), max_groups);
+        
+        for sub_group in &group.sub_groups {
+            check_group_constraint(sub_group, max_groups);
+        }
+    }
+
+    #[test]
+    fn test_hierarchical_id_generation() {
+        let divider = HierarchicalTaskDivider::new(3, 2).unwrap(); // 3 levels, 2 groups per level
+        let content_triples = create_test_content_triples(8); // 8 items for interesting distribution
+        
+        let hierarchy = divider.create_hierarchy(content_triples).unwrap();
+        
+        // Collect all IDs from the hierarchy
+        let mut all_ids = std::collections::HashSet::new();
+        collect_all_ids(&hierarchy.levels, &mut all_ids);
+        
+        // Verify ID format and uniqueness
+        for id in &all_ids {
+            // Check ID format (should be numbers separated by dots)
+            let parts: Vec<&str> = id.split('.').collect();
+            assert!(!parts.is_empty(), "ID should not be empty: {}", id);
+            assert!(parts.len() <= 4, "ID should have at most 4 levels: {}", id); // 3 levels + task number
+            
+            // Each part should be a positive number
+            for part in parts {
+                let num: usize = part.parse().expect(&format!("ID part should be a number: {}", part));
+                assert!(num > 0, "ID parts should be positive: {}", id);
+            }
+        }
+        
+        // Verify uniqueness (set size should equal number of unique IDs)
+        let total_ids = count_total_ids(&hierarchy.levels);
+        assert_eq!(all_ids.len(), total_ids, "All IDs should be unique");
+    }
+
+    #[test]
+    fn test_hierarchical_id_format_compliance() {
+        let divider = HierarchicalTaskDivider::new(4, 7).unwrap(); // Standard 4 levels, 7 groups
+        let content_triples = create_test_content_triples(35);
+        
+        let hierarchy = divider.create_hierarchy(content_triples).unwrap();
+        
+        // Check that level 1 groups have IDs like "1", "2", "3", etc.
+        if let Some(level1) = hierarchy.levels.first() {
+            for (idx, group) in level1.groups.iter().enumerate() {
+                let expected_id = (idx + 1).to_string();
+                assert_eq!(group.id, expected_id, "Level 1 group ID should be {}", expected_id);
+            }
+        }
+        
+        // Verify hierarchical structure in IDs
+        verify_hierarchical_id_structure(&hierarchy.levels, "");
+    }
+
+    #[test]
+    fn test_task_id_uniqueness() {
+        let divider = HierarchicalTaskDivider::new(4, 7).unwrap();
+        let content_triples = create_test_content_triples(100);
+        
+        let hierarchy = divider.create_hierarchy(content_triples).unwrap();
+        
+        // Collect all task IDs
+        let mut task_ids = std::collections::HashSet::new();
+        collect_all_task_ids(&hierarchy.levels, &mut task_ids);
+        
+        // Verify uniqueness
+        let total_tasks = count_total_tasks(&hierarchy.levels);
+        assert_eq!(task_ids.len(), total_tasks, "All task IDs should be unique");
+        
+        // Verify task ID format (should be group_id.task_number)
+        for task_id in &task_ids {
+            let parts: Vec<&str> = task_id.split('.').collect();
+            assert!(parts.len() >= 2, "Task ID should have at least 2 parts: {}", task_id);
+            
+            // Last part should be the task number within the group
+            let task_num: usize = parts.last().unwrap().parse()
+                .expect(&format!("Last part of task ID should be a number: {}", task_id));
+            assert!(task_num > 0, "Task number should be positive: {}", task_id);
+        }
+    }
+
+    #[test]
+    fn test_parent_child_relationships() {
+        let divider = HierarchicalTaskDivider::new(3, 3).unwrap(); // 3 levels, 3 groups per level
+        let content_triples = create_test_content_triples(18); // 18 items for good distribution
+        
+        let hierarchy = divider.create_hierarchy(content_triples).unwrap();
+        
+        // Verify parent-child ID relationships
+        verify_parent_child_relationships(&hierarchy.levels);
+    }
+
+    #[test]
+    fn test_hierarchy_integrity() {
+        let divider = HierarchicalTaskDivider::new(4, 5).unwrap();
+        let content_triples = create_test_content_triples(200);
+        
+        let hierarchy = divider.create_hierarchy(content_triples).unwrap();
+        
+        // Verify hierarchy integrity
+        assert_eq!(hierarchy.total_tasks, 200);
+        
+        // Count tasks at leaf level should equal total tasks
+        let leaf_task_count = count_leaf_tasks(&hierarchy.levels);
+        assert_eq!(leaf_task_count, 200, "Leaf task count should match total tasks");
+        
+        // Verify no orphaned groups or tasks
+        verify_no_orphaned_elements(&hierarchy.levels);
+    }
+
+    // Helper functions for testing
+
+    fn collect_all_ids(levels: &[TaskLevel], ids: &mut std::collections::HashSet<String>) {
+        for level in levels {
+            for group in &level.groups {
+                ids.insert(group.id.clone());
+                collect_group_ids(group, ids);
+            }
+        }
+    }
+
+    fn collect_group_ids(group: &HierarchicalTaskGroup, ids: &mut std::collections::HashSet<String>) {
+        for sub_group in &group.sub_groups {
+            ids.insert(sub_group.id.clone());
+            collect_group_ids(sub_group, ids);
+        }
+        
+        for task in &group.tasks {
+            ids.insert(task.id.clone());
+        }
+    }
+
+    fn count_total_ids(levels: &[TaskLevel]) -> usize {
+        let mut count = 0;
+        for level in levels {
+            for group in &level.groups {
+                count += 1; // Count the group itself
+                count += count_group_ids(group);
+            }
+        }
+        count
+    }
+
+    fn count_group_ids(group: &HierarchicalTaskGroup) -> usize {
+        let mut count = 0;
+        for sub_group in &group.sub_groups {
+            count += 1; // Count the sub-group
+            count += count_group_ids(sub_group);
+        }
+        count += group.tasks.len(); // Count tasks
+        count
+    }
+
+    fn collect_all_task_ids(levels: &[TaskLevel], task_ids: &mut std::collections::HashSet<String>) {
+        for level in levels {
+            for group in &level.groups {
+                collect_task_ids_from_group(group, task_ids);
+            }
+        }
+    }
+
+    fn collect_task_ids_from_group(group: &HierarchicalTaskGroup, task_ids: &mut std::collections::HashSet<String>) {
+        for task in &group.tasks {
+            task_ids.insert(task.id.clone());
+        }
+        
+        for sub_group in &group.sub_groups {
+            collect_task_ids_from_group(sub_group, task_ids);
+        }
+    }
+
+    fn count_total_tasks(levels: &[TaskLevel]) -> usize {
+        let mut count = 0;
+        for level in levels {
+            for group in &level.groups {
+                count += count_tasks_in_group(group);
+            }
+        }
+        count
+    }
+
+    fn count_tasks_in_group(group: &HierarchicalTaskGroup) -> usize {
+        let mut count = group.tasks.len();
+        for sub_group in &group.sub_groups {
+            count += count_tasks_in_group(sub_group);
+        }
+        count
+    }
+
+    fn verify_hierarchical_id_structure(levels: &[TaskLevel], parent_prefix: &str) {
+        for level in levels {
+            for (idx, group) in level.groups.iter().enumerate() {
+                let expected_prefix = if parent_prefix.is_empty() {
+                    (idx + 1).to_string()
+                } else {
+                    format!("{}.{}", parent_prefix, idx + 1)
+                };
+                
+                assert!(group.id.starts_with(&expected_prefix), 
+                        "Group ID {} should start with {}", group.id, expected_prefix);
+                
+                // Recursively verify sub-groups
+                verify_sub_group_id_structure(&group.sub_groups, &group.id);
+            }
+        }
+    }
+
+    fn verify_sub_group_id_structure(sub_groups: &[HierarchicalTaskGroup], parent_id: &str) {
+        for (idx, sub_group) in sub_groups.iter().enumerate() {
+            let expected_id = format!("{}.{}", parent_id, idx + 1);
+            assert_eq!(sub_group.id, expected_id, 
+                      "Sub-group ID should be {}", expected_id);
+            
+            // Recursively verify nested sub-groups
+            verify_sub_group_id_structure(&sub_group.sub_groups, &sub_group.id);
+        }
+    }
+
+    fn verify_parent_child_relationships(levels: &[TaskLevel]) {
+        for level in levels {
+            for group in &level.groups {
+                verify_group_parent_child_relationships(group);
+            }
+        }
+    }
+
+    fn verify_group_parent_child_relationships(group: &HierarchicalTaskGroup) {
+        // Verify that all sub-groups have IDs that start with this group's ID
+        for sub_group in &group.sub_groups {
+            assert!(sub_group.id.starts_with(&group.id), 
+                   "Sub-group ID {} should start with parent ID {}", 
+                   sub_group.id, group.id);
+            
+            // Verify the sub-group ID is exactly parent_id + "." + number
+            let expected_prefix = format!("{}.", group.id);
+            assert!(sub_group.id.starts_with(&expected_prefix),
+                   "Sub-group ID {} should have format {}<number>", 
+                   sub_group.id, expected_prefix);
+            
+            // Recursively verify nested relationships
+            verify_group_parent_child_relationships(sub_group);
+        }
+        
+        // Verify that all tasks have IDs that start with this group's ID
+        for task in &group.tasks {
+            assert!(task.id.starts_with(&group.id),
+                   "Task ID {} should start with group ID {}", 
+                   task.id, group.id);
+        }
+    }
+
+    fn count_leaf_tasks(levels: &[TaskLevel]) -> usize {
+        let mut count = 0;
+        for level in levels {
+            for group in &level.groups {
+                count += count_leaf_tasks_in_group(group);
+            }
+        }
+        count
+    }
+
+    fn count_leaf_tasks_in_group(group: &HierarchicalTaskGroup) -> usize {
+        if !group.tasks.is_empty() {
+            // This is a leaf group with actual tasks
+            group.tasks.len()
+        } else {
+            // This is an intermediate group, count tasks in sub-groups
+            let mut count = 0;
+            for sub_group in &group.sub_groups {
+                count += count_leaf_tasks_in_group(sub_group);
+            }
+            count
+        }
+    }
+
+    fn verify_no_orphaned_elements(levels: &[TaskLevel]) {
+        for level in levels {
+            for group in &level.groups {
+                verify_no_orphaned_elements_in_group(group);
+            }
+        }
+    }
+
+    fn verify_no_orphaned_elements_in_group(group: &HierarchicalTaskGroup) {
+        // A group should either have tasks OR sub-groups, but not both
+        if !group.tasks.is_empty() {
+            assert!(group.sub_groups.is_empty(), 
+                   "Leaf group {} should not have sub-groups", group.id);
+        } else if !group.sub_groups.is_empty() {
+            // Intermediate group should have sub-groups
+            for sub_group in &group.sub_groups {
+                verify_no_orphaned_elements_in_group(sub_group);
+            }
+        } else {
+            // Empty group is not allowed
+            panic!("Group {} should have either tasks or sub-groups", group.id);
+        }
     }
 }
