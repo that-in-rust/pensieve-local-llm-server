@@ -1,5 +1,5 @@
 use thiserror::Error;
-use tracing::{error, warn, debug};
+use tracing::{error, warn, debug, info};
 
 /// Main error type for the code ingestion system with actionable error messages
 #[derive(Error, Debug)]

@@ -395,11 +395,11 @@ impl ContentExtractor {
     }
 
     /// Create a streaming version of extract_all_rows for very large tables
-    pub fn extract_rows_stream(
-        &self,
-        table_name: &str,
+    pub fn extract_rows_stream<'a>(
+        &'a self,
+        table_name: &'a str,
         batch_size: usize,
-    ) -> impl Stream<Item = TaskResult<ContentTriple>> + '_ {
+    ) -> impl Stream<Item = TaskResult<ContentTriple>> + 'a {
         stream::unfold(
             (0usize, false), // (offset, finished)
             move |(offset, finished)| async move {
@@ -492,6 +492,8 @@ impl ContentExtractor {
             .await
             .map_err(|e| TaskError::QueryResultProcessingFailed {
                 cause: format!("Failed to fetch rows from table '{}': {}", table_name, e),
+                suggestion: "Check database connection and table accessibility".to_string(),
+                source: Some(Box::new(e)),
             })?;
 
         info!("Retrieved {} rows from table '{}'", rows.len(), table_name);
@@ -535,6 +537,8 @@ impl ContentExtractor {
             TaskError::TaskFileCreationFailed {
                 path: self.output_dir.display().to_string(),
                 cause: format!("Failed to create output directory: {}", e),
+                suggestion: "Check directory permissions and available disk space".to_string(),
+                source: Some(Box::new(e)),
             }
         })?;
 

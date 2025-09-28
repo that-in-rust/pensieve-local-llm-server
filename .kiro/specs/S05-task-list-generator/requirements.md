@@ -47,21 +47,25 @@ code-ingest generate-hierarchical-tasks INGEST_20250928101039 --levels 4 --group
 
 ### Current generate-hierarchical-tasks has following format
 
+
+### Advanced commands
+
+1. Feature Request 1:
+
+current version of generate-hierarchical-tasks command:
 code-ingest generate-hierarchical-tasks <TableName> --levels <UserOptionLevels> --groups <UserOptionGroupCount> --output TableName_tasks.md --prompt-file <UserOptionPromptFilePathFileName>
 
-### Advanced command
-
+new requirement:
 code-ingest generate-hierarchical-tasks <TableName> --chunks <UserOptionChunkSizeInLOC> --levels <UserOptionLevels> --groups <UserOptionGroupCount> --output TableName_tasks.md --prompt-file <UserOptionPromptFilePathFileName>
 
 When User sends the above command, following things happen
 - a new table is created named <TableName_UserOptionChunkSizeInLOC>
-  - this table has 2 big changes from the previous columns
-  - first if 
-
-
-
-
-# Ultra Pro Max Scope - Ultra Pro Max Task Generator
-
-
+  - Check if LOC < <UserOptionChunkSizeInLOC> then row processing same as <TableName>
+  - If LOC >= <UserOptionChunkSizeInLOC> then
+    - the row is broken into chunks of <UserOptionChunkSizeInLOC> lines
+    - variables will be like following
+      - filepath remains same
+      - parent_filepath remains same
+      - filename remains same
+      - new column called <ChunkNumber>
 
