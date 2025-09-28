@@ -23,6 +23,9 @@ fn test_query_config_customization() {
         llm_format: true,
         include_stats: false,
         stream_results: false,
+        timeout_seconds: 30,
+        offset: 0,
+        show_helpful_errors: true,
     };
     
     assert_eq!(config.max_rows, 100);
@@ -146,6 +149,9 @@ fn test_configuration_combinations() {
         include_stats: false,
         max_rows: 0, // No limit for LLM processing
         stream_results: true,
+        timeout_seconds: 30,
+        offset: 0,
+        show_helpful_errors: true,
     };
     
     assert!(llm_config.llm_format);
@@ -158,6 +164,9 @@ fn test_configuration_combinations() {
         include_stats: true,
         max_rows: 100, // Limit for terminal display
         stream_results: false,
+        timeout_seconds: 30,
+        offset: 0,
+        show_helpful_errors: true,
     };
     
     assert!(!terminal_config.llm_format);

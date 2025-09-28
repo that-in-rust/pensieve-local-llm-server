@@ -14,7 +14,7 @@ use tracing::debug;
 /// Database exploration manager
 pub struct DatabaseExplorer {
     pool: PgPool,
-    schema_manager: SchemaManager,
+    pub schema_manager: SchemaManager,
 }
 
 /// Information about database connection and status
@@ -93,6 +93,51 @@ pub struct ConstraintInfo {
     pub definition: Option<String>,
 }
 
+/// Result of table cleanup operation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CleanupResult {
+    pub tables_removed: usize,
+    pub tables_kept: usize,
+    pub space_freed_mb: f64,
+    pub errors: Vec<String>,
+}
+
+/// Management recommendation for database maintenance
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ManagementRecommendation {
+    pub recommendation_type: RecommendationType,
+    pub title: String,
+    pub description: String,
+    pub action: String,
+    pub priority: Priority,
+}
+
+/// Type of management recommendation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RecommendationType {
+    Cleanup,
+    Performance,
+    Security,
+    Storage,
+}
+
+/// Priority level for recommendations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Priority {
+    High,
+    Medium,
+    Low,
+}
+
+/// Result of table optimization operation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OptimizationResult {
+    pub tables_optimized: usize,
+    pub total_tables: usize,
+    pub duration_ms: u64,
+    pub errors: Vec<String>,
+}
+
 impl DatabaseExplorer {
     /// Create a new database explorer
     pub fn new(pool: PgPool) -> Self {
@@ -101,6 +146,170 @@ impl DatabaseExplorer {
             pool,
             schema_manager,
         }
+    }
+
+    /// Clean up old ingestion tables
+    pub async fn cleanup_old_tables(&self, keep_count: usize) -> DatabaseResult<CleanupResult> {
+        debug!("Cleaning up old ingestion tables, keeping {} most recent", keep_count);
+
+        // Get all ingestion tables sorted by creation date
+        let ingestion_tables = self.schema_manager.list_tables(Some(TableType::Ingestion)).await?;
+        
+        if ingestion_tables.len() <= keep_count {
+            return Ok(CleanupResult {
+                tables_removed: 0,
+                tables_kept: ingestion_tables.len(),
+                space_freed_mb: 0.0,
+                errors: vec![],
+            });
+        }
+
+        // Sort tables by creation date (newest first)
+        let mut table_info: Vec<(String, DateTime<Utc>, f64)> = Vec::new();
+        for table_name in &ingestion_tables {
+            if let Ok(info) = self.schema_manager.get_table_info(table_name).await {
+                let (_, size_mb) = self.get_table_stats(table_name).await.unwrap_or((None, Some(0.0)));
+                table_info.push((table_name.clone(), info.created_at, size_mb.unwrap_or(0.0)));
+            }
+        }
+        
+        table_info.sort_by(|a, b| b.1.cmp(&a.1)); // Sort by date, newest first
+
+        // Identify tables to remove (keep the newest ones)
+        let tables_to_remove: Vec<_> = table_info.iter().skip(keep_count).collect();
+        
+        let mut removed_count = 0;
+        let mut space_freed = 0.0;
+        let mut errors = Vec::new();
+
+        for (table_name, _, size_mb) in tables_to_remove {
+            match self.drop_table(table_name).await {
+                Ok(_) => {
+                    removed_count += 1;
+                    space_freed += size_mb;
+                    debug!("Dropped table: {}", table_name);
+                }
+                Err(e) => {
+                    errors.push(format!("Failed to drop table {}: {}", table_name, e));
+                }
+            }
+        }
+
+        Ok(CleanupResult {
+            tables_removed: removed_count,
+            tables_kept: table_info.len() - removed_count,
+            space_freed_mb: space_freed,
+            errors,
+        })
+    }
+
+    /// Drop a specific table
+    pub async fn drop_table(&self, table_name: &str) -> DatabaseResult<()> {
+        debug!("Dropping table: {}", table_name);
+
+        // Verify table exists
+        if !self.schema_manager.table_exists(table_name).await? {
+            return Err(DatabaseError::QueryFailed {
+                query: format!("DROP TABLE {}", table_name),
+                cause: "Table does not exist".to_string(),
+            });
+        }
+
+        let drop_sql = format!("DROP TABLE \"{}\" CASCADE", table_name);
+        sqlx::query(&drop_sql)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DatabaseError::QueryFailed {
+                query: drop_sql,
+                cause: e.to_string(),
+            })?;
+
+        Ok(())
+    }
+
+    /// Get table management recommendations
+    pub async fn get_management_recommendations(&self) -> DatabaseResult<Vec<ManagementRecommendation>> {
+        let mut recommendations = Vec::new();
+
+        // Check for old ingestion tables
+        let ingestion_tables = self.schema_manager.list_tables(Some(TableType::Ingestion)).await?;
+        if ingestion_tables.len() > 10 {
+            recommendations.push(ManagementRecommendation {
+                recommendation_type: RecommendationType::Cleanup,
+                title: "Too many ingestion tables".to_string(),
+                description: format!("You have {} ingestion tables. Consider cleaning up old ones.", ingestion_tables.len()),
+                action: format!("Run: code-ingest cleanup-tables --keep 5"),
+                priority: Priority::Medium,
+            });
+        }
+
+        // Check for large tables
+        for table_name in &ingestion_tables {
+            if let Ok((Some(row_count), Some(size_mb))) = self.get_table_stats(table_name).await {
+                if size_mb > 100.0 {
+                    recommendations.push(ManagementRecommendation {
+                        recommendation_type: RecommendationType::Performance,
+                        title: format!("Large table: {}", table_name),
+                        description: format!("Table {} is {:.1} MB with {} rows", table_name, size_mb, row_count),
+                        action: "Consider archiving or cleaning up this table if no longer needed".to_string(),
+                        priority: Priority::Low,
+                    });
+                }
+            }
+        }
+
+        // Check for empty tables
+        for table_name in &ingestion_tables {
+            if let Ok((Some(row_count), _)) = self.get_table_stats(table_name).await {
+                if row_count == 0 {
+                    recommendations.push(ManagementRecommendation {
+                        recommendation_type: RecommendationType::Cleanup,
+                        title: format!("Empty table: {}", table_name),
+                        description: format!("Table {} has no data", table_name),
+                        action: format!("Consider dropping: code-ingest drop-table --table {}", table_name),
+                        priority: Priority::Low,
+                    });
+                }
+            }
+        }
+
+        Ok(recommendations)
+    }
+
+    /// Vacuum and analyze tables for performance
+    pub async fn optimize_tables(&self, table_names: Option<Vec<String>>) -> DatabaseResult<OptimizationResult> {
+        let tables = if let Some(names) = table_names {
+            names
+        } else {
+            self.schema_manager.list_tables(None).await?
+        };
+
+        let mut optimized_count = 0;
+        let mut errors = Vec::new();
+        let start_time = std::time::Instant::now();
+
+        for table_name in &tables {
+            // VACUUM ANALYZE for each table
+            let vacuum_sql = format!("VACUUM ANALYZE \"{}\"", table_name);
+            match sqlx::query(&vacuum_sql).execute(&self.pool).await {
+                Ok(_) => {
+                    optimized_count += 1;
+                    debug!("Optimized table: {}", table_name);
+                }
+                Err(e) => {
+                    errors.push(format!("Failed to optimize table {}: {}", table_name, e));
+                }
+            }
+        }
+
+        let duration_ms = start_time.elapsed().as_millis() as u64;
+
+        Ok(OptimizationResult {
+            tables_optimized: optimized_count,
+            total_tables: tables.len(),
+            duration_ms,
+            errors,
+        })
     }
 
     /// Get comprehensive database information

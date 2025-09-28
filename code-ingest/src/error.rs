@@ -1,6 +1,131 @@
 use thiserror::Error;
+use tracing::{error, warn, debug};
 
-/// Top-level system error that encompasses all error types
+/// Main error type for the code ingestion system with actionable error messages
+#[derive(Error, Debug)]
+pub enum CodeIngestError {
+    #[error("Git operation failed: {message}\n💡 Suggestion: {suggestion}")]
+    Git { 
+        message: String, 
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("Database operation failed: {message}\n💡 Suggestion: {suggestion}")]
+    Database { 
+        message: String, 
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("File system operation failed: {message}\n💡 Suggestion: {suggestion}")]
+    FileSystem { 
+        message: String, 
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("File processing failed: {file_path} - {message}\n💡 Suggestion: {suggestion}")]
+    FileProcessing { 
+        file_path: String, 
+        message: String, 
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("Content conversion failed: {tool} - {message}\n💡 Suggestion: {suggestion}")]
+    ConversionFailed { 
+        tool: String, 
+        message: String, 
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("Configuration error: {message}\n💡 Suggestion: {suggestion}")]
+    Configuration { 
+        message: String, 
+        suggestion: String,
+    },
+
+    #[error("GitHub authentication failed: {message}\n💡 Suggestion: {suggestion}")]
+    Authentication { 
+        message: String, 
+        suggestion: String,
+    },
+
+    #[error("Repository not accessible: {url}\n💡 Suggestion: {suggestion}")]
+    RepositoryNotFound { 
+        url: String, 
+        suggestion: String,
+    },
+
+    #[error("PostgreSQL connection failed: {message}\n💡 Suggestion: {suggestion}")]
+    DatabaseConnection { 
+        message: String, 
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("Network operation failed: {message}\n💡 Suggestion: {suggestion}")]
+    Network { 
+        message: String, 
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("Validation failed: {field} - {message}\n💡 Suggestion: {suggestion}")]
+    Validation { 
+        field: String, 
+        message: String, 
+        suggestion: String,
+    },
+
+    #[error("Resource limit exceeded: {resource} - {message}\n💡 Suggestion: {suggestion}")]
+    ResourceLimit { 
+        resource: String, 
+        message: String, 
+        suggestion: String,
+    },
+
+    #[error("Task generation failed: {message}\n💡 Suggestion: {suggestion}")]
+    TaskGeneration { 
+        message: String, 
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("Query execution failed: {query} - {message}\n💡 Suggestion: {suggestion}")]
+    QueryExecution { 
+        query: String, 
+        message: String, 
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("Permission denied: {path}\n💡 Suggestion: {suggestion}")]
+    PermissionDenied { 
+        path: String, 
+        suggestion: String,
+    },
+
+    #[error("Timeout occurred: {operation} took longer than {timeout_seconds}s\n💡 Suggestion: {suggestion}")]
+    Timeout { 
+        operation: String, 
+        timeout_seconds: u64, 
+        suggestion: String,
+    },
+}
+
+/// Legacy system error for backward compatibility
 #[derive(Error, Debug)]
 pub enum SystemError {
     #[error("Ingestion error: {0}")]
@@ -17,6 +142,9 @@ pub enum SystemError {
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("Code ingest error: {0}")]
+    CodeIngest(#[from] CodeIngestError),
 }
 
 /// Errors related to repository ingestion and file discovery
@@ -42,6 +170,24 @@ pub enum IngestionError {
 
     #[error("Network error during clone: {cause}")]
     NetworkError { cause: String },
+
+    #[error("File system error: {path} - {cause}")]
+    FileSystemError { path: String, cause: String },
+
+    #[error("Configuration error: {message}")]
+    ConfigurationError { message: String },
+
+    #[error("Database error: {cause}")]
+    DatabaseError { cause: String },
+
+    #[error("Git error: {cause}")]
+    GitError { cause: String },
+
+    #[error("Processing error: {cause}")]
+    ProcessingError { cause: String },
+
+    #[error("Authentication error: {message}")]
+    AuthenticationError { message: String },
 }
 
 /// Errors related to database operations
@@ -120,13 +266,295 @@ pub enum TaskError {
 }
 
 /// Result type aliases for common operations
+pub type CodeIngestResult<T> = Result<T, CodeIngestError>;
 pub type SystemResult<T> = Result<T, SystemError>;
 pub type IngestionResult<T> = Result<T, IngestionError>;
 pub type DatabaseResult<T> = Result<T, DatabaseError>;
 pub type ProcessingResult<T> = Result<T, ProcessingError>;
 pub type TaskResult<T> = Result<T, TaskError>;
 
-/// Convert from external error types to our error types
+/// Error recovery strategies and helper functions
+impl CodeIngestError {
+    /// Create a Git error with actionable suggestions
+    pub fn git_error(message: impl Into<String>, source: Option<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+        let message = message.into();
+        let suggestion = match message.as_str() {
+            msg if msg.contains("authentication") || msg.contains("401") => {
+                "Set your GitHub token: export GITHUB_TOKEN=your_token_here or use --token flag".to_string()
+            },
+            msg if msg.contains("not found") || msg.contains("404") => {
+                "Check the repository URL and ensure it exists and is accessible".to_string()
+            },
+            msg if msg.contains("network") || msg.contains("timeout") => {
+                "Check your internet connection and try again. Use --retry flag for automatic retries".to_string()
+            },
+            msg if msg.contains("permission") || msg.contains("403") => {
+                "Ensure you have access to this repository. For private repos, set GITHUB_TOKEN".to_string()
+            },
+            _ => "Check the repository URL and your network connection".to_string(),
+        };
+        
+        error!("Git operation failed: {}", message);
+        debug!("Git error source: {:?}", source);
+        
+        Self::Git { message, suggestion, source }
+    }
+
+    /// Create a database error with actionable suggestions
+    pub fn database_error(message: impl Into<String>, source: Option<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+        let message = message.into();
+        let suggestion = match message.as_str() {
+            msg if msg.contains("connection") || msg.contains("connect") => {
+                "Start PostgreSQL: 'brew services start postgresql' or 'sudo systemctl start postgresql'".to_string()
+            },
+            msg if msg.contains("database") && msg.contains("does not exist") => {
+                "Create the database: 'createdb your_database_name' or run 'code-ingest pg-start' for setup help".to_string()
+            },
+            msg if msg.contains("permission") || msg.contains("authentication") => {
+                "Check your database credentials and permissions in the connection string".to_string()
+            },
+            msg if msg.contains("syntax") => {
+                "Check your SQL query syntax. Use 'code-ingest sql --help' for examples".to_string()
+            },
+            msg if msg.contains("table") && msg.contains("does not exist") => {
+                "Run ingestion first to create tables, or check table name with 'code-ingest list-tables'".to_string()
+            },
+            _ => "Check your database connection and try 'code-ingest pg-start' for setup help".to_string(),
+        };
+        
+        error!("Database operation failed: {}", message);
+        debug!("Database error source: {:?}", source);
+        
+        Self::Database { message, suggestion, source }
+    }
+
+    /// Create a file system error with actionable suggestions
+    pub fn file_system_error(message: impl Into<String>, source: Option<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+        let message = message.into();
+        let suggestion = match message.as_str() {
+            msg if msg.contains("permission") || msg.contains("denied") => {
+                "Check file permissions: 'ls -la path' and ensure you have read/write access".to_string()
+            },
+            msg if msg.contains("not found") || msg.contains("No such file") => {
+                "Verify the path exists and is spelled correctly".to_string()
+            },
+            msg if msg.contains("space") || msg.contains("disk full") => {
+                "Free up disk space or choose a different location with more available space".to_string()
+            },
+            msg if msg.contains("too many") => {
+                "Close some files or increase system file descriptor limits".to_string()
+            },
+            _ => "Check the file path and your system permissions".to_string(),
+        };
+        
+        error!("File system operation failed: {}", message);
+        debug!("File system error source: {:?}", source);
+        
+        Self::FileSystem { message, suggestion, source }
+    }
+
+    /// Create a file processing error with actionable suggestions
+    pub fn file_processing_error(
+        file_path: impl Into<String>, 
+        message: impl Into<String>, 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>
+    ) -> Self {
+        let file_path = file_path.into();
+        let message = message.into();
+        let suggestion = match message.as_str() {
+            msg if msg.contains("encoding") => {
+                "File may have unusual encoding. Try converting to UTF-8 first".to_string()
+            },
+            msg if msg.contains("too large") => {
+                "File exceeds size limit. Use --max-file-size flag to increase limit or exclude large files".to_string()
+            },
+            msg if msg.contains("binary") => {
+                "Binary files are stored as metadata only. This is expected behavior".to_string()
+            },
+            msg if msg.contains("conversion") => {
+                "Install required tools: 'brew install pandoc poppler-utils' or check tool availability".to_string()
+            },
+            _ => "Check if the file is readable and not corrupted".to_string(),
+        };
+        
+        warn!("File processing failed for {}: {}", file_path, message);
+        debug!("File processing error source: {:?}", source);
+        
+        Self::FileProcessing { file_path, message, suggestion, source }
+    }
+
+    /// Create a conversion error with actionable suggestions
+    pub fn conversion_error(
+        tool: impl Into<String>, 
+        message: impl Into<String>, 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>
+    ) -> Self {
+        let tool = tool.into();
+        let message = message.into();
+        let suggestion = match tool.as_str() {
+            "pdftotext" => "Install poppler-utils: 'brew install poppler' or 'sudo apt-get install poppler-utils'".to_string(),
+            "pandoc" => "Install pandoc: 'brew install pandoc' or visit https://pandoc.org/installing.html".to_string(),
+            "xlsx2csv" => "Install xlsx2csv: 'pip install xlsx2csv' or use alternative Excel processing".to_string(),
+            _ => format!("Install or check the '{}' tool and ensure it's in your PATH", tool),
+        };
+        
+        error!("Conversion failed with {}: {}", tool, message);
+        debug!("Conversion error source: {:?}", source);
+        
+        Self::ConversionFailed { tool, message, suggestion, source }
+    }
+
+    /// Create a configuration error with actionable suggestions
+    pub fn configuration_error(message: impl Into<String>) -> Self {
+        let message = message.into();
+        let suggestion = match message.as_str() {
+            msg if msg.contains("database") => {
+                "Check your database connection string format: postgresql://user:pass@host:port/db".to_string()
+            },
+            msg if msg.contains("path") => {
+                "Ensure all paths are absolute and directories exist".to_string()
+            },
+            msg if msg.contains("token") => {
+                "Set GITHUB_TOKEN environment variable or use --token flag".to_string()
+            },
+            _ => "Check your configuration values and command line arguments".to_string(),
+        };
+        
+        error!("Configuration error: {}", message);
+        
+        Self::Configuration { message, suggestion }
+    }
+
+    /// Check if this error is recoverable with retry
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::Network { .. } => true,
+            Self::Timeout { .. } => true,
+            Self::Database { message, .. } if message.contains("connection") => true,
+            Self::Git { message, .. } if message.contains("network") || message.contains("timeout") => true,
+            _ => false,
+        }
+    }
+
+    /// Get suggested retry delay in seconds
+    pub fn retry_delay_seconds(&self) -> u64 {
+        match self {
+            Self::Network { .. } => 5,
+            Self::Timeout { .. } => 10,
+            Self::Database { .. } => 3,
+            Self::Git { .. } => 5,
+            _ => 1,
+        }
+    }
+
+    /// Log error with appropriate level
+    pub fn log_error(&self) {
+        match self {
+            Self::FileProcessing { .. } => warn!("{}", self),
+            Self::ConversionFailed { .. } => warn!("{}", self),
+            Self::Validation { .. } => warn!("{}", self),
+            _ => error!("{}", self),
+        }
+    }
+}
+
+/// Convert from external error types to CodeIngestError
+impl From<sqlx::Error> for CodeIngestError {
+    fn from(err: sqlx::Error) -> Self {
+        match err {
+            sqlx::Error::Database(ref db_err) => {
+                CodeIngestError::database_error(
+                    format!("Database query failed: {}", db_err),
+                    None,
+                )
+            },
+            sqlx::Error::Configuration(ref config_err) => {
+                CodeIngestError::database_error(
+                    format!("Database configuration error: {}", config_err),
+                    None,
+                )
+            },
+            sqlx::Error::Io(ref io_err) => {
+                CodeIngestError::database_error(
+                    format!("Database connection I/O error: {}", io_err),
+                    None,
+                )
+            },
+            _ => CodeIngestError::database_error(
+                format!("Database operation failed: {}", err),
+                None,
+            ),
+        }
+    }
+}
+
+impl From<git2::Error> for CodeIngestError {
+    fn from(err: git2::Error) -> Self {
+        match err.class() {
+            git2::ErrorClass::Net => {
+                CodeIngestError::Network {
+                    message: format!("Git network error: {}", err.message()),
+                    suggestion: "Check your internet connection and try again".to_string(),
+                    source: None,
+                }
+            },
+            git2::ErrorClass::Http => {
+                CodeIngestError::git_error(
+                    format!("Git HTTP authentication failed: {}", err.message()),
+                    None,
+                )
+            },
+            _ => CodeIngestError::git_error(
+                format!("Git operation failed: {}", err.message()),
+                None,
+            ),
+        }
+    }
+}
+
+impl From<std::io::Error> for CodeIngestError {
+    fn from(err: std::io::Error) -> Self {
+        match err.kind() {
+            std::io::ErrorKind::NotFound => {
+                CodeIngestError::file_system_error(
+                    format!("File or directory not found: {}", err),
+                    None,
+                )
+            },
+            std::io::ErrorKind::PermissionDenied => {
+                CodeIngestError::PermissionDenied {
+                    path: "unknown".to_string(),
+                    suggestion: "Check file permissions and ensure you have read/write access".to_string(),
+                }
+            },
+            std::io::ErrorKind::TimedOut => {
+                CodeIngestError::Timeout {
+                    operation: "I/O operation".to_string(),
+                    timeout_seconds: 30,
+                    suggestion: "Try again or increase timeout limits".to_string(),
+                }
+            },
+            _ => CodeIngestError::file_system_error(
+                format!("I/O error: {}", err),
+                None,
+            ),
+        }
+    }
+}
+
+impl From<walkdir::Error> for CodeIngestError {
+    fn from(err: walkdir::Error) -> Self {
+        let path = err.path().map_or("unknown".to_string(), |p| p.display().to_string());
+        
+        CodeIngestError::file_processing_error(
+            path,
+            format!("Directory traversal error: {}", err),
+            None,
+        )
+    }
+}
+
+/// Legacy conversions for backward compatibility
 impl From<sqlx::Error> for DatabaseError {
     fn from(err: sqlx::Error) -> Self {
         match err {
@@ -190,7 +618,208 @@ impl From<DatabaseError> for IngestionError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::error::Error;
 
+    #[test]
+    fn test_code_ingest_error_git_suggestions() {
+        let auth_error = CodeIngestError::git_error("authentication failed", None);
+        assert!(auth_error.to_string().contains("Set your GitHub token"));
+        
+        let not_found_error = CodeIngestError::git_error("repository not found", None);
+        assert!(not_found_error.to_string().contains("Check the repository URL"));
+        
+        let network_error = CodeIngestError::git_error("network timeout", None);
+        assert!(network_error.to_string().contains("Check your internet connection"));
+    }
+
+    #[test]
+    fn test_code_ingest_error_database_suggestions() {
+        let connection_error = CodeIngestError::database_error("connection refused", None);
+        assert!(connection_error.to_string().contains("Start PostgreSQL"));
+        
+        let db_not_exist_error = CodeIngestError::database_error("database does not exist", None);
+        assert!(db_not_exist_error.to_string().contains("Create the database"));
+        
+        let syntax_error = CodeIngestError::database_error("syntax error", None);
+        assert!(syntax_error.to_string().contains("Check your SQL query syntax"));
+    }
+
+    #[test]
+    fn test_code_ingest_error_file_system_suggestions() {
+        let permission_error = CodeIngestError::file_system_error("permission denied", None);
+        assert!(permission_error.to_string().contains("Check file permissions"));
+        
+        let not_found_error = CodeIngestError::file_system_error("file not found", None);
+        assert!(not_found_error.to_string().contains("Verify the path exists"));
+        
+        let disk_full_error = CodeIngestError::file_system_error("no space left on device", None);
+        assert!(disk_full_error.to_string().contains("Free up disk space"));
+    }
+
+    #[test]
+    fn test_code_ingest_error_file_processing_suggestions() {
+        let encoding_error = CodeIngestError::file_processing_error(
+            "/path/file.txt", 
+            "encoding error", 
+            None
+        );
+        assert!(encoding_error.to_string().contains("unusual encoding"));
+        
+        let size_error = CodeIngestError::file_processing_error(
+            "/path/large.txt", 
+            "file too large", 
+            None
+        );
+        assert!(size_error.to_string().contains("--max-file-size"));
+        
+        let binary_error = CodeIngestError::file_processing_error(
+            "/path/file.bin", 
+            "binary file", 
+            None
+        );
+        assert!(binary_error.to_string().contains("metadata only"));
+    }
+
+    #[test]
+    fn test_code_ingest_error_conversion_suggestions() {
+        let pdf_error = CodeIngestError::conversion_error("pdftotext", "command not found", None);
+        assert!(pdf_error.to_string().contains("Install poppler-utils"));
+        
+        let pandoc_error = CodeIngestError::conversion_error("pandoc", "not found", None);
+        assert!(pandoc_error.to_string().contains("Install pandoc"));
+        
+        let xlsx_error = CodeIngestError::conversion_error("xlsx2csv", "missing", None);
+        assert!(xlsx_error.to_string().contains("pip install xlsx2csv"));
+    }
+
+    #[test]
+    fn test_code_ingest_error_configuration_suggestions() {
+        let db_config_error = CodeIngestError::configuration_error("invalid database URL");
+        assert!(db_config_error.to_string().contains("postgresql://user:pass@host:port/db"));
+        
+        let path_config_error = CodeIngestError::configuration_error("invalid path");
+        assert!(path_config_error.to_string().contains("absolute"));
+        
+        let token_config_error = CodeIngestError::configuration_error("missing token");
+        assert!(token_config_error.to_string().contains("GITHUB_TOKEN"));
+    }
+
+    #[test]
+    fn test_error_recovery_strategies() {
+        let network_error = CodeIngestError::Network {
+            message: "connection timeout".to_string(),
+            suggestion: "retry".to_string(),
+            source: None,
+        };
+        assert!(network_error.is_recoverable());
+        assert_eq!(network_error.retry_delay_seconds(), 5);
+        
+        let timeout_error = CodeIngestError::Timeout {
+            operation: "clone".to_string(),
+            timeout_seconds: 30,
+            suggestion: "retry".to_string(),
+        };
+        assert!(timeout_error.is_recoverable());
+        assert_eq!(timeout_error.retry_delay_seconds(), 10);
+        
+        let config_error = CodeIngestError::Configuration {
+            message: "invalid config".to_string(),
+            suggestion: "fix config".to_string(),
+        };
+        assert!(!config_error.is_recoverable());
+    }
+
+    #[test]
+    fn test_external_error_conversions_to_code_ingest_error() {
+        // Test sqlx::Error conversion
+        let sqlx_error = sqlx::Error::Configuration("Invalid connection string".into());
+        let code_ingest_error: CodeIngestError = sqlx_error.into();
+        match code_ingest_error {
+            CodeIngestError::Database { message, suggestion, .. } => {
+                assert!(message.contains("configuration error"));
+                assert!(suggestion.contains("PostgreSQL") || suggestion.contains("database"));
+            }
+            _ => panic!("Expected CodeIngestError::Database"),
+        }
+
+        // Test git2::Error conversion
+        let git_error = git2::Error::from_str("Authentication failed");
+        let code_ingest_error: CodeIngestError = git_error.into();
+        match code_ingest_error {
+            CodeIngestError::Git { message, suggestion, .. } => {
+                assert!(message.contains("Authentication failed"));
+                assert!(suggestion.contains("repository URL") || suggestion.contains("network"));
+            }
+            _ => panic!("Expected CodeIngestError::Git"),
+        }
+
+        // Test std::io::Error conversion
+        let io_error = std::io::Error::new(std::io::ErrorKind::NotFound, "File not found");
+        let code_ingest_error: CodeIngestError = io_error.into();
+        match code_ingest_error {
+            CodeIngestError::FileSystem { message, suggestion, .. } => {
+                assert!(message.contains("not found"));
+                assert!(suggestion.contains("Verify the path"));
+            }
+            _ => panic!("Expected CodeIngestError::FileSystem"),
+        }
+
+        // Test permission denied conversion
+        let permission_error = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Access denied");
+        let code_ingest_error: CodeIngestError = permission_error.into();
+        match code_ingest_error {
+            CodeIngestError::PermissionDenied { path: _, suggestion } => {
+                assert!(suggestion.contains("permissions"));
+            }
+            _ => panic!("Expected CodeIngestError::PermissionDenied"),
+        }
+    }
+
+    #[test]
+    fn test_error_display_with_suggestions() {
+        let error = CodeIngestError::Git {
+            message: "Repository not found".to_string(),
+            suggestion: "Check the URL".to_string(),
+            source: None,
+        };
+        let display = error.to_string();
+        assert!(display.contains("Git operation failed"));
+        assert!(display.contains("Repository not found"));
+        assert!(display.contains("💡 Suggestion: Check the URL"));
+    }
+
+    #[test]
+    fn test_error_source_chaining() {
+        let io_error = std::io::Error::new(std::io::ErrorKind::NotFound, "Original error");
+        let source = Some(Box::new(io_error) as Box<dyn std::error::Error + Send + Sync>);
+        
+        let code_ingest_error = CodeIngestError::FileSystem {
+            message: "File operation failed".to_string(),
+            suggestion: "Check the path".to_string(),
+            source,
+        };
+        
+        // Test that source is preserved
+        assert!(code_ingest_error.source().is_some());
+        let source_error = code_ingest_error.source().unwrap();
+        assert!(source_error.to_string().contains("Original error"));
+    }
+
+    #[test]
+    fn test_result_type_aliases_with_code_ingest_error() {
+        fn test_code_ingest_result() -> CodeIngestResult<String> {
+            Ok("success".to_string())
+        }
+
+        fn test_code_ingest_error_result() -> CodeIngestResult<i32> {
+            Err(CodeIngestError::configuration_error("test error"))
+        }
+
+        assert!(test_code_ingest_result().is_ok());
+        assert!(test_code_ingest_error_result().is_err());
+    }
+
+    // Legacy tests for backward compatibility
     #[test]
     fn test_system_error_from_ingestion_error() {
         let ingestion_error = IngestionError::LocalPathNotFound {

@@ -26,6 +26,12 @@ pub struct QueryConfig {
     pub include_stats: bool,
     /// Whether to stream large results
     pub stream_results: bool,
+    /// Query timeout in seconds (0 = no timeout)
+    pub timeout_seconds: u64,
+    /// Offset for pagination (0 = start from beginning)
+    pub offset: usize,
+    /// Whether to show helpful error messages
+    pub show_helpful_errors: bool,
 }
 
 impl Default for QueryConfig {
@@ -35,6 +41,9 @@ impl Default for QueryConfig {
             llm_format: false,
             include_stats: true,
             stream_results: true,
+            timeout_seconds: 30, // 30 second default timeout
+            offset: 0,
+            show_helpful_errors: true,
         }
     }
 }
@@ -87,12 +96,36 @@ impl QueryExecutor {
         debug!("Executing query with config: {:?}", config);
         
         // Validate the SQL query
-        self.validate_query(sql)?;
+        if let Err(e) = self.validate_query(sql) {
+            if config.show_helpful_errors {
+                return Err(self.enhance_error_message(e, sql));
+            } else {
+                return Err(e);
+            }
+        }
         
-        // Execute the query
-        let result = self.operations.execute_query(sql).await?;
+        // Apply pagination to the query if needed
+        let paginated_sql = self.apply_pagination(sql, config)?;
         
-        // Apply row limit if specified
+        // Execute the query with timeout
+        let result = if config.timeout_seconds > 0 {
+            self.execute_query_with_timeout(&paginated_sql, config.timeout_seconds).await
+        } else {
+            self.operations.execute_query(&paginated_sql).await
+        };
+        
+        let result = match result {
+            Ok(r) => r,
+            Err(e) => {
+                if config.show_helpful_errors {
+                    return Err(self.enhance_error_message(e, sql));
+                } else {
+                    return Err(e);
+                }
+            }
+        };
+        
+        // Apply row limit if specified (in addition to pagination)
         let (limited_result, truncated) = self.apply_row_limit(result, config.max_rows);
         
         // Format the output based on configuration
@@ -103,10 +136,11 @@ impl QueryExecutor {
         };
         
         info!(
-            "Query executed successfully: {} rows in {}ms{}",
+            "Query executed successfully: {} rows in {}ms{}{}",
             limited_result.row_count,
             limited_result.execution_time_ms,
-            if truncated { " (truncated)" } else { "" }
+            if truncated { " (truncated)" } else { "" },
+            if config.offset > 0 { &format!(" (offset: {})", config.offset) } else { "" }
         );
         
         Ok(FormattedQueryOutput {
@@ -167,6 +201,96 @@ impl QueryExecutor {
         
         info!("Streaming query completed: {} total rows", total_rows);
         Ok(total_rows)
+    }
+
+    /// Execute query with timeout
+    async fn execute_query_with_timeout(
+        &self,
+        sql: &str,
+        timeout_seconds: u64,
+    ) -> DatabaseResult<QueryResult> {
+        use tokio::time::{timeout, Duration};
+        
+        let timeout_duration = Duration::from_secs(timeout_seconds);
+        
+        match timeout(timeout_duration, self.operations.execute_query(sql)).await {
+            Ok(result) => result,
+            Err(_) => Err(DatabaseError::QueryFailed {
+                query: sql.to_string(),
+                cause: format!("Query timed out after {} seconds", timeout_seconds),
+            }),
+        }
+    }
+
+    /// Apply pagination to SQL query
+    fn apply_pagination(&self, sql: &str, config: &QueryConfig) -> DatabaseResult<String> {
+        let sql_trimmed = sql.trim();
+        
+        // Don't paginate if no limit or offset specified
+        if config.max_rows == 0 && config.offset == 0 {
+            return Ok(sql.to_string());
+        }
+        
+        // Check if query already has LIMIT/OFFSET
+        let sql_lower = sql_trimmed.to_lowercase();
+        if sql_lower.contains(" limit ") || sql_lower.contains(" offset ") {
+            warn!("Query already contains LIMIT/OFFSET, skipping pagination");
+            return Ok(sql.to_string());
+        }
+        
+        let mut paginated_sql = sql_trimmed.to_string();
+        
+        // Add LIMIT if specified
+        if config.max_rows > 0 {
+            paginated_sql.push_str(&format!(" LIMIT {}", config.max_rows));
+        }
+        
+        // Add OFFSET if specified
+        if config.offset > 0 {
+            paginated_sql.push_str(&format!(" OFFSET {}", config.offset));
+        }
+        
+        Ok(paginated_sql)
+    }
+
+    /// Enhance error messages with helpful suggestions
+    fn enhance_error_message(&self, error: DatabaseError, sql: &str) -> DatabaseError {
+        let sql_lower = sql.trim().to_lowercase();
+        
+        match &error {
+            DatabaseError::QueryFailed { query, cause } => {
+                let enhanced_cause = if cause.contains("relation") && cause.contains("does not exist") {
+                    format!("{}\n\nHelpful suggestions:\n• Check table name spelling\n• Use 'code-ingest list-tables' to see available tables\n• Table names are case-sensitive in PostgreSQL", cause)
+                } else if cause.contains("column") && cause.contains("does not exist") {
+                    format!("{}\n\nHelpful suggestions:\n• Check column name spelling\n• Use 'code-ingest describe --table <table_name>' to see table schema\n• Column names are case-sensitive", cause)
+                } else if cause.contains("syntax error") {
+                    let mut suggestions = vec!["Check SQL syntax"];
+                    
+                    if !sql_lower.starts_with("select") && !sql_lower.starts_with("with") {
+                        suggestions.push("Most queries should start with SELECT");
+                    }
+                    
+                    if sql_lower.contains("where") && !sql_lower.contains("=") && !sql_lower.contains("like") {
+                        suggestions.push("WHERE clauses need comparison operators (=, LIKE, etc.)");
+                    }
+                    
+                    format!("{}\n\nHelpful suggestions:\n{}", cause, 
+                           suggestions.iter().map(|s| format!("• {}", s)).collect::<Vec<_>>().join("\n"))
+                } else if cause.contains("permission denied") {
+                    format!("{}\n\nHelpful suggestions:\n• Check database connection permissions\n• Ensure you have read access to the table\n• Try connecting with different credentials", cause)
+                } else if cause.contains("timeout") || cause.contains("timed out") {
+                    format!("{}\n\nHelpful suggestions:\n• Try adding a LIMIT clause to reduce result size\n• Use more specific WHERE conditions\n• Consider using pagination with OFFSET/LIMIT", cause)
+                } else {
+                    cause.clone()
+                };
+                
+                DatabaseError::QueryFailed {
+                    query: query.clone(),
+                    cause: enhanced_cause,
+                }
+            }
+            _ => error,
+        }
     }
 
     /// Validate SQL query for safety and correctness
@@ -516,6 +640,9 @@ mod tests {
             llm_format: true,
             include_stats: false,
             stream_results: false,
+            timeout_seconds: 30,
+            offset: 0,
+            show_helpful_errors: true,
         };
         
         assert_eq!(config.max_rows, 100);

@@ -1,13 +1,14 @@
 use crate::error::{IngestionError, IngestionResult};
-use crate::processing::{FileProcessor, ProcessedFile};
+use crate::processing::{FileProcessor, ProcessedFile, StreamingProcessor, StreamingConfig, StreamingProgress, PerformanceMonitor, PerformanceConfig};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, Semaphore};
 use tokio::task::JoinSet;
 use tokio::time::timeout;
+use tokio_stream::StreamExt;
 use tracing::{debug, error, info, warn};
 
 /// Configuration for batch processing
@@ -27,6 +28,10 @@ pub struct BatchConfig {
     pub continue_on_error: bool,
     /// Interval for progress updates
     pub progress_update_interval: Duration,
+    /// Whether to use streaming processing for constant memory usage
+    pub use_streaming: bool,
+    /// Whether to enable performance monitoring
+    pub enable_performance_monitoring: bool,
 }
 
 impl Default for BatchConfig {
@@ -39,6 +44,8 @@ impl Default for BatchConfig {
             max_memory_bytes: 512 * 1024 * 1024, // 512MB default
             continue_on_error: true,
             progress_update_interval: Duration::from_millis(100),
+            use_streaming: true, // Enable streaming by default for better memory management
+            enable_performance_monitoring: true,
         }
     }
 }
@@ -88,6 +95,8 @@ pub struct BatchProcessor {
     file_processor: Arc<dyn FileProcessor>,
     shutdown_signal: Arc<AtomicBool>,
     memory_monitor: Arc<MemoryMonitor>,
+    streaming_processor: Option<StreamingProcessor>,
+    performance_monitor: Option<Arc<PerformanceMonitor>>,
 }
 
 /// Memory usage monitor
@@ -139,16 +148,181 @@ impl BatchProcessor {
     pub fn new(config: BatchConfig, file_processor: Arc<dyn FileProcessor>) -> Self {
         let memory_monitor = Arc::new(MemoryMonitor::new(config.max_memory_bytes));
         
+        // Create streaming processor if enabled
+        let streaming_processor = if config.use_streaming {
+            let streaming_config = StreamingConfig {
+                max_concurrency: config.max_concurrency,
+                buffer_size: config.batch_size * 2,
+                global_memory_limit: config.max_memory_bytes,
+                file_timeout: config.file_timeout,
+                progress_interval: config.progress_update_interval,
+                adaptive_concurrency: true,
+                ..Default::default()
+            };
+            Some(StreamingProcessor::new(streaming_config, Arc::clone(&file_processor)))
+        } else {
+            None
+        };
+
+        // Create performance monitor if enabled
+        let performance_monitor = if config.enable_performance_monitoring {
+            let perf_config = PerformanceConfig {
+                collection_interval: Duration::from_secs(1),
+                adaptive_optimization: true,
+                ..Default::default()
+            };
+            Some(Arc::new(PerformanceMonitor::new(perf_config)))
+        } else {
+            None
+        };
+        
         Self {
             config,
             file_processor,
             shutdown_signal: Arc::new(AtomicBool::new(false)),
             memory_monitor,
+            streaming_processor,
+            performance_monitor,
         }
     }
 
     /// Process a batch of files with parallel processing and progress tracking
     pub async fn process_files<P>(
+        &self,
+        file_paths: Vec<P>,
+        progress_callback: Option<Box<dyn Fn(BatchProgress) + Send + Sync>>,
+    ) -> IngestionResult<(Vec<ProcessedFile>, BatchStats)>
+    where
+        P: AsRef<Path> + Send + 'static,
+    {
+        // Use streaming processor if available for better memory management
+        if let Some(ref _streaming_processor) = self.streaming_processor {
+            return self.process_files_streaming(file_paths, progress_callback).await;
+        }
+
+        // Fall back to original batch processing
+        self.process_files_legacy(file_paths, progress_callback).await
+    }
+
+    /// Process files using streaming for constant memory usage
+    async fn process_files_streaming<P>(
+        &self,
+        file_paths: Vec<P>,
+        progress_callback: Option<Box<dyn Fn(BatchProgress) + Send + Sync>>,
+    ) -> IngestionResult<(Vec<ProcessedFile>, BatchStats)>
+    where
+        P: AsRef<Path> + Send + 'static,
+    {
+        let start_time = Instant::now();
+        let total_files = file_paths.len();
+        
+        info!("Starting streaming batch processing of {} files", total_files);
+
+        // Start performance monitoring if enabled
+        let _perf_handle = if let Some(ref perf_monitor) = self.performance_monitor {
+            Some(perf_monitor.start_monitoring().await)
+        } else {
+            None
+        };
+
+        // Convert paths to PathBuf for streaming processor
+        let path_bufs: Vec<PathBuf> = file_paths.into_iter()
+            .map(|p| p.as_ref().to_path_buf())
+            .collect();
+
+        let streaming_processor = self.streaming_processor.as_ref().unwrap();
+
+        // Create progress adapter for streaming
+        let batch_size = self.config.batch_size;
+        let streaming_progress_callback = progress_callback.map(move |callback| {
+            Box::new(move |streaming_progress: StreamingProgress| {
+                let batch_progress = BatchProgress {
+                    current_file: streaming_progress.current_file,
+                    files_processed: streaming_progress.files_processed,
+                    total_files: streaming_progress.total_files.unwrap_or(total_files),
+                    current_batch: (streaming_progress.files_processed / batch_size) + 1,
+                    total_batches: (total_files + batch_size - 1) / batch_size,
+                    processing_rate: streaming_progress.processing_rate,
+                    eta: streaming_progress.eta,
+                };
+                callback(batch_progress);
+            }) as Box<dyn Fn(StreamingProgress) + Send + Sync>
+        });
+
+        // Process files as a stream
+        let mut stream = streaming_processor
+            .process_files_streaming(path_bufs, streaming_progress_callback)
+            .await
+            .map_err(|e| IngestionError::NetworkError {
+                cause: format!("Streaming processing failed: {}", e),
+            })?;
+
+        // Collect results
+        let mut processed_files = Vec::new();
+        let mut files_processed = 0;
+        let mut files_failed = 0;
+        let mut files_skipped = 0;
+
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok(processed_file) => {
+                    if processed_file.skipped {
+                        files_skipped += 1;
+                    } else {
+                        files_processed += 1;
+                        processed_files.push(processed_file);
+                    }
+                }
+                Err(e) => {
+                    files_failed += 1;
+                    if !self.config.continue_on_error {
+                        error!("Streaming processing failed, stopping: {}", e);
+                        break;
+                    } else {
+                        warn!("File processing failed in stream, continuing: {}", e);
+                    }
+                }
+            }
+
+            // Check shutdown signal
+            if self.shutdown_signal.load(Ordering::Relaxed) {
+                warn!("Shutdown requested, stopping streaming processing");
+                break;
+            }
+        }
+
+        let total_duration = start_time.elapsed();
+        let avg_file_duration = if files_processed > 0 {
+            total_duration / files_processed as u32
+        } else {
+            Duration::ZERO
+        };
+
+        // Get memory usage from streaming processor
+        let (_, peak_memory) = streaming_processor.get_memory_usage();
+
+        let stats = BatchStats {
+            files_processed,
+            files_failed,
+            files_skipped,
+            total_duration,
+            avg_file_duration,
+            peak_memory_bytes: peak_memory,
+            batches_processed: (files_processed + self.config.batch_size - 1) / self.config.batch_size,
+        };
+
+        info!(
+            "Streaming batch processing completed: {} files in {:?} ({:.2} files/sec)",
+            files_processed,
+            total_duration,
+            files_processed as f64 / total_duration.as_secs_f64()
+        );
+
+        Ok((processed_files, stats))
+    }
+
+    /// Legacy batch processing method (non-streaming)
+    async fn process_files_legacy<P>(
         &self,
         file_paths: Vec<P>,
         progress_callback: Option<Box<dyn Fn(BatchProgress) + Send + Sync>>,
@@ -452,6 +626,32 @@ impl BatchProcessor {
         // Fallback estimation: assume 1MB/second processing rate
         let estimated_seconds = total_size / (1024 * 1024); // 1MB/sec
         Duration::from_secs(estimated_seconds.max(1))
+    }
+
+    /// Get performance monitor if available
+    pub fn get_performance_monitor(&self) -> Option<Arc<PerformanceMonitor>> {
+        self.performance_monitor.as_ref().map(Arc::clone)
+    }
+
+    /// Get current system resource utilization
+    pub fn get_resource_utilization(&self) -> Option<(f64, f64)> {
+        self.performance_monitor
+            .as_ref()
+            .and_then(|monitor| monitor.get_current_utilization().ok())
+    }
+
+    /// Check if the system is under resource pressure
+    pub fn is_under_resource_pressure(&self) -> bool {
+        self.performance_monitor
+            .as_ref()
+            .map_or(false, |monitor| monitor.is_under_pressure())
+    }
+
+    /// Get optimization recommendations based on current performance
+    pub fn get_optimization_recommendations(&self) -> Vec<crate::processing::OptimizationRecommendation> {
+        self.performance_monitor
+            .as_ref()
+            .map_or(Vec::new(), |monitor| monitor.get_optimization_recommendations())
     }
 }
 

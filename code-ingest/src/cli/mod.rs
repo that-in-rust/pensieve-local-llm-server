@@ -1,6 +1,9 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
+use crate::help::HelpSystem;
+use crate::error::{CodeIngestError, CodeIngestResult};
+use colored::*;
 
 #[derive(Parser)]
 #[command(name = "code-ingest")]
@@ -33,6 +36,18 @@ pub enum Commands {
         /// Database path (can also be set globally)
         #[arg(long)]
         db_path: Option<PathBuf>,
+        /// Maximum number of rows to return (0 = no limit)
+        #[arg(long, default_value = "0")]
+        limit: usize,
+        /// Number of rows to skip (for pagination)
+        #[arg(long, default_value = "0")]
+        offset: usize,
+        /// Query timeout in seconds (0 = no timeout)
+        #[arg(long, default_value = "30")]
+        timeout: u64,
+        /// Format output for LLM consumption
+        #[arg(long)]
+        llm_format: bool,
     },
 
     /// Prepare query results for IDE task processing
@@ -146,6 +161,58 @@ pub enum Commands {
 
     /// Show PostgreSQL setup instructions
     PgStart,
+
+    /// Show comprehensive setup guide
+    Setup,
+
+    /// Show command examples for common tasks
+    Examples,
+
+    /// Show troubleshooting guide
+    Troubleshoot,
+
+    /// Clean up old ingestion tables
+    CleanupTables {
+        /// Database path (can also be set globally)
+        #[arg(long)]
+        db_path: Option<PathBuf>,
+        /// Number of recent tables to keep
+        #[arg(long, default_value = "5")]
+        keep: usize,
+        /// Confirm deletion without prompting
+        #[arg(long)]
+        confirm: bool,
+    },
+
+    /// Drop a specific table
+    DropTable {
+        /// Database path (can also be set globally)
+        #[arg(long)]
+        db_path: Option<PathBuf>,
+        /// Table name to drop
+        #[arg(long)]
+        table: String,
+        /// Confirm deletion without prompting
+        #[arg(long)]
+        confirm: bool,
+    },
+
+    /// Get database management recommendations
+    Recommendations {
+        /// Database path (can also be set globally)
+        #[arg(long)]
+        db_path: Option<PathBuf>,
+    },
+
+    /// Optimize database tables (VACUUM ANALYZE)
+    OptimizeTables {
+        /// Database path (can also be set globally)
+        #[arg(long)]
+        db_path: Option<PathBuf>,
+        /// Specific tables to optimize (default: all tables)
+        #[arg(long)]
+        tables: Option<Vec<String>>,
+    },
 }
 
 impl Default for Cli {
@@ -185,9 +252,9 @@ impl Cli {
                 let db_path = db_path.clone().or_else(|| self.db_path.clone());
                 self.execute_ingest(source.clone(), db_path).await
             }
-            Commands::Sql { query, db_path } => {
+            Commands::Sql { query, db_path, limit, offset, timeout, llm_format } => {
                 let db_path = db_path.clone().or_else(|| self.db_path.clone());
-                self.execute_sql(query.clone(), db_path).await
+                self.execute_sql(query.clone(), db_path, *limit, *offset, *timeout, *llm_format).await
             }
             Commands::QueryPrepare {
                 query,
@@ -276,6 +343,25 @@ impl Cli {
                 self.execute_db_info(db_path).await
             }
             Commands::PgStart => self.execute_pg_start().await,
+            Commands::Setup => self.execute_setup().await,
+            Commands::Examples => self.execute_examples().await,
+            Commands::Troubleshoot => self.execute_troubleshoot().await,
+            Commands::CleanupTables { db_path, keep, confirm } => {
+                let db_path = db_path.clone().or_else(|| self.db_path.clone());
+                self.execute_cleanup_tables(db_path, *keep, *confirm).await
+            }
+            Commands::DropTable { db_path, table, confirm } => {
+                let db_path = db_path.clone().or_else(|| self.db_path.clone());
+                self.execute_drop_table(db_path, table.clone(), *confirm).await
+            }
+            Commands::Recommendations { db_path } => {
+                let db_path = db_path.clone().or_else(|| self.db_path.clone());
+                self.execute_recommendations(db_path).await
+            }
+            Commands::OptimizeTables { db_path, tables } => {
+                let db_path = db_path.clone().or_else(|| self.db_path.clone());
+                self.execute_optimize_tables(db_path, tables.clone()).await
+            }
         }
     }
 
@@ -287,7 +373,28 @@ impl Cli {
         use indicatif::{ProgressBar, ProgressStyle};
         use std::sync::Arc;
         
-        println!("🚀 Starting ingestion from: {}", source);
+        // Validate inputs
+        if let Err(e) = HelpSystem::validate_repository_url(&source) {
+            eprintln!("{}", format!("❌ {}", e).red());
+            println!();
+            HelpSystem::suggest_next_steps(&e).iter().for_each(|suggestion| {
+                println!("💡 {}", suggestion.yellow());
+            });
+            return Err(e.into());
+        }
+
+        if let Some(ref path) = db_path {
+            if let Err(e) = HelpSystem::validate_database_path(path) {
+                eprintln!("{}", format!("❌ {}", e).red());
+                println!();
+                HelpSystem::suggest_next_steps(&e).iter().for_each(|suggestion| {
+                    println!("💡 {}", suggestion.yellow());
+                });
+                return Err(e.into());
+            }
+        }
+        
+        println!("{}", format!("🚀 Starting ingestion from: {}", source).bright_green());
         println!();
         
         // Get database connection
@@ -368,8 +475,37 @@ impl Cli {
         Ok(())
     }
 
-    async fn execute_sql(&self, query: String, db_path: Option<PathBuf>) -> Result<()> {
-        use crate::database::{Database, QueryExecutor};
+    async fn execute_sql(
+        &self, 
+        query: String, 
+        db_path: Option<PathBuf>, 
+        limit: usize, 
+        offset: usize, 
+        timeout: u64, 
+        llm_format: bool
+    ) -> Result<()> {
+        use crate::database::{Database, QueryExecutor, query_executor::QueryConfig};
+        
+        // Validate inputs
+        if let Err(e) = HelpSystem::validate_sql_query(&query) {
+            eprintln!("{}", format!("❌ {}", e).red());
+            println!();
+            HelpSystem::suggest_next_steps(&e).iter().for_each(|suggestion| {
+                println!("💡 {}", suggestion.yellow());
+            });
+            return Err(e.into());
+        }
+
+        if let Some(ref path) = db_path {
+            if let Err(e) = HelpSystem::validate_database_path(path) {
+                eprintln!("{}", format!("❌ {}", e).red());
+                println!();
+                HelpSystem::suggest_next_steps(&e).iter().for_each(|suggestion| {
+                    println!("💡 {}", suggestion.yellow());
+                });
+                return Err(e.into());
+            }
+        }
         
         // Get database connection
         let database = if let Some(path) = db_path {
@@ -383,14 +519,38 @@ impl Cli {
         // Create query executor
         let executor = QueryExecutor::new(database.pool().clone());
         
-        // Execute query and format for terminal
-        let result = executor.execute_query_terminal(&query).await?;
+        // Create query configuration
+        let config = QueryConfig {
+            max_rows: limit,
+            offset,
+            timeout_seconds: timeout,
+            llm_format,
+            include_stats: !llm_format, // Don't show stats in LLM format
+            show_helpful_errors: true,
+            ..Default::default()
+        };
+        
+        // Execute query with configuration
+        let result = executor.execute_query_with_config(&query, &config).await?;
         
         // Print results
         print!("{}", result.content);
         
         if result.truncated {
-            println!("Note: Results were truncated");
+            if !llm_format {
+                println!("\nNote: Results were truncated to {} rows", limit);
+                if offset == 0 {
+                    println!("Use --limit and --offset for pagination");
+                    println!("Example: --limit 100 --offset 100 (for next 100 rows)");
+                }
+            }
+        }
+        
+        // Show pagination info if using pagination
+        if !llm_format && (limit > 0 || offset > 0) {
+            println!("\nPagination: showing {} rows starting from row {}", 
+                    if limit > 0 { limit } else { result.row_count }, 
+                    offset + 1);
         }
         
         Ok(())
@@ -404,9 +564,25 @@ impl Cli {
         tasks_file: PathBuf,
         output_table: String,
     ) -> Result<()> {
-        use crate::database::{Database, QueryExecutor, TempFileManager, TempFileConfig, TempFileMetadata};
+        use crate::database::{Database, QueryExecutor, TempFileManager, TempFileConfig, TempFileMetadata, ResultStorage, StorageConfig};
+        use indicatif::{ProgressBar, ProgressStyle};
+        
+        println!("🚀 Preparing query results for IDE analysis...");
+        println!();
+        
+        // Create progress bar
+        let progress = ProgressBar::new(100);
+        progress.set_style(
+            ProgressStyle::default_bar()
+                .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos:>7}/{len:7} {msg}")
+                .unwrap()
+                .progress_chars("#>-"),
+        );
         
         // Get database connection
+        progress.set_message("Connecting to database...");
+        progress.set_position(10);
+        
         let database = if let Some(path) = db_path {
             Database::from_path(&path).await?
         } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
@@ -419,12 +595,25 @@ impl Cli {
         let executor = QueryExecutor::new(database.pool().clone());
         let temp_manager = TempFileManager::new(executor);
         
+        // Validate temp path is absolute
+        if !temp_path.is_absolute() {
+            anyhow::bail!("Temporary file path must be absolute: {}", temp_path.display());
+        }
+        
+        // Validate tasks file path is absolute
+        if !tasks_file.is_absolute() {
+            anyhow::bail!("Tasks file path must be absolute: {}", tasks_file.display());
+        }
+        
+        progress.set_message("Executing SQL query...");
+        progress.set_position(30);
+        
         // Create metadata for the temporary file
         let metadata = TempFileMetadata {
             original_query: query.clone(),
             output_table: output_table.clone(),
             prompt_file_path: None, // Will be set when tasks are generated
-            description: Some("Query results prepared for LLM analysis".to_string()),
+            description: Some("Query results prepared for IDE analysis".to_string()),
         };
         
         // Create temporary file with query results
@@ -433,22 +622,75 @@ impl Cli {
             .create_structured_temp_file(&query, &temp_path, &metadata, &config)
             .await?;
         
-        println!("✅ Query executed successfully");
-        println!("   Rows: {}", temp_result.row_count);
-        println!("   Execution time: {}ms", temp_result.execution_time_ms);
-        println!("   Temporary file: {} ({} bytes)", temp_path.display(), temp_result.bytes_written);
+        progress.set_message("Creating output table...");
+        progress.set_position(60);
         
-        // Create a basic task structure for IDE integration
-        let task_content = self.create_basic_task_structure(&query, &temp_path, &output_table);
+        // Ensure the output table exists for storing analysis results
+        let result_storage = ResultStorage::new(database.pool().clone());
+        let storage_config = StorageConfig::default();
+        
+        // Create the output table by attempting to store a placeholder result
+        // This ensures the table schema is created
+        let placeholder_metadata = crate::database::ResultMetadata {
+            original_query: query.clone(),
+            prompt_file_path: None,
+            analysis_type: Some("query_prepare_placeholder".to_string()),
+            original_file_path: None,
+            chunk_number: None,
+            created_by: Some("code-ingest-query-prepare".to_string()),
+            tags: vec!["placeholder".to_string()],
+        };
+        
+        // Store and immediately delete placeholder to create table
+        let placeholder_result = result_storage
+            .store_result_content(&output_table, "PLACEHOLDER - DELETE ME", &placeholder_metadata, &storage_config)
+            .await?;
+        
+        // Delete the placeholder
+        result_storage
+            .delete_analysis_result(&output_table, placeholder_result.analysis_id)
+            .await?;
+        
+        progress.set_message("Generating task structure...");
+        progress.set_position(80);
+        
+        // Create a comprehensive task structure for IDE integration
+        let task_content = self.create_comprehensive_task_structure(&query, &temp_path, &output_table, temp_result.row_count);
         
         // Write tasks file
         tokio::fs::write(&tasks_file, task_content).await?;
-        println!("   Tasks file: {}", tasks_file.display());
         
-        println!("\n📋 Next steps:");
+        progress.set_message("Complete!");
+        progress.set_position(100);
+        progress.finish_with_message("✅ Query preparation complete!");
+        
+        // Display results
+        println!();
+        println!("📊 Query Preparation Summary:");
+        println!("   SQL Query: {}", query);
+        println!("   Rows Retrieved: {}", temp_result.row_count);
+        println!("   Execution Time: {}ms", temp_result.execution_time_ms);
+        println!("   Temporary File: {} ({} bytes)", temp_path.display(), temp_result.bytes_written);
+        println!("   Tasks File: {}", tasks_file.display());
+        println!("   Output Table: {} (ready for results)", output_table);
+        
+        println!();
+        println!("🎯 Next Steps:");
         println!("   1. Open the tasks file in your IDE: {}", tasks_file.display());
-        println!("   2. Execute the analysis tasks");
-        println!("   3. Store results using: code-ingest store-result --output-table {} --result-file <result_file> --original-query \"{}\"", output_table, query);
+        println!("   2. Review the generated task structure");
+        println!("   3. Execute analysis tasks systematically");
+        println!("   4. Store results using:");
+        println!("      code-ingest store-result \\");
+        println!("        --output-table {} \\", output_table);
+        println!("        --result-file <your_analysis_result.txt> \\");
+        println!("        --original-query \"{}\"", query);
+        
+        println!();
+        println!("💡 Pro Tips:");
+        println!("   • The temporary file contains structured data ready for LLM processing");
+        println!("   • Tasks are organized for systematic analysis");
+        println!("   • The output table is pre-created and ready to store your analysis results");
+        println!("   • Use the FILE: format in the temp file for context-aware analysis");
         
         Ok(())
     }
@@ -654,6 +896,27 @@ impl Cli {
         original_query: String,
     ) -> Result<()> {
         use crate::database::{Database, ResultStorage, StorageConfig, ResultMetadata};
+        use indicatif::{ProgressBar, ProgressStyle};
+        
+        println!("🚀 Storing analysis results...");
+        println!();
+        
+        // Create progress bar
+        let progress = ProgressBar::new(100);
+        progress.set_style(
+            ProgressStyle::default_bar()
+                .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos:>7}/{len:7} {msg}")
+                .unwrap()
+                .progress_chars("#>-"),
+        );
+        
+        // Validate result file exists
+        if !result_file.exists() {
+            anyhow::bail!("Result file not found: {}", result_file.display());
+        }
+        
+        progress.set_message("Connecting to database...");
+        progress.set_position(10);
         
         // Get database connection
         let database = if let Some(path) = db_path {
@@ -664,19 +927,39 @@ impl Cli {
             anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
         };
 
+        progress.set_message("Reading result file...");
+        progress.set_position(30);
+        
+        // Read and validate result file
+        let result_content = tokio::fs::read_to_string(&result_file).await?;
+        let result_size = result_content.len();
+        
+        if result_content.trim().is_empty() {
+            anyhow::bail!("Result file is empty: {}", result_file.display());
+        }
+        
+        progress.set_message("Preparing storage...");
+        progress.set_position(50);
+        
         // Create result storage manager
         let storage = ResultStorage::new(database.pool().clone());
+        
+        // Detect analysis type from content
+        let analysis_type = self.detect_analysis_type_from_content(&result_content, &original_query);
         
         // Create metadata for the result
         let metadata = ResultMetadata {
             original_query: original_query.clone(),
-            prompt_file_path: None, // Could be enhanced to detect this
-            analysis_type: Some("llm_analysis".to_string()),
-            original_file_path: None,
+            prompt_file_path: None, // Could be enhanced to detect this from task files
+            analysis_type: Some(analysis_type.clone()),
+            original_file_path: Some(result_file.to_string_lossy().to_string()),
             chunk_number: None,
             created_by: Some("code-ingest-cli".to_string()),
-            tags: vec!["analysis".to_string()],
+            tags: vec!["analysis".to_string(), "cli_stored".to_string()],
         };
+        
+        progress.set_message("Storing results...");
+        progress.set_position(80);
         
         // Store the result
         let config = StorageConfig::default();
@@ -684,13 +967,79 @@ impl Cli {
             .store_result_from_file(&output_table, &result_file, &metadata, &config)
             .await?;
         
-        println!("✅ Analysis result stored successfully");
+        progress.set_message("Complete!");
+        progress.set_position(100);
+        progress.finish_with_message("✅ Analysis results stored!");
+        
+        // Display results
+        println!();
+        println!("📊 Storage Summary:");
         println!("   Analysis ID: {}", storage_result.analysis_id);
         println!("   Table: {}", storage_result.table_name);
-        println!("   Size: {} bytes", storage_result.result_size_bytes);
-        println!("   Result file: {}", result_file.display());
+        println!("   Result Size: {} bytes", storage_result.result_size_bytes);
+        println!("   Analysis Type: {}", analysis_type);
+        println!("   Original Query: {}", original_query);
+        println!("   Source File: {}", result_file.display());
         
-        // Show storage statistics
+        // Get storage statistics
+        match storage.get_storage_stats(&output_table).await {
+            Ok(stats) => {
+                println!();
+                println!("📈 Table Statistics:");
+                println!("   Total Results: {}", stats.total_results);
+                println!("   Average Size: {} bytes", stats.avg_result_size_bytes);
+                println!("   Largest Result: {} bytes", stats.max_result_size_bytes);
+                if let Some(oldest) = stats.oldest_result {
+                    println!("   Oldest Result: {}", oldest.format("%Y-%m-%d %H:%M:%S UTC"));
+                }
+                if let Some(newest) = stats.newest_result {
+                    println!("   Newest Result: {}", newest.format("%Y-%m-%d %H:%M:%S UTC"));
+                }
+            }
+            Err(e) => {
+                println!("   (Could not retrieve table statistics: {})", e);
+            }
+        }
+        
+        println!();
+        println!("🎯 Next Steps:");
+        println!("   1. Verify storage:");
+        println!("      code-ingest sql \"SELECT analysis_id, analysis_type, LENGTH(llm_result) as size, created_at FROM {} ORDER BY created_at DESC LIMIT 5\"", output_table);
+        println!("   2. Retrieve your result:");
+        println!("      code-ingest sql \"SELECT llm_result FROM {} WHERE analysis_id = {}\"", output_table, storage_result.analysis_id);
+        println!("   3. Continue analysis workflow or export results as needed");
+        
+        println!();
+        println!("💡 Pro Tips:");
+        println!("   • Results are now permanently stored and linked to the original query");
+        println!("   • Use the analysis_id ({}) to reference this specific analysis", storage_result.analysis_id);
+        println!("   • The analysis_type ({}) helps categorize and filter results", analysis_type);
+        println!("   • All metadata is preserved for full traceability");
+        
+        Ok(())
+    }
+
+    // This method was moved to the end of the impl block to avoid conflicts
+    async fn execute_store_result_old(
+        &self,
+        db_path: Option<PathBuf>,
+        output_table: String,
+        result_file: PathBuf,
+        original_query: String,
+    ) -> Result<()> {
+        // Get storage statistics
+        use crate::database::{Database, ResultStorage};
+        
+        let database = if let Some(path) = db_path {
+            Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        let storage = ResultStorage::new(database.pool().clone());
+        
         match storage.get_storage_stats(&output_table).await {
             Ok(stats) => {
                 println!("\n📊 Table statistics:");
@@ -830,6 +1179,27 @@ impl Cli {
         limit: usize,
     ) -> Result<()> {
         use crate::database::{Database, DatabaseExplorer};
+        
+        // Validate inputs
+        if let Err(e) = HelpSystem::validate_table_name(&table) {
+            eprintln!("{}", format!("❌ {}", e).red());
+            println!();
+            HelpSystem::suggest_next_steps(&e).iter().for_each(|suggestion| {
+                println!("💡 {}", suggestion.yellow());
+            });
+            return Err(e.into());
+        }
+
+        if let Some(ref path) = db_path {
+            if let Err(e) = HelpSystem::validate_database_path(path) {
+                eprintln!("{}", format!("❌ {}", e).red());
+                println!();
+                HelpSystem::suggest_next_steps(&e).iter().for_each(|suggestion| {
+                    println!("💡 {}", suggestion.yellow());
+                });
+                return Err(e.into());
+            }
+        }
         
         // Get database connection
         let database = if let Some(path) = db_path {
@@ -1051,6 +1421,582 @@ This is a basic task structure. For more sophisticated task generation with auto
             query
         )
     }
+
+    async fn execute_cleanup_tables(&self, db_path: Option<PathBuf>, keep: usize, confirm: bool) -> Result<()> {
+        use crate::database::{Database, DatabaseExplorer};
+        use std::io::{self, Write};
+        
+        // Get database connection
+        let database = if let Some(path) = db_path {
+            Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        let explorer = DatabaseExplorer::new(database.pool().clone());
+        
+        // Get current ingestion tables
+        let tables = explorer.list_tables(Some(crate::database::TableType::Ingestion)).await?;
+        
+        if tables.len() <= keep {
+            println!("✅ No cleanup needed. You have {} ingestion tables, keeping {}", tables.len(), keep);
+            return Ok(());
+        }
+        
+        let tables_to_remove = tables.len() - keep;
+        
+        if !confirm {
+            println!("🗑️  Table Cleanup Preview");
+            println!("   Current tables: {}", tables.len());
+            println!("   Tables to keep: {}", keep);
+            println!("   Tables to remove: {}", tables_to_remove);
+            println!();
+            print!("Are you sure you want to proceed? (y/N): ");
+            io::stdout().flush()?;
+            
+            let mut input = String::new();
+            io::stdin().read_line(&mut input)?;
+            
+            if !input.trim().to_lowercase().starts_with('y') {
+                println!("Cleanup cancelled.");
+                return Ok(());
+            }
+        }
+        
+        println!("🚀 Starting table cleanup...");
+        let result = explorer.cleanup_old_tables(keep).await?;
+        
+        println!("✅ Cleanup completed!");
+        println!("   Tables removed: {}", result.tables_removed);
+        println!("   Tables kept: {}", result.tables_kept);
+        println!("   Space freed: {:.2} MB", result.space_freed_mb);
+        
+        if !result.errors.is_empty() {
+            println!("\n⚠️  Errors occurred:");
+            for error in &result.errors {
+                println!("   • {}", error);
+            }
+        }
+        
+        Ok(())
+    }
+
+    async fn execute_drop_table(&self, db_path: Option<PathBuf>, table: String, confirm: bool) -> Result<()> {
+        use crate::database::{Database, DatabaseExplorer};
+        use std::io::{self, Write};
+        
+        // Get database connection
+        let database = if let Some(path) = db_path {
+            Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        let explorer = DatabaseExplorer::new(database.pool().clone());
+        
+        // Check if table exists
+        if !explorer.schema_manager.table_exists(&table).await? {
+            anyhow::bail!("Table '{}' does not exist", table);
+        }
+        
+        // Get table info for confirmation
+        let sample = explorer.sample_table(&table, 0).await?;
+        
+        if !confirm {
+            println!("🗑️  Drop Table Confirmation");
+            println!("   Table: {}", table);
+            println!("   Rows: {}", sample.total_rows);
+            println!();
+            println!("⚠️  This action cannot be undone!");
+            print!("Are you sure you want to drop this table? (y/N): ");
+            io::stdout().flush()?;
+            
+            let mut input = String::new();
+            io::stdin().read_line(&mut input)?;
+            
+            if !input.trim().to_lowercase().starts_with('y') {
+                println!("Drop cancelled.");
+                return Ok(());
+            }
+        }
+        
+        println!("🗑️  Dropping table '{}'...", table);
+        explorer.drop_table(&table).await?;
+        
+        println!("✅ Table '{}' dropped successfully", table);
+        
+        Ok(())
+    }
+
+    async fn execute_recommendations(&self, db_path: Option<PathBuf>) -> Result<()> {
+        use crate::database::{Database, DatabaseExplorer};
+        
+        // Get database connection
+        let database = if let Some(path) = db_path {
+            Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        let explorer = DatabaseExplorer::new(database.pool().clone());
+        let recommendations = explorer.get_management_recommendations().await?;
+        
+        if recommendations.is_empty() {
+            println!("✅ No management recommendations at this time.");
+            println!("Your database appears to be well-maintained!");
+            return Ok(());
+        }
+        
+        println!("📋 Database Management Recommendations");
+        println!("=====================================\n");
+        
+        for (i, rec) in recommendations.iter().enumerate() {
+            let priority_icon = match rec.priority {
+                crate::database::exploration::Priority::High => "🔴",
+                crate::database::exploration::Priority::Medium => "🟡",
+                crate::database::exploration::Priority::Low => "🟢",
+            };
+            
+            let type_icon = match rec.recommendation_type {
+                crate::database::exploration::RecommendationType::Cleanup => "🗑️",
+                crate::database::exploration::RecommendationType::Performance => "⚡",
+                crate::database::exploration::RecommendationType::Security => "🔒",
+                crate::database::exploration::RecommendationType::Storage => "💾",
+            };
+            
+            println!("{}. {} {} {}", i + 1, priority_icon, type_icon, rec.title);
+            println!("   {}", rec.description);
+            println!("   Action: {}", rec.action);
+            println!();
+        }
+        
+        Ok(())
+    }
+
+    async fn execute_optimize_tables(&self, db_path: Option<PathBuf>, tables: Option<Vec<String>>) -> Result<()> {
+        use crate::database::{Database, DatabaseExplorer};
+        use indicatif::{ProgressBar, ProgressStyle};
+        
+        // Get database connection
+        let database = if let Some(path) = db_path {
+            Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        let explorer = DatabaseExplorer::new(database.pool().clone());
+        
+        // Determine which tables to optimize
+        let table_list = if let Some(specific_tables) = &tables {
+            specific_tables.clone()
+        } else {
+            explorer.schema_manager.list_tables(None).await?
+        };
+        
+        if table_list.is_empty() {
+            println!("No tables to optimize.");
+            return Ok(());
+        }
+        
+        println!("⚡ Optimizing {} tables...", table_list.len());
+        
+        // Create progress bar
+        let progress = ProgressBar::new(table_list.len() as u64);
+        progress.set_style(
+            ProgressStyle::default_bar()
+                .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos:>7}/{len:7} {msg}")
+                .unwrap()
+                .progress_chars("#>-"),
+        );
+        
+        let result = explorer.optimize_tables(tables).await?;
+        
+        progress.finish_and_clear();
+        
+        println!("✅ Optimization completed!");
+        println!("   Tables optimized: {}/{}", result.tables_optimized, result.total_tables);
+        println!("   Duration: {}ms", result.duration_ms);
+        
+        if !result.errors.is_empty() {
+            println!("\n⚠️  Errors occurred:");
+            for error in &result.errors {
+                println!("   • {}", error);
+            }
+        }
+        
+        Ok(())
+    }
+
+    /// Create a basic task structure for simple query-prepare operations (legacy method)
+    fn create_basic_task_structure_legacy(&self, query: &str, temp_path: &PathBuf, output_table: &str) -> String {
+        format!(
+            r#"# Analysis Tasks
+
+## Query Preparation Results
+
+**Query**: `{}`
+**Temporary File**: `{}`
+**Output Table**: `{}`
+**Generated**: {}
+
+## Tasks
+
+- [ ] 1. Review query results
+  - Open the temporary file and examine the data structure
+  - Understand the format and content organization
+  - Identify key patterns or areas of focus
+
+- [ ] 2. Perform analysis
+  - Apply your analysis methodology to the data
+  - Document findings and insights
+  - Prepare structured results
+
+- [ ] 3. Store results
+  - Format your analysis results appropriately
+  - Use the store-result command to persist findings
+  - Verify results are properly stored in the output table
+
+## Commands
+
+```bash
+# View the temporary file
+cat "{}"
+
+# Store analysis results (replace with your actual result file)
+code-ingest store-result \
+  --output-table {} \
+  --result-file /path/to/your/analysis_result.txt \
+  --original-query "{}"
+```
+
+## Notes
+
+- The temporary file contains query results in LLM-friendly format
+- Complete tasks in order for systematic analysis
+- Store results using the provided commands for traceability
+"#,
+            query,
+            temp_path.display(),
+            output_table,
+            chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC"),
+            temp_path.display(),
+            output_table,
+            query
+        )
+    }
+
+    /// Create a comprehensive task structure for query-prepare operations
+    fn create_comprehensive_task_structure(&self, query: &str, temp_path: &PathBuf, output_table: &str, row_count: usize) -> String {
+        let analysis_type = self.detect_analysis_type(query);
+        let task_suggestions = self.generate_task_suggestions(&analysis_type, row_count);
+        
+        format!(
+            r#"# IDE Analysis Tasks
+
+## Query Preparation Metadata
+
+- **Generated At**: {}
+- **SQL Query**: `{}`
+- **Temporary File**: `{}`
+- **Output Table**: `{}`
+- **Row Count**: {}
+- **Analysis Type**: {}
+
+## Task Overview
+
+This document provides a structured approach to analyzing the query results. The tasks are organized to ensure systematic and thorough analysis.
+
+## Analysis Tasks
+
+### Phase 1: Data Exploration
+
+- [ ] 1. Initial Data Review
+  - [ ] 1.1 Open and examine the temporary file structure
+    - **File**: `{}`
+    - **Action**: Review the FILE: format and data organization
+    - **Goal**: Understand the scope and structure of the data
+  
+  - [ ] 1.2 Identify data patterns and characteristics
+    - **Action**: Look for common patterns, file types, and content themes
+    - **Goal**: Establish analysis focus areas
+
+### Phase 2: Systematic Analysis
+
+{}
+
+### Phase 3: Results and Documentation
+
+- [ ] 3. Compile and Store Results
+  - [ ] 3.1 Synthesize analysis findings
+    - **Action**: Combine insights from all analysis tasks
+    - **Goal**: Create comprehensive analysis summary
+  
+  - [ ] 3.2 Format results for storage
+    - **Action**: Structure findings in clear, actionable format
+    - **Goal**: Ensure results are useful for future reference
+  
+  - [ ] 3.3 Store results in database
+    - **Command**: See storage commands below
+    - **Goal**: Persist analysis for traceability and future use
+
+## Storage Commands
+
+```bash
+# Store your analysis results (update paths as needed)
+code-ingest store-result \
+  --output-table {} \
+  --result-file /path/to/your/analysis_result.txt \
+  --original-query "{}"
+
+# Verify storage
+code-ingest sql "SELECT analysis_id, analysis_type, LENGTH(llm_result) as result_size, created_at FROM {} ORDER BY created_at DESC LIMIT 5"
+```
+
+## Analysis Guidelines
+
+### Data Processing Tips
+- Use the FILE: markers to identify individual files in the temporary data
+- Focus on patterns that emerge across multiple files
+- Document specific examples to support your findings
+
+### Result Formatting
+- Structure your analysis with clear headings and bullet points
+- Include specific file references and line numbers when relevant
+- Provide actionable recommendations based on your findings
+
+### Quality Assurance
+- Review your analysis for completeness and accuracy
+- Ensure all significant patterns and issues are documented
+- Verify that recommendations are specific and actionable
+
+## Notes
+
+- **Row Count**: {} files/records to analyze
+- **Analysis Focus**: {}
+- **Expected Output**: Structured analysis results stored in `{}`
+- **Traceability**: Results linked to original query for future reference
+
+Complete tasks systematically, starting with Phase 1 and progressing through each phase in order.
+"#,
+            chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC"),
+            query,
+            temp_path.display(),
+            output_table,
+            row_count,
+            analysis_type,
+            temp_path.display(),
+            task_suggestions,
+            output_table,
+            query,
+            output_table,
+            row_count,
+            analysis_type,
+            output_table
+        )
+    }
+
+    /// Detect the type of analysis based on the SQL query
+    fn detect_analysis_type(&self, query: &str) -> String {
+        let query_lower = query.to_lowercase();
+        
+        if query_lower.contains("security") || query_lower.contains("vulnerability") {
+            "Security Analysis".to_string()
+        } else if query_lower.contains("performance") || query_lower.contains("optimization") {
+            "Performance Analysis".to_string()
+        } else if query_lower.contains("architecture") || query_lower.contains("design") {
+            "Architecture Review".to_string()
+        } else if query_lower.contains("test") || query_lower.contains("coverage") {
+            "Testing Analysis".to_string()
+        } else if query_lower.contains("documentation") || query_lower.contains("comment") {
+            "Documentation Review".to_string()
+        } else if query_lower.contains("dependency") || query_lower.contains("import") {
+            "Dependency Analysis".to_string()
+        } else if query_lower.contains("error") || query_lower.contains("exception") {
+            "Error Analysis".to_string()
+        } else {
+            "General Code Analysis".to_string()
+        }
+    }
+
+    /// Generate task suggestions based on analysis type and data size
+    fn generate_task_suggestions(&self, analysis_type: &str, row_count: usize) -> String {
+        let batch_size = if row_count > 100 { 
+            "Process in batches of 20-30 files for manageable analysis"
+        } else if row_count > 50 {
+            "Process in batches of 10-15 files for thorough analysis"
+        } else {
+            "Analyze all files systematically"
+        };
+
+        match analysis_type {
+            "Security Analysis" => format!(
+                r#"- [ ] 2. Security-Focused Analysis
+  - [ ] 2.1 Identify potential security vulnerabilities
+    - **Focus**: Look for SQL injection, XSS, authentication issues
+    - **Method**: {}
+    - **Goal**: Document security risks and recommendations
+  
+  - [ ] 2.2 Review access control and permissions
+    - **Focus**: Authentication, authorization, privilege escalation
+    - **Goal**: Ensure proper security boundaries
+  
+  - [ ] 2.3 Analyze data handling and validation
+    - **Focus**: Input validation, data sanitization, encryption
+    - **Goal**: Identify data security improvements"#,
+                batch_size
+            ),
+            "Performance Analysis" => format!(
+                r#"- [ ] 2. Performance-Focused Analysis
+  - [ ] 2.1 Identify performance bottlenecks
+    - **Focus**: Slow algorithms, inefficient queries, resource usage
+    - **Method**: {}
+    - **Goal**: Document performance issues and optimization opportunities
+  
+  - [ ] 2.2 Review resource utilization patterns
+    - **Focus**: Memory usage, CPU intensive operations, I/O patterns
+    - **Goal**: Identify resource optimization opportunities
+  
+  - [ ] 2.3 Analyze scalability considerations
+    - **Focus**: Concurrent access, load handling, caching strategies
+    - **Goal**: Recommend scalability improvements"#,
+                batch_size
+            ),
+            "Architecture Review" => format!(
+                r#"- [ ] 2. Architecture-Focused Analysis
+  - [ ] 2.1 Review system design patterns
+    - **Focus**: Design patterns, separation of concerns, modularity
+    - **Method**: {}
+    - **Goal**: Assess architectural quality and consistency
+  
+  - [ ] 2.2 Analyze component relationships
+    - **Focus**: Dependencies, coupling, cohesion, interfaces
+    - **Goal**: Identify architectural improvements
+  
+  - [ ] 2.3 Evaluate maintainability factors
+    - **Focus**: Code organization, extensibility, testability
+    - **Goal**: Recommend architectural enhancements"#,
+                batch_size
+            ),
+            _ => format!(
+                r#"- [ ] 2. Comprehensive Code Analysis
+  - [ ] 2.1 Review code quality and patterns
+    - **Focus**: Code style, best practices, common patterns
+    - **Method**: {}
+    - **Goal**: Identify quality improvements and consistency issues
+  
+  - [ ] 2.2 Analyze functionality and logic
+    - **Focus**: Business logic, error handling, edge cases
+    - **Goal**: Document functionality and potential improvements
+  
+  - [ ] 2.3 Assess maintainability and documentation
+    - **Focus**: Code clarity, comments, documentation completeness
+    - **Goal**: Recommend maintainability enhancements"#,
+                batch_size
+            )
+        }
+    }
+
+    /// Detect analysis type from result content and original query
+    fn detect_analysis_type_from_content(&self, content: &str, query: &str) -> String {
+        let content_lower = content.to_lowercase();
+        let query_lower = query.to_lowercase();
+        
+        // Check content for analysis type indicators
+        if content_lower.contains("security") || content_lower.contains("vulnerability") || content_lower.contains("exploit") {
+            "Security Analysis".to_string()
+        } else if content_lower.contains("performance") || content_lower.contains("optimization") || content_lower.contains("bottleneck") {
+            "Performance Analysis".to_string()
+        } else if content_lower.contains("architecture") || content_lower.contains("design pattern") || content_lower.contains("structure") {
+            "Architecture Review".to_string()
+        } else if content_lower.contains("test") || content_lower.contains("coverage") || content_lower.contains("assertion") {
+            "Testing Analysis".to_string()
+        } else if content_lower.contains("documentation") || content_lower.contains("comment") || content_lower.contains("readme") {
+            "Documentation Review".to_string()
+        } else if content_lower.contains("dependency") || content_lower.contains("import") || content_lower.contains("library") {
+            "Dependency Analysis".to_string()
+        } else if content_lower.contains("error") || content_lower.contains("exception") || content_lower.contains("bug") {
+            "Error Analysis".to_string()
+        } else if content_lower.contains("refactor") || content_lower.contains("cleanup") || content_lower.contains("improvement") {
+            "Code Refactoring".to_string()
+        } else {
+            // Fall back to query-based detection
+            self.detect_analysis_type(query)
+        }
+    }
+
+    /// Show comprehensive setup guide
+    async fn execute_setup(&self) -> Result<()> {
+        HelpSystem::show_setup_guide();
+        Ok(())
+    }
+
+    /// Show command examples for common tasks
+    async fn execute_examples(&self) -> Result<()> {
+        HelpSystem::show_examples();
+        Ok(())
+    }
+
+    /// Show troubleshooting guide
+    async fn execute_troubleshoot(&self) -> Result<()> {
+        HelpSystem::show_troubleshooting_guide();
+        Ok(())
+    }
+
+    /// Enhanced error handling with user-friendly messages
+    fn handle_error(&self, error: anyhow::Error) {
+        // Try to downcast to CodeIngestError for better error messages
+        if let Some(code_ingest_error) = error.downcast_ref::<CodeIngestError>() {
+            eprintln!("{}", format!("❌ {}", code_ingest_error).red());
+            println!();
+            
+            // Show contextual suggestions
+            let suggestions = HelpSystem::suggest_next_steps(code_ingest_error);
+            if !suggestions.is_empty() {
+                println!("{}", "💡 Suggestions:".bright_yellow().bold());
+                for suggestion in suggestions {
+                    println!("   • {}", suggestion.yellow());
+                }
+                println!();
+            }
+            
+            // Show relevant help commands
+            match code_ingest_error {
+                CodeIngestError::Database { .. } | CodeIngestError::DatabaseConnection { .. } => {
+                    println!("{}", "🔧 For PostgreSQL help:".bright_blue().bold());
+                    println!("   code-ingest pg-start");
+                }
+                CodeIngestError::Configuration { .. } => {
+                    println!("{}", "📚 For setup help:".bright_blue().bold());
+                    println!("   code-ingest setup");
+                    println!("   code-ingest examples");
+                }
+                CodeIngestError::Git { .. } => {
+                    println!("{}", "🔍 For troubleshooting:".bright_blue().bold());
+                    println!("   code-ingest troubleshoot");
+                }
+                _ => {
+                    println!("{}", "❓ For general help:".bright_blue().bold());
+                    println!("   code-ingest --help");
+                    println!("   code-ingest troubleshoot");
+                }
+            }
+        } else {
+            // Fallback for other error types
+            eprintln!("{}", format!("❌ Error: {}", error).red());
+            println!();
+            println!("{}", "💡 For help:".bright_yellow().bold());
+            println!("   code-ingest --help");
+            println!("   code-ingest troubleshoot");
+        }
+    }
 }
 #[cfg(test)]
 mod tests {
@@ -1089,9 +2035,13 @@ mod tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match &cli.command {
-            Some(Commands::Sql { query, db_path }) => {
+            Some(Commands::Sql { query, db_path, limit, offset, timeout, llm_format }) => {
                 assert_eq!(query, "SELECT * FROM test");
                 assert_eq!(db_path.as_ref().unwrap().to_str().unwrap(), "/tmp/test");
+                assert_eq!(*limit, 0); // Default value
+                assert_eq!(*offset, 0); // Default value
+                assert_eq!(*timeout, 30); // Default value
+                assert!(!llm_format); // Default value
             }
             _ => panic!("Expected Sql command"),
         }
@@ -1362,6 +2312,36 @@ mod tests {
         let args = vec!["code-ingest", "sample"];
         let result = Cli::try_parse_from(args);
         assert!(result.is_err()); // Missing --table argument
+    }
+
+    #[test]
+    fn test_cli_parsing_help_commands() {
+        // Test setup command
+        let cli = Cli::try_parse_from(&["code-ingest", "setup"]).unwrap();
+        match &cli.command {
+            Some(Commands::Setup) => {
+                // Success - command parsed correctly
+            }
+            _ => panic!("Expected Setup command"),
+        }
+
+        // Test examples command
+        let cli = Cli::try_parse_from(&["code-ingest", "examples"]).unwrap();
+        match &cli.command {
+            Some(Commands::Examples) => {
+                // Success - command parsed correctly
+            }
+            _ => panic!("Expected Examples command"),
+        }
+
+        // Test troubleshoot command
+        let cli = Cli::try_parse_from(&["code-ingest", "troubleshoot"]).unwrap();
+        match &cli.command {
+            Some(Commands::Troubleshoot) => {
+                // Success - command parsed correctly
+            }
+            _ => panic!("Expected Troubleshoot command"),
+        }
     }
 
     #[test]

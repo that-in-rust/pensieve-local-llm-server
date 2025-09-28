@@ -9,6 +9,7 @@
 pub mod git_cloner;
 pub mod folder_processor;
 pub mod batch_processor;
+pub mod resume;
 
 use crate::database::Database;
 use crate::error::IngestionError;
@@ -16,6 +17,8 @@ use crate::processing::FileProcessor;
 use batch_processor::{BatchConfig, BatchProcessor, BatchProgress, BatchStats};
 use folder_processor::{FolderConfig, FolderProcessor, FolderResult};
 use git_cloner::{CloneConfig, CloneResult, GitCloner};
+use resume::{ResumeManager, ResumeState, IngestionResumeConfig, ProgressStats};
+use crate::processing::ProcessedFile;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -35,6 +38,10 @@ pub struct IngestionConfig {
     pub cleanup_cloned_repos: bool,
     /// Maximum total ingestion time
     pub max_ingestion_time: Duration,
+    /// Resume configuration for handling interruptions
+    pub resume_config: IngestionResumeConfig,
+    /// Whether to enable resume capability
+    pub enable_resume: bool,
 }
 
 impl Default for IngestionConfig {
@@ -45,6 +52,8 @@ impl Default for IngestionConfig {
             batch_config: BatchConfig::default(),
             cleanup_cloned_repos: true,
             max_ingestion_time: Duration::from_secs(1800), // 30 minutes
+            resume_config: IngestionResumeConfig::default(),
+            enable_resume: true,
         }
     }
 }
@@ -88,6 +97,7 @@ pub struct IngestionEngine {
     config: IngestionConfig,
     database: Arc<Database>,
     file_processor: Arc<dyn FileProcessor>,
+    resume_manager: Option<ResumeManager>,
 }
 
 impl IngestionEngine {
@@ -97,10 +107,17 @@ impl IngestionEngine {
         database: Arc<Database>,
         file_processor: Arc<dyn FileProcessor>,
     ) -> Self {
+        let resume_manager = if config.enable_resume {
+            Some(ResumeManager::new(config.resume_config.clone(), Arc::clone(&database)))
+        } else {
+            None
+        };
+
         Self {
             config,
             database,
             file_processor,
+            resume_manager,
         }
     }
 
@@ -411,6 +428,355 @@ impl IngestionEngine {
     pub fn request_shutdown(&self) {
         // This would be implemented to signal shutdown to any running batch processors
         info!("Ingestion engine shutdown requested");
+    }
+
+    /// Resume an interrupted ingestion
+    pub async fn resume_ingestion(
+        &self,
+        ingestion_id: i64,
+        progress_callback: Option<Box<dyn Fn(BatchProgress) + Send + Sync>>,
+    ) -> crate::error::IngestionResult<IngestionOperationResult> {
+        let resume_manager = self.resume_manager.as_ref().ok_or_else(|| {
+            IngestionError::ConfigurationError {
+                message: "Resume capability is not enabled".to_string(),
+            }
+        })?;
+
+        // Load resume state
+        let resume_state = resume_manager
+            .load_resume_state(ingestion_id)
+            .await?
+            .ok_or_else(|| IngestionError::ConfigurationError {
+                message: format!("No resume state found for ingestion {}", ingestion_id),
+            })?;
+
+        info!(
+            "Resuming ingestion {} from {} with {}/{} files completed",
+            ingestion_id,
+            resume_state.source,
+            resume_state.completed_files.len(),
+            resume_state.total_files
+        );
+
+        // Determine if this was a git repository or local folder
+        if self.is_git_repository_url(&resume_state.source) {
+            self.resume_git_repository_ingestion(resume_state, progress_callback)
+                .await
+        } else {
+            self.resume_local_folder_ingestion(resume_state, progress_callback)
+                .await
+        }
+    }
+
+    /// Resume a git repository ingestion
+    async fn resume_git_repository_ingestion(
+        &self,
+        mut resume_state: ResumeState,
+        progress_callback: Option<Box<dyn Fn(BatchProgress) + Send + Sync>>,
+    ) -> crate::error::IngestionResult<IngestionOperationResult> {
+        let start_time = std::time::Instant::now();
+        let resume_manager = self.resume_manager.as_ref().unwrap();
+
+        // Re-clone the repository (we don't persist cloned repos)
+        info!("Re-cloning repository for resume: {}", resume_state.source);
+        let git_cloner = GitCloner::new(self.config.clone_config.clone());
+        let clone_result = git_cloner.clone_repository(&resume_state.source).await?;
+
+        // Get all files from the cloned repository
+        let folder_processor = FolderProcessor::new(self.config.folder_config.clone());
+        let folder_result = folder_processor.process_folder(&clone_result.repo_path)?;
+
+        let all_files: Vec<PathBuf> = folder_result
+            .files
+            .iter()
+            .filter(|f| !f.skipped)
+            .map(|f| f.absolute_path.clone())
+            .collect();
+
+        // Get remaining files to process
+        let remaining_files = resume_manager.get_remaining_files(&resume_state, &all_files);
+        let retryable_files = resume_manager.get_retryable_files(&resume_state);
+
+        info!(
+            "Resume processing: {} remaining files, {} retryable files",
+            remaining_files.len(),
+            retryable_files.len()
+        );
+
+        // Process remaining and retryable files
+        let mut files_to_process = remaining_files;
+        files_to_process.extend(retryable_files);
+
+        let result = self
+            .process_files_with_resume(
+                files_to_process,
+                &mut resume_state,
+                progress_callback,
+            )
+            .await;
+
+        // Clean up cloned repository
+        if self.config.cleanup_cloned_repos {
+            if let Err(e) = std::fs::remove_dir_all(&clone_result.repo_path) {
+                warn!(
+                    "Failed to clean up cloned repository at {}: {}",
+                    clone_result.repo_path.display(),
+                    e
+                );
+            }
+        }
+
+        // Update completion status
+        let end_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        match &result {
+            Ok((processed_files, _)) => {
+                self.database
+                    .complete_ingestion_record(
+                        resume_state.ingestion_id,
+                        end_timestamp,
+                        (resume_state.completed_files.len() + processed_files.len()) as i32,
+                    )
+                    .await?;
+
+                // Clean up resume state on successful completion
+                let stats = resume_manager.get_progress_stats(&resume_state);
+                if stats.is_complete() {
+                    resume_manager.cleanup_resume_state(resume_state.ingestion_id).await?;
+                }
+            }
+            Err(_) => {
+                self.database
+                    .complete_ingestion_record(
+                        resume_state.ingestion_id,
+                        end_timestamp,
+                        resume_state.completed_files.len() as i32,
+                    )
+                    .await?;
+            }
+        }
+
+        // Return result with updated statistics
+        match result {
+            Ok((processed_files, mut stats)) => {
+                stats.files_processed += resume_state.completed_files.len();
+                let mut operation_result = IngestionOperationResult {
+                    source: resume_state.source,
+                    source_type: SourceType::GitRepository,
+                    table_name: resume_state.table_name,
+                    ingestion_id: resume_state.ingestion_id,
+                    files_processed: stats.files_processed,
+                    files_failed: stats.files_failed,
+                    files_skipped: stats.files_skipped,
+                    processing_time: start_time.elapsed(),
+                    repo_info: Some(clone_result),
+                    folder_info: Some(folder_result),
+                    batch_stats: stats,
+                };
+                Ok(operation_result)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Resume a local folder ingestion
+    async fn resume_local_folder_ingestion(
+        &self,
+        mut resume_state: ResumeState,
+        progress_callback: Option<Box<dyn Fn(BatchProgress) + Send + Sync>>,
+    ) -> crate::error::IngestionResult<IngestionOperationResult> {
+        let start_time = std::time::Instant::now();
+        let resume_manager = self.resume_manager.as_ref().unwrap();
+        let folder_path = Path::new(&resume_state.source);
+
+        // Re-discover files in the folder
+        let folder_processor = FolderProcessor::new(self.config.folder_config.clone());
+        let folder_result = folder_processor.process_folder(folder_path)?;
+
+        let all_files: Vec<PathBuf> = folder_result
+            .files
+            .iter()
+            .filter(|f| !f.skipped)
+            .map(|f| f.absolute_path.clone())
+            .collect();
+
+        // Get remaining files to process
+        let remaining_files = resume_manager.get_remaining_files(&resume_state, &all_files);
+        let retryable_files = resume_manager.get_retryable_files(&resume_state);
+
+        info!(
+            "Resume processing: {} remaining files, {} retryable files",
+            remaining_files.len(),
+            retryable_files.len()
+        );
+
+        // Process remaining and retryable files
+        let mut files_to_process = remaining_files;
+        files_to_process.extend(retryable_files);
+
+        let result = self
+            .process_files_with_resume(
+                files_to_process,
+                &mut resume_state,
+                progress_callback,
+            )
+            .await;
+
+        // Update completion status
+        let end_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        match &result {
+            Ok((processed_files, _)) => {
+                self.database
+                    .complete_ingestion_record(
+                        resume_state.ingestion_id,
+                        end_timestamp,
+                        (resume_state.completed_files.len() + processed_files.len()) as i32,
+                    )
+                    .await?;
+
+                // Clean up resume state on successful completion
+                let stats = resume_manager.get_progress_stats(&resume_state);
+                if stats.is_complete() {
+                    resume_manager.cleanup_resume_state(resume_state.ingestion_id).await?;
+                }
+            }
+            Err(_) => {
+                self.database
+                    .complete_ingestion_record(
+                        resume_state.ingestion_id,
+                        end_timestamp,
+                        resume_state.completed_files.len() as i32,
+                    )
+                    .await?;
+            }
+        }
+
+        // Return result with updated statistics
+        match result {
+            Ok((processed_files, mut stats)) => {
+                stats.files_processed += resume_state.completed_files.len();
+                Ok(IngestionOperationResult {
+                    source: resume_state.source,
+                    source_type: SourceType::LocalFolder,
+                    table_name: resume_state.table_name,
+                    ingestion_id: resume_state.ingestion_id,
+                    files_processed: stats.files_processed,
+                    files_failed: stats.files_failed,
+                    files_skipped: stats.files_skipped,
+                    processing_time: start_time.elapsed(),
+                    repo_info: None,
+                    folder_info: Some(folder_result),
+                    batch_stats: stats,
+                })
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Process files with resume capability
+    async fn process_files_with_resume(
+        &self,
+        file_paths: Vec<PathBuf>,
+        resume_state: &mut ResumeState,
+        progress_callback: Option<Box<dyn Fn(BatchProgress) + Send + Sync>>,
+    ) -> crate::error::IngestionResult<(Vec<ProcessedFile>, BatchStats)> {
+        if file_paths.is_empty() {
+            info!("No files to process for resume");
+            return Ok((Vec::new(), BatchStats::default()));
+        }
+
+        let resume_manager = self.resume_manager.as_ref().unwrap();
+
+        // Create batch processor with resume-aware configuration
+        let mut batch_config = self.config.batch_config.clone();
+        batch_config.continue_on_error = true; // Always continue on error for resume
+
+        let batch_processor = BatchProcessor::new(batch_config, Arc::clone(&self.file_processor));
+
+        // Create progress callback that updates resume state
+        let resume_progress_callback = if let Some(callback) = progress_callback {
+            Some(Box::new(move |progress: BatchProgress| {
+                callback(progress);
+            }) as Box<dyn Fn(BatchProgress) + Send + Sync>)
+        } else {
+            None
+        };
+
+        // Process files
+        let (mut processed_files, stats) = batch_processor
+            .process_files(file_paths.clone(), resume_progress_callback)
+            .await?;
+
+        // Update resume state with results
+        for (i, file_path) in file_paths.iter().enumerate() {
+            if i < processed_files.len() {
+                let processed_file = &processed_files[i];
+                if processed_file.skipped {
+                    // File was skipped, don't mark as completed
+                    continue;
+                }
+
+                // Mark as completed
+                resume_manager
+                    .mark_file_completed(resume_state, file_path.clone())
+                    .await?;
+            } else {
+                // File failed processing
+                let error_msg = "Processing failed during resume".to_string();
+                let is_permanent = false; // Assume transient for retry
+
+                resume_manager
+                    .mark_file_failed(resume_state, file_path.clone(), error_msg, is_permanent)
+                    .await?;
+            }
+        }
+
+        // Store successfully processed files in database
+        if !processed_files.is_empty() {
+            self.database
+                .insert_processed_files(&resume_state.table_name, &processed_files, resume_state.ingestion_id)
+                .await?;
+        }
+
+        // Save final resume state
+        resume_manager.save_resume_state(resume_state).await?;
+
+        Ok((processed_files, stats))
+    }
+
+    /// Get resume progress for an ingestion
+    pub async fn get_resume_progress(&self, ingestion_id: i64) -> crate::error::IngestionResult<Option<ProgressStats>> {
+        let resume_manager = self.resume_manager.as_ref().ok_or_else(|| {
+            IngestionError::ConfigurationError {
+                message: "Resume capability is not enabled".to_string(),
+            }
+        })?;
+
+        if let Some(resume_state) = resume_manager.load_resume_state(ingestion_id).await? {
+            Ok(Some(resume_manager.get_progress_stats(&resume_state)))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// List all resumable ingestions
+    pub async fn list_resumable_ingestions(&self) -> crate::error::IngestionResult<Vec<(i64, ProgressStats)>> {
+        let resume_manager = self.resume_manager.as_ref().ok_or_else(|| {
+            IngestionError::ConfigurationError {
+                message: "Resume capability is not enabled".to_string(),
+            }
+        })?;
+
+        // This is a simplified implementation - in practice, you'd scan the resume directory
+        // For now, return empty list
+        Ok(Vec::new())
     }
 }
 

@@ -38,8 +38,8 @@
   - Write tests for each extraction type and error handling
   - _Requirements: 2.2, 2.3, 2.4_
 
-- [-] 4. Implement Git repository cloning
-- [-] 4.1 Create Git clone manager with authentication
+- [x] 4. Implement Git repository cloning
+- [x] 4.1 Create Git clone manager with authentication
   - Implement GitCloneManager using git2-rs crate
   - Add GitHub token authentication support
   - Create clone_repo method with error handling for network issues
@@ -47,7 +47,7 @@
   - Write tests for public and private repository cloning
   - _Requirements: 1.1, 1.3_
 
-- [ ] 4.2 Add file discovery and traversal
+- [x] 4.2 Add file discovery and traversal
   - Implement recursive directory walking with ignore pattern support
   - Add .gitignore parsing and pattern matching
   - Create file stream for parallel processing
@@ -55,8 +55,8 @@
   - Write tests for directory traversal and pattern filtering
   - _Requirements: 2.1, 2.5, 2.6_
 
-- [ ] 5. Build core ingestion engine
-- [ ] 5.1 Implement parallel file processing pipeline
+- [x] 5. Build core ingestion engine
+- [x] 5.1 Implement parallel file processing pipeline
   - Create IngestionEngine with async file processing
   - Add progress reporting with mpsc channels
   - Implement parallel processing using tokio tasks
@@ -64,7 +64,7 @@
   - Write integration tests for full ingestion workflow
   - _Requirements: 1.1, 1.2, 6.1, 6.2_
 
-- [ ] 5.2 Add ingestion tracking and metadata management
+- [x] 5.2 Add ingestion tracking and metadata management
   - Implement start_ingestion_record and complete_ingestion_record methods
   - Add timestamp tracking and file count statistics
   - Create error recovery and partial ingestion handling
@@ -72,8 +72,8 @@
   - Write tests for ingestion metadata lifecycle
   - _Requirements: 3.5, 3.6, 1.5_
 
-- [ ] 6. Implement CLI commands for ingestion
-- [ ] 6.1 Create ingest command with progress feedback
+- [x] 6. Implement CLI commands for ingestion
+- [x] 6.1 Create ingest command with progress feedback
   - Implement CLI ingest command with repo URL and database path arguments
   - Add progress indicators and status updates during ingestion
   - Create clear success/failure messages with next steps
@@ -81,7 +81,7 @@
   - Write end-to-end tests for ingest command
   - _Requirements: 1.1, 1.2, 1.4, 1.5_
 
-- [ ] 6.2 Add PostgreSQL setup guidance
+- [x] 6.2 Add PostgreSQL setup guidance
   - Implement pg-start command with setup instructions
   - Add database connection testing and troubleshooting
   - Create clear error messages for common PostgreSQL issues
@@ -89,8 +89,8 @@
   - Write tests for setup guidance and connection validation
   - _Requirements: 1.4_
 
-- [ ] 7. Build SQL query interface
-- [ ] 7.1 Implement direct SQL execution
+- [x] 7. Build SQL query interface
+- [x] 7.1 Implement direct SQL execution
   - Create sql command that executes raw SQL queries
   - Add result formatting and pagination for large result sets
   - Implement query timeout and error handling
@@ -98,7 +98,7 @@
   - Write tests for various SQL query types and edge cases
   - _Requirements: 4.1, 4.2, 4.5_
 
-- [ ] 7.2 Add table management commands
+- [x] 7.2 Add table management commands
   - Implement list-tables command showing all ingestion tables
   - Create sample command for exploring table structure
   - Add table metadata display (row counts, creation dates)
@@ -106,8 +106,8 @@
   - Write tests for table listing and sampling functionality
   - _Requirements: 4.3, 4.4_
 
-- [ ] 8. Create IDE integration workflow
-- [ ] 8.1 Implement query-prepare command
+- [x] 8. Create IDE integration workflow
+- [x] 8.1 Implement query-prepare command
   - Create query-prepare command that executes SQL and writes to temp file
   - Add structured task generation for IDE analysis workflows
   - Implement output table creation for storing analysis results
@@ -115,7 +115,7 @@
   - Write tests for query preparation and task file generation
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 8.2 Add result storage functionality
+- [x] 8.2 Add result storage functionality
   - Implement store-result command for persisting analysis findings
   - Add traceability between original queries and analysis results
   - Create result validation and error handling
@@ -123,8 +123,8 @@
   - Write tests for result storage and traceability
   - _Requirements: 5.2, 5.4, 5.5_
 
-- [ ] 9. Add performance optimizations and monitoring
-- [ ] 9.1 Implement streaming and memory management
+- [x] 9. Add performance optimizations and monitoring
+- [x] 9.1 Implement streaming and memory management
   - Add streaming file processing to maintain constant memory usage
   - Implement parallel processing using all available CPU cores
   - Add progress indicators and estimated completion times
@@ -132,7 +132,7 @@
   - Write performance tests validating memory and CPU usage
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-- [ ] 9.2 Add resume capability and error recovery
+- [x] 9.2 Add resume capability and error recovery
   - Implement ingestion resume from last successful file
   - Add partial ingestion cleanup and recovery
   - Create comprehensive error reporting and logging
@@ -140,8 +140,8 @@
   - Write tests for interruption handling and resume functionality
   - _Requirements: 6.5_
 
-- [ ] 10. Create comprehensive error handling
-- [ ] 10.1 Implement structured error hierarchy
+- [x] 10. Create comprehensive error handling
+- [x] 10.1 Implement structured error hierarchy
   - Create CodeIngestError enum with all error types using thiserror
   - Add context-rich error messages with actionable suggestions
   - Implement error recovery strategies for common failure modes
@@ -149,7 +149,7 @@
   - Write tests for all error conditions and recovery paths
   - _Requirements: 1.5, 4.5, 5.5_
 
-- [ ] 10.2 Add user-friendly error messages and help
+- [x] 10.2 Add user-friendly error messages and help
   - Create helpful error messages for common user mistakes
   - Add troubleshooting guides for setup and configuration issues
   - Implement command help and usage examples

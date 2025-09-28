@@ -3,6 +3,17 @@ pub mod text_processor;
 pub mod converter;
 pub mod binary_processor;
 pub mod pipeline;
+pub mod streaming;
+pub mod performance;
+
+// Re-export main types and traits for convenience
+pub use classifier::{FileClassifier};
+pub use text_processor::{TextProcessor, TextProcessorConfig};
+pub use converter::{Converter, ConverterConfig};
+pub use binary_processor::{BinaryProcessor, BinaryProcessorConfig};
+pub use pipeline::{ContentExtractionPipeline, PipelineConfig, ProcessingStats};
+pub use streaming::{StreamingProcessor, StreamingConfig, StreamingProgress, StreamingStats};
+pub use performance::{PerformanceMonitor, PerformanceConfig, PerformanceSnapshot, PerformanceStats, OptimizationRecommendation};
 
 use serde::{Deserialize, Serialize};
 use std::path::Path;
