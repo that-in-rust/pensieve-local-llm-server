@@ -127,6 +127,12 @@ impl DatabaseOperations {
             }
         }
 
+        // Populate window content after all files are inserted
+        if inserted_count > 0 {
+            info!("Populating multi-scale context windows for {} files", inserted_count);
+            self.populate_window_content(&mut transaction, table_name).await?;
+        }
+
         // Commit transaction
         transaction.commit().await.map_err(|e| DatabaseError::TransactionFailed {
             cause: format!("Failed to commit transaction: {}", e),
@@ -372,19 +378,19 @@ impl DatabaseOperations {
         transaction: &mut Transaction<'_, Postgres>,
         table_name: &str,
     ) -> DatabaseResult<()> {
-        // Update l1_window_content (directory level)
+        // Update l1_window_content (directory level) using GROUP BY instead of window functions
         let l1_update_sql = format!(
             r#"
             UPDATE "{}" SET l1_window_content = subquery.l1_content
             FROM (
                 SELECT 
-                    file_id,
-                    STRING_AGG(content_text, E'\n--- FILE SEPARATOR ---\n' ORDER BY filepath) 
-                        OVER (PARTITION BY parent_filepath) as l1_content
+                    parent_filepath,
+                    STRING_AGG(content_text, E'\n--- FILE SEPARATOR ---\n' ORDER BY filepath) as l1_content
                 FROM "{}"
                 WHERE content_text IS NOT NULL
+                GROUP BY parent_filepath
             ) AS subquery
-            WHERE "{}".file_id = subquery.file_id
+            WHERE "{}".parent_filepath = subquery.parent_filepath
             "#,
             table_name, table_name, table_name
         );
@@ -403,21 +409,23 @@ impl DatabaseOperations {
             UPDATE "{}" SET l2_window_content = subquery.l2_content
             FROM (
                 SELECT 
-                    file_id,
-                    STRING_AGG(content_text, E'\n--- MODULE SEPARATOR ---\n' ORDER BY parent_filepath, filepath) 
-                        OVER (PARTITION BY 
-                            CASE 
-                                WHEN parent_filepath LIKE '%/%' THEN 
-                                    LEFT(parent_filepath, LENGTH(parent_filepath) - POSITION('/' IN REVERSE(parent_filepath)))
-                                ELSE parent_filepath 
-                            END
-                        ) as l2_content
+                    CASE 
+                        WHEN parent_filepath LIKE '%/%' THEN 
+                            LEFT(parent_filepath, LENGTH(parent_filepath) - POSITION('/' IN REVERSE(parent_filepath)))
+                        ELSE parent_filepath 
+                    END as grandfather_filepath,
+                    STRING_AGG(content_text, E'\n--- MODULE SEPARATOR ---\n' ORDER BY parent_filepath, filepath) as l2_content
                 FROM "{}"
                 WHERE content_text IS NOT NULL
+                GROUP BY grandfather_filepath
             ) AS subquery
-            WHERE "{}".file_id = subquery.file_id
+            WHERE CASE 
+                WHEN "{}".parent_filepath LIKE '%/%' THEN 
+                    LEFT("{}".parent_filepath, LENGTH("{}".parent_filepath) - POSITION('/' IN REVERSE("{}".parent_filepath)))
+                ELSE "{}".parent_filepath 
+            END = subquery.grandfather_filepath
             "#,
-            table_name, table_name, table_name
+            table_name, table_name, table_name, table_name, table_name, table_name, table_name
         );
 
         sqlx::query(&l2_update_sql)

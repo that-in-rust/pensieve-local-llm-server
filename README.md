@@ -278,7 +278,7 @@ graph TD
     end
 ```
 
-### Database Schema
+### Enhanced Database Schema
 
 ```sql
 -- Metadata table for tracking ingestions
@@ -293,7 +293,7 @@ CREATE TABLE ingestion_meta (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Timestamped ingestion tables (INGEST_YYYYMMDDHHMMSS)
+-- Enhanced timestamped ingestion tables (INGEST_YYYYMMDDHHMMSS)
 CREATE TABLE INGEST_YYYYMMDDHHMMSS (
     file_id BIGSERIAL PRIMARY KEY,
     ingestion_id BIGINT REFERENCES ingestion_meta(ingestion_id),
@@ -309,12 +309,20 @@ CREATE TABLE INGEST_YYYYMMDDHHMMSS (
     conversion_command VARCHAR,
     relative_path VARCHAR NOT NULL,
     absolute_path VARCHAR NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT NOW(),
+    
+    -- Multi-scale context columns for knowledge arbitrage
+    parent_filepath VARCHAR,          -- Calculated: go back by 1 slash
+    l1_window_content TEXT,           -- Directory-level concatenation  
+    l2_window_content TEXT,           -- System-level concatenation
+    ast_patterns JSONB                -- Pattern matches for semantic search
 );
 
--- Full-text search index
+-- Enhanced indexes
 CREATE INDEX idx_content_fts ON INGEST_YYYYMMDDHHMMSS 
 USING gin(to_tsvector('english', content_text));
+CREATE INDEX idx_parent_filepath ON INGEST_YYYYMMDDHHMMSS(parent_filepath);
+CREATE INDEX idx_ast_patterns ON INGEST_YYYYMMDDHHMMSS USING gin(ast_patterns);
 ```
 
 ### Key Components
