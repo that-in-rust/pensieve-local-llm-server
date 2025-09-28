@@ -11,11 +11,16 @@ pub mod hierarchical_generator;
 pub mod l1l8_markdown_generator;
 pub mod markdown_writer;
 pub mod models;
+pub mod output_directory_manager;
 pub mod task_structure_builder;
 
 pub use database_query_engine::{DatabaseQueryEngine, TableValidation, DatabaseConnectionStats};
 pub use content_extractor::{ContentExtractor, ContentTriple, RowMetadata};
-pub use content_generator::{ContentGenerator, ContentFileSet, RowData};
+pub use content_generator::{ContentGenerator, ContentFileSet, RowData, ContentStatistics, FileStatistics};
+pub use output_directory_manager::{
+    OutputDirectoryManager, OutputDirectoryConfig, DirectoryStatistics, FileConflict, 
+    ConflictResolution, CleanupResult, OrganizationResult, ClearResult, BackupResult
+};
 pub use hierarchical_task_divider::{
     HierarchicalTaskDivider, TaskHierarchy, TaskLevel, HierarchicalTaskGroup, 
     AnalysisTask, AnalysisStage

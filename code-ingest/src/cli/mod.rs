@@ -3,29 +3,61 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use crate::help::HelpSystem;
 use crate::error::{CodeIngestError, CodeIngestResult};
+use crate::config::{Config, ConfigManager, merge_config_with_cli, MergedConfig};
 use colored::*;
 
 #[derive(Parser)]
 #[command(name = "code-ingest")]
-#[command(about = "A Rust-based code ingestion system for PostgreSQL")]
+#[command(about = "A high-performance Rust tool for ingesting GitHub repositories and local folders into PostgreSQL databases for systematic code analysis")]
 #[command(version = "0.1.0")]
+#[command(long_about = "Code Ingest is a powerful command-line tool that enables systematic analysis of codebases by ingesting GitHub repositories or local folders into PostgreSQL databases. It supports hierarchical task generation, chunked analysis for large files, and provides comprehensive SQL interfaces for code exploration.
+
+EXAMPLES:
+    # Ingest GitHub repository
+    code-ingest ingest https://github.com/user/repo --db-path /path/to/db
+    
+    # Ingest local folder
+    code-ingest ingest /absolute/path/to/folder --folder-flag --db-path /path/to/db
+    
+    # Generate hierarchical tasks
+    code-ingest generate-hierarchical-tasks TABLE_NAME --levels 4 --groups 7 --output tasks.md
+    
+    # Generate tasks with chunking for large files
+    code-ingest generate-hierarchical-tasks TABLE_NAME --chunks 500 --output tasks.md")]
 pub struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
     /// Database path for PostgreSQL connection
-    #[arg(long, global = true)]
+    #[arg(long, global = true, help = "Path to PostgreSQL database directory")]
     db_path: Option<PathBuf>,
+    
+    /// Configuration file path (default: ~/.config/code-ingest/config.toml)
+    #[arg(long, global = true, help = "Path to configuration file")]
+    config: Option<PathBuf>,
 }
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Ingest a GitHub repository or local folder
+    /// Ingest a GitHub repository or local folder into PostgreSQL database
+    /// 
+    /// Examples:
+    ///   # Ingest GitHub repository
+    ///   code-ingest ingest https://github.com/user/repo --db-path /path/to/db
+    ///   
+    ///   # Ingest local folder
+    ///   code-ingest ingest /path/to/folder --folder-flag --db-path /path/to/db
     Ingest {
-        /// GitHub repository URL or local folder path
+        /// GitHub repository URL (https://github.com/user/repo) or absolute local folder path
+        #[arg(help = "GitHub repository URL or absolute path to local folder")]
         source: String,
+        
+        /// Enable local folder ingestion mode (required for local paths)
+        #[arg(long, help = "Enable local folder ingestion mode for processing local directories")]
+        folder_flag: bool,
+        
         /// Database path (can also be set globally)
-        #[arg(long)]
+        #[arg(long, help = "Path to PostgreSQL database directory")]
         db_path: Option<PathBuf>,
     },
 
@@ -235,27 +267,52 @@ pub enum Commands {
         db_path: Option<PathBuf>,
     },
 
-    /// Generate hierarchical tasks from database table
+    /// Generate hierarchical task lists from database table for systematic code analysis
+    /// 
+    /// Creates structured markdown files with hierarchical task numbering for systematic
+    /// codebase analysis. Supports both basic file-level analysis and advanced chunked
+    /// processing for large files.
+    /// 
+    /// Examples:
+    ///   # Basic hierarchical task generation
+    ///   code-ingest generate-hierarchical-tasks INGEST_20250928101039 \
+    ///     --levels 4 --groups 7 --output tasks.md --db-path /path/to/db
+    ///   
+    ///   # Chunked analysis for large files
+    ///   code-ingest generate-hierarchical-tasks INGEST_20250928101039 \
+    ///     --chunks 500 --levels 4 --groups 7 --output tasks.md \
+    ///     --prompt-file custom_prompt.md --db-path /path/to/db
     GenerateHierarchicalTasks {
-        /// Table name to generate tasks from
+        /// Database table name containing ingested code data
+        #[arg(help = "Name of the database table to generate tasks from (e.g., INGEST_20250928101039)")]
         table_name: String,
-        /// Number of hierarchy levels (default: 4)
-        #[arg(long, default_value = "4")]
+        
+        /// Number of hierarchy levels in the task structure (1-8)
+        #[arg(long, default_value = "4", value_parser = clap::value_parser!(usize).range(1..=8), 
+              help = "Number of hierarchical levels (1-8, default: 4)")]
         levels: usize,
-        /// Number of groups per level (default: 7)
-        #[arg(long, default_value = "7")]
+        
+        /// Number of groups per hierarchy level (1-20)
+        #[arg(long, default_value = "7", value_parser = clap::value_parser!(usize).range(1..=20),
+              help = "Number of groups per level (1-20, default: 7)")]
         groups: usize,
-        /// Output markdown file path
-        #[arg(long)]
+        
+        /// Output markdown file path for generated tasks
+        #[arg(long, help = "Path where the generated task markdown file will be saved")]
         output: PathBuf,
-        /// Prompt file for analysis instructions
-        #[arg(long, default_value = ".kiro/steering/spec-S04-steering-doc-analysis.md")]
+        
+        /// Prompt file containing analysis instructions
+        #[arg(long, default_value = ".kiro/steering/spec-S04-steering-doc-analysis.md",
+              help = "Path to prompt file with analysis instructions")]
         prompt_file: PathBuf,
-        /// Chunk size in lines of code (LOC) for large file processing
-        #[arg(long)]
+        
+        /// Chunk size in lines of code (LOC) for processing large files
+        #[arg(long, value_parser = clap::value_parser!(usize).range(50..=10000),
+              help = "Split large files into chunks of specified LOC (50-10000)")]
         chunks: Option<usize>,
+        
         /// Database path (can also be set globally)
-        #[arg(long)]
+        #[arg(long, help = "Path to PostgreSQL database directory")]
         db_path: Option<PathBuf>,
     },
 }
@@ -270,6 +327,17 @@ impl Cli {
     pub fn new() -> Self {
         Self::parse()
     }
+    
+    /// Load configuration from file
+    fn load_config(&self) -> Result<Config> {
+        let config_manager = if let Some(config_path) = &self.config {
+            ConfigManager::with_path(config_path.clone())
+        } else {
+            ConfigManager::new()
+        };
+        
+        config_manager.load_config()
+    }
 
     pub async fn run(&self) -> Result<()> {
         match &self.command {
@@ -281,7 +349,8 @@ impl Cli {
                 if args.len() >= 2 && !args[1].starts_with('-') {
                     let source = args[1].clone();
                     let db_path = self.db_path.clone();
-                    self.execute_ingest(source, db_path).await
+                    // Default to false for folder_flag in legacy mode
+                    self.execute_ingest(source, false, db_path).await
                 } else {
                     println!("Code ingestion tool");
                     println!("Use --help for usage information");
@@ -293,9 +362,9 @@ impl Cli {
 
     async fn execute_command(&self, command: &Commands) -> Result<()> {
         match command {
-            Commands::Ingest { source, db_path } => {
+            Commands::Ingest { source, folder_flag, db_path } => {
                 let db_path = db_path.clone().or_else(|| self.db_path.clone());
-                self.execute_ingest(source.clone(), db_path).await
+                self.execute_ingest(source.clone(), *folder_flag, db_path).await
             }
             Commands::Sql { query, db_path, limit, offset, timeout, llm_format } => {
                 let db_path = db_path.clone().or_else(|| self.db_path.clone());
@@ -438,7 +507,7 @@ impl Cli {
         }
     }
 
-    async fn execute_ingest(&self, source: String, db_path: Option<PathBuf>) -> Result<()> {
+    async fn execute_ingest(&self, source: String, folder_flag: bool, db_path: Option<PathBuf>) -> Result<()> {
         use crate::database::{Database, SchemaManager};
         use crate::ingestion::{IngestionEngine, IngestionConfig};
         use crate::processing::text_processor::TextProcessor;
@@ -446,14 +515,39 @@ impl Cli {
         use indicatif::{ProgressBar, ProgressStyle};
         use std::sync::Arc;
         
-        // Validate inputs
-        if let Err(e) = HelpSystem::validate_repository_url(&source) {
-            eprintln!("{}", format!("❌ {}", e).red());
-            println!();
-            HelpSystem::suggest_next_steps(&e).iter().for_each(|suggestion| {
-                println!("💡 {}", suggestion.yellow());
-            });
-            return Err(e.into());
+        // Validate inputs based on source type and folder flag
+        if folder_flag {
+            // Local folder ingestion mode
+            if !source.starts_with('/') {
+                anyhow::bail!("When using --folder-flag, source must be an absolute path (starting with '/'). Got: {}", source);
+            }
+            
+            let path = std::path::Path::new(&source);
+            if !path.exists() {
+                anyhow::bail!("Local folder does not exist: {}", source);
+            }
+            
+            if !path.is_dir() {
+                anyhow::bail!("Path is not a directory: {}", source);
+            }
+            
+            println!("📁 Local folder ingestion mode enabled");
+        } else {
+            // GitHub repository ingestion mode
+            if source.starts_with('/') || source.starts_with('.') {
+                anyhow::bail!("Local paths require --folder-flag parameter. Use: --folder-flag for local directory ingestion");
+            }
+            
+            if let Err(e) = HelpSystem::validate_repository_url(&source) {
+                eprintln!("{}", format!("❌ {}", e).red());
+                println!();
+                HelpSystem::suggest_next_steps(&e).iter().for_each(|suggestion| {
+                    println!("💡 {}", suggestion.yellow());
+                });
+                return Err(e.into());
+            }
+            
+            println!("🌐 GitHub repository ingestion mode");
         }
 
         if let Some(ref path) = db_path {
@@ -2215,6 +2309,89 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         Ok(())
     }
 
+    /// Validate parameters for generate-hierarchical-tasks command
+    fn validate_hierarchical_task_parameters(
+        &self,
+        table_name: &str,
+        levels: usize,
+        groups: usize,
+        output: &PathBuf,
+        prompt_file: &PathBuf,
+        chunks: Option<usize>,
+    ) -> Result<()> {
+        // Validate table name format
+        if table_name.is_empty() {
+            anyhow::bail!("Table name cannot be empty");
+        }
+        
+        if table_name.contains(' ') {
+            anyhow::bail!("Table name cannot contain spaces: '{}'", table_name);
+        }
+        
+        // Validate levels (already validated by clap, but double-check)
+        if !(1..=8).contains(&levels) {
+            anyhow::bail!("Levels must be between 1 and 8, got: {}", levels);
+        }
+        
+        // Validate groups (already validated by clap, but double-check)
+        if !(1..=20).contains(&groups) {
+            anyhow::bail!("Groups must be between 1 and 20, got: {}", groups);
+        }
+        
+        // Validate output file path
+        if let Some(parent) = output.parent() {
+            if !parent.exists() {
+                println!("ℹ️  Output directory will be created: {}", parent.display());
+            }
+        }
+        
+        // Check if output file already exists
+        if output.exists() {
+            println!("⚠️  Warning: Output file already exists and will be overwritten: {}", output.display());
+        }
+        
+        // Validate output file extension
+        if let Some(extension) = output.extension() {
+            if extension != "md" {
+                println!("ℹ️  Note: Output file does not have .md extension: {}", output.display());
+            }
+        } else {
+            println!("ℹ️  Note: Output file has no extension, consider using .md: {}", output.display());
+        }
+        
+        // Validate prompt file exists and is readable
+        if !prompt_file.exists() {
+            anyhow::bail!("Prompt file not found: {}", prompt_file.display());
+        }
+        
+        if !prompt_file.is_file() {
+            anyhow::bail!("Prompt file path is not a file: {}", prompt_file.display());
+        }
+        
+        // Try to read the prompt file to ensure it's accessible
+        match std::fs::metadata(&prompt_file) {
+            Ok(metadata) => {
+                if metadata.len() == 0 {
+                    println!("⚠️  Warning: Prompt file is empty: {}", prompt_file.display());
+                }
+            }
+            Err(e) => {
+                anyhow::bail!("Cannot access prompt file {}: {}", prompt_file.display(), e);
+            }
+        }
+        
+        // Validate chunks parameter if provided
+        if let Some(chunk_size) = chunks {
+            if !(50..=10000).contains(&chunk_size) {
+                anyhow::bail!("Chunk size must be between 50 and 10000 LOC, got: {}", chunk_size);
+            }
+            
+            println!("🔄 Chunking mode enabled: {} LOC per chunk", chunk_size);
+        }
+        
+        Ok(())
+    }
+
     /// Execute generate-hierarchical-tasks command
     async fn execute_generate_hierarchical_tasks(
         &self,
@@ -2226,18 +2403,32 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         chunks: Option<usize>,
         db_path: Option<PathBuf>,
     ) -> Result<()> {
+        // Load configuration and merge with CLI arguments
+        let config = self.load_config()?;
+        let merged_config = merge_config_with_cli(
+            &config,
+            db_path.clone().or_else(|| self.db_path.clone()),
+            Some(levels),
+            Some(groups),
+            Some(prompt_file.clone()),
+            chunks,
+        );
+        
+        // Validate parameters using merged configuration
+        self.validate_hierarchical_task_parameters(&table_name, merged_config.levels, merged_config.groups, &output, &merged_config.prompt_file, merged_config.chunks)?;
         use crate::tasks::{DatabaseQueryEngine, ContentExtractor, HierarchicalTaskDivider, L1L8MarkdownGenerator};
         use indicatif::{ProgressBar, ProgressStyle};
         
         println!("🏗️  Generating hierarchical tasks from table: {}", table_name.bright_cyan());
         println!("📊 Configuration:");
-        println!("   Levels: {}", levels);
-        println!("   Groups per level: {}", groups);
+        println!("   Levels: {}", merged_config.levels);
+        println!("   Groups per level: {}", merged_config.groups);
         println!("   Output file: {}", output.display().to_string().bright_yellow());
-        println!("   Prompt file: {}", prompt_file.display().to_string().bright_blue());
-        if let Some(chunk_size) = chunks {
+        println!("   Prompt file: {}", merged_config.prompt_file.display().to_string().bright_blue());
+        if let Some(chunk_size) = merged_config.chunks {
             println!("   Chunk size: {} LOC", chunk_size.to_string().bright_green());
         }
+        println!("   Database timeout: {}s", merged_config.timeout_seconds);
         println!();
         
         // Validate prompt file exists

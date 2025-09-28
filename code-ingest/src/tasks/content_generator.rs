@@ -8,6 +8,7 @@ use crate::error::{TaskError, TaskResult};
 use crate::tasks::models::{
     ChunkMetadata, ContentFileReference, ContentFileType, GenerationConfig,
 };
+use crate::tasks::output_directory_manager::{OutputDirectoryManager, ConflictResolution};
 use sqlx::{PgPool, Row};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -23,6 +24,8 @@ pub struct ContentGenerator {
     output_dir: PathBuf,
     /// Configuration for generation
     config: GenerationConfig,
+    /// Output directory manager
+    dir_manager: OutputDirectoryManager,
 }
 
 /// Set of three content files for analysis (A, L1, L2)
@@ -71,10 +74,12 @@ impl ContentGenerator {
     /// # Returns
     /// * `Self` - New ContentGenerator instance
     pub fn new(db_pool: Arc<PgPool>, output_dir: PathBuf, config: GenerationConfig) -> Self {
+        let dir_manager = OutputDirectoryManager::from_generation_config(&config);
         Self {
             db_pool,
             output_dir,
             config,
+            dir_manager,
         }
     }
 
@@ -145,11 +150,20 @@ impl ContentGenerator {
             row_number, table_name
         );
 
-        // Generate file paths using the naming convention
+        // Generate file paths using the naming convention and directory manager
         let base_name = format!("{}_{}_Content", table_name, row_number);
-        let content_a_path = self.output_dir.join(format!("{}.txt", base_name));
-        let content_l1_path = self.output_dir.join(format!("{}_L1.txt", base_name));
-        let content_l2_path = self.output_dir.join(format!("{}_L2.txt", base_name));
+        let content_a_path = self.dir_manager.get_output_path(
+            &format!("{}.txt", base_name), 
+            Some(table_name)
+        );
+        let content_l1_path = self.dir_manager.get_output_path(
+            &format!("{}_L1.txt", base_name), 
+            Some(table_name)
+        );
+        let content_l2_path = self.dir_manager.get_output_path(
+            &format!("{}_L2.txt", base_name), 
+            Some(table_name)
+        );
 
         // Get raw content
         let raw_content = row_data.content_text.as_deref().unwrap_or("");
@@ -229,9 +243,18 @@ impl ContentGenerator {
         // For chunked tables, use the chunked table name in file paths
         let effective_table_name = self.config.effective_table_name();
         let base_name = format!("{}_{}_Content", effective_table_name, row_number);
-        let content_a_path = self.output_dir.join(format!("{}.txt", base_name));
-        let content_l1_path = self.output_dir.join(format!("{}_L1.txt", base_name));
-        let content_l2_path = self.output_dir.join(format!("{}_L2.txt", base_name));
+        let content_a_path = self.dir_manager.get_output_path(
+            &format!("{}.txt", base_name), 
+            Some(&effective_table_name)
+        );
+        let content_l1_path = self.dir_manager.get_output_path(
+            &format!("{}_L1.txt", base_name), 
+            Some(&effective_table_name)
+        );
+        let content_l2_path = self.dir_manager.get_output_path(
+            &format!("{}_L2.txt", base_name), 
+            Some(&effective_table_name)
+        );
 
         // Get chunk content
         let chunk_content = row_data.content_text.as_deref().unwrap_or("");
@@ -302,15 +325,7 @@ impl ContentGenerator {
 
     /// Ensure the output directory exists
     async fn ensure_output_directory(&self) -> TaskResult<()> {
-        fs::create_dir_all(&self.output_dir).await.map_err(|e| {
-            TaskError::TaskFileCreationFailed {
-                path: self.output_dir.display().to_string(),
-                cause: format!("Failed to create output directory: {}", e),
-                suggestion: "Check directory permissions and available disk space".to_string(),
-                source: Some(Box::new(e)),
-            }
-        })?;
-
+        self.dir_manager.ensure_directory_structure().await?;
         debug!("Ensured output directory exists: {}", self.output_dir.display());
         Ok(())
     }
@@ -613,25 +628,40 @@ impl ContentGenerator {
         context.push_str("# L1 Context: Chunk Context (Previous + Current + Next)\n\n");
         context.push_str("## Chunk Information\n\n");
 
-        if let Some(chunk_number) = row_data.chunk_number {
-            context.push_str(&format!("- **Chunk Number**: {}\n", chunk_number));
-        }
+        let chunk_number = row_data.chunk_number.unwrap_or(1);
+        let start_line = row_data.chunk_start_line.unwrap_or(1);
+        let end_line = row_data.chunk_end_line.unwrap_or(1);
 
-        if let (Some(start_line), Some(end_line)) = (row_data.chunk_start_line, row_data.chunk_end_line) {
-            context.push_str(&format!("- **Line Range**: {}-{}\n", start_line, end_line));
-        }
+        context.push_str(&format!("- **Current Chunk**: {}\n", chunk_number));
+        context.push_str(&format!("- **Line Range**: {}-{} ({} lines)\n", 
+            start_line, end_line, end_line - start_line + 1));
 
         if let Some(filepath) = &row_data.filepath {
             context.push_str(&format!("- **File Path**: `{}`\n", filepath));
         }
 
+        if let Some(parent_filepath) = &row_data.parent_filepath {
+            context.push_str(&format!("- **Original File**: `{}`\n", parent_filepath));
+        }
+
+        // Get chunk context information
+        let context_info = self.get_chunk_context_info(row_data, 1).await?;
+        context.push_str(&format!("- **L1 Context Range**: Chunks {}-{} ({} chunks)\n", 
+            context_info.start_chunk, context_info.end_chunk, context_info.chunk_count));
+
         // Query for previous and next chunks to build L1 context
         let l1_content = self.query_chunk_context(row_data, 1).await?;
         
         context.push_str("\n## L1 Context Content\n\n");
-        context.push_str("```\n");
-        context.push_str(&l1_content);
-        context.push_str("\n```\n");
+        context.push_str("*This section contains the concatenated content of the previous chunk, current chunk, and next chunk to provide immediate context for analysis.*\n\n");
+        
+        if l1_content.trim().is_empty() {
+            context.push_str("*No context content available - this may be a single chunk file.*\n");
+        } else {
+            context.push_str("```\n");
+            context.push_str(&l1_content);
+            context.push_str("\n```\n");
+        }
 
         Ok(context)
     }
@@ -643,21 +673,83 @@ impl ContentGenerator {
         context.push_str("# L2 Context: Extended Chunk Context (±2 Chunks)\n\n");
         context.push_str("## Extended Chunk Information\n\n");
 
-        if let Some(chunk_number) = row_data.chunk_number {
-            context.push_str(&format!("- **Current Chunk**: {}\n", chunk_number));
-            context.push_str(&format!("- **Context Range**: Chunks {}-{}\n", 
-                std::cmp::max(1, chunk_number - 2), chunk_number + 2));
+        let chunk_number = row_data.chunk_number.unwrap_or(1);
+        let start_line = row_data.chunk_start_line.unwrap_or(1);
+        let end_line = row_data.chunk_end_line.unwrap_or(1);
+
+        context.push_str(&format!("- **Current Chunk**: {}\n", chunk_number));
+        context.push_str(&format!("- **Line Range**: {}-{} ({} lines)\n", 
+            start_line, end_line, end_line - start_line + 1));
+
+        // Get chunk context information
+        let context_info = self.get_chunk_context_info(row_data, 2).await?;
+        context.push_str(&format!("- **L2 Context Range**: Chunks {}-{} ({} chunks)\n", 
+            context_info.start_chunk, context_info.end_chunk, context_info.chunk_count));
+
+        if let Some(filepath) = &row_data.filepath {
+            context.push_str(&format!("- **File Path**: `{}`\n", filepath));
+        }
+
+        if let Some(parent_filepath) = &row_data.parent_filepath {
+            context.push_str(&format!("- **Original File**: `{}`\n", parent_filepath));
         }
 
         // Query for ±2 chunks to build L2 context
         let l2_content = self.query_chunk_context(row_data, 2).await?;
         
         context.push_str("\n## L2 Context Content\n\n");
-        context.push_str("```\n");
-        context.push_str(&l2_content);
-        context.push_str("\n```\n");
+        context.push_str("*This section contains the concatenated content of ±2 chunks around the current chunk to provide broader architectural context for analysis.*\n\n");
+        
+        if l2_content.trim().is_empty() {
+            context.push_str("*No extended context content available - this may be a small file with few chunks.*\n");
+        } else {
+            context.push_str("```\n");
+            context.push_str(&l2_content);
+            context.push_str("\n```\n");
+        }
 
         Ok(context)
+    }
+
+
+
+    /// Get information about chunk context range
+    async fn get_chunk_context_info(&self, row_data: &RowData, context_level: i32) -> TaskResult<ChunkContextInfo> {
+        let chunk_number = row_data.chunk_number.unwrap_or(1);
+        let file_id = row_data.file_id.unwrap_or(0);
+        
+        let start_chunk = std::cmp::max(1, chunk_number - context_level);
+        let end_chunk = chunk_number + context_level;
+
+        // Query to get the actual range of available chunks
+        let query = format!(
+            "SELECT MIN(chunk_number) as min_chunk, MAX(chunk_number) as max_chunk, COUNT(*) as chunk_count
+             FROM \"{}\" 
+             WHERE file_id = $1 AND chunk_number BETWEEN $2 AND $3",
+            self.config.effective_table_name()
+        );
+
+        let row = sqlx::query(&query)
+            .bind(file_id)
+            .bind(start_chunk)
+            .bind(end_chunk)
+            .fetch_one(&*self.db_pool)
+            .await
+            .map_err(|e| TaskError::QueryResultProcessingFailed {
+                cause: format!("Failed to fetch chunk context info: {}", e),
+                suggestion: "Check database connection and chunked table accessibility".to_string(),
+                source: Some(Box::new(e)),
+            })?;
+
+        let actual_start: Option<i32> = row.try_get("min_chunk").ok().flatten();
+        let actual_end: Option<i32> = row.try_get("max_chunk").ok().flatten();
+        let count: i64 = row.try_get("chunk_count").unwrap_or(0);
+
+        Ok(ChunkContextInfo {
+            start_chunk: actual_start.unwrap_or(start_chunk),
+            end_chunk: actual_end.unwrap_or(end_chunk),
+            chunk_count: count as usize,
+        })
     }
 
     /// Query chunk context (±N chunks around current)
@@ -669,7 +761,7 @@ impl ContentGenerator {
         let end_chunk = chunk_number + context_level;
 
         let query = format!(
-            "SELECT chunk_number, content_text 
+            "SELECT chunk_number, content_text, chunk_start_line, chunk_end_line
              FROM \"{}\" 
              WHERE file_id = $1 AND chunk_number BETWEEN $2 AND $3
              ORDER BY chunk_number",
@@ -688,15 +780,44 @@ impl ContentGenerator {
                 source: Some(Box::new(e)),
             })?;
 
+        if rows.is_empty() {
+            return Ok(String::new());
+        }
+
         let mut context_content = String::new();
-        for row in rows {
+        for (i, row) in rows.iter().enumerate() {
             let chunk_num: i32 = row.try_get("chunk_number").unwrap_or(0);
             let content: Option<String> = row.try_get("content_text").ok();
+            let start_line: Option<i32> = row.try_get("chunk_start_line").ok();
+            let end_line: Option<i32> = row.try_get("chunk_end_line").ok();
             
             if let Some(content) = content {
-                context_content.push_str(&format!("=== Chunk {} ===\n", chunk_num));
+                // Add separator between chunks
+                if i > 0 {
+                    context_content.push_str("\n");
+                }
+
+                // Add chunk header with line information
+                if let (Some(start), Some(end)) = (start_line, end_line) {
+                    context_content.push_str(&format!(
+                        "=== Chunk {} (lines {}-{}) ===\n", 
+                        chunk_num, start, end
+                    ));
+                } else {
+                    context_content.push_str(&format!("=== Chunk {} ===\n", chunk_num));
+                }
+
+                // Mark current chunk
+                if chunk_num == chunk_number {
+                    context_content.push_str(">>> CURRENT CHUNK <<<\n");
+                }
+
                 context_content.push_str(&content);
-                context_content.push_str("\n\n");
+                
+                // Add trailing newline if content doesn't end with one
+                if !content.ends_with('\n') {
+                    context_content.push_str("\n");
+                }
             }
         }
 
@@ -858,6 +979,202 @@ impl ContentGenerator {
         }
 
         Ok(())
+    }
+
+    /// Validate generated content files
+    pub async fn validate_content_files(&self, content_set: &ContentFileSet) -> TaskResult<()> {
+        // Check that all files exist and are readable
+        let files = [
+            &content_set.content_a.file_path,
+            &content_set.content_l1.file_path,
+            &content_set.content_l2.file_path,
+        ];
+
+        for file_path in &files {
+            if !file_path.exists() {
+                return Err(TaskError::TaskFileCreationFailed {
+                    path: file_path.display().to_string(),
+                    cause: "Content file does not exist after creation".to_string(),
+                    suggestion: "Check file system permissions and disk space".to_string(),
+                    source: None,
+                });
+            }
+
+            // Check file is readable and not empty
+            let metadata = fs::metadata(file_path).await.map_err(|e| {
+                TaskError::TaskFileCreationFailed {
+                    path: file_path.display().to_string(),
+                    cause: format!("Cannot read file metadata: {}", e),
+                    suggestion: "Check file permissions".to_string(),
+                    source: Some(Box::new(e)),
+                }
+            })?;
+
+            if metadata.len() == 0 {
+                warn!("Content file is empty: {}", file_path.display());
+            }
+        }
+
+        debug!("Validated content files for row {}", content_set.row_number);
+        Ok(())
+    }
+
+    /// Clean up content files (for error recovery)
+    pub async fn cleanup_content_files(&self, content_set: &ContentFileSet) -> TaskResult<()> {
+        let files = [
+            &content_set.content_a.file_path,
+            &content_set.content_l1.file_path,
+            &content_set.content_l2.file_path,
+        ];
+
+        for file_path in &files {
+            if file_path.exists() {
+                if let Err(e) = fs::remove_file(file_path).await {
+                    warn!("Failed to cleanup content file {}: {}", file_path.display(), e);
+                } else {
+                    debug!("Cleaned up content file: {}", file_path.display());
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Get content file statistics
+    pub async fn get_content_statistics(&self, content_set: &ContentFileSet) -> TaskResult<ContentStatistics> {
+        let mut stats = ContentStatistics::default();
+
+        let files = [
+            (&content_set.content_a.file_path, "A"),
+            (&content_set.content_l1.file_path, "L1"),
+            (&content_set.content_l2.file_path, "L2"),
+        ];
+
+        for (file_path, file_type) in &files {
+            if file_path.exists() {
+                let content = fs::read_to_string(file_path).await.map_err(|e| {
+                    TaskError::TaskFileCreationFailed {
+                        path: file_path.display().to_string(),
+                        cause: format!("Failed to read content file for statistics: {}", e),
+                        suggestion: "Check file permissions".to_string(),
+                        source: Some(Box::new(e)),
+                    }
+                })?;
+
+                let file_stats = FileStatistics {
+                    file_type: file_type.to_string(),
+                    size_bytes: content.len(),
+                    line_count: content.lines().count(),
+                    word_count: content.split_whitespace().count(),
+                    char_count: content.chars().count(),
+                };
+
+                match *file_type {
+                    "A" => stats.content_a = Some(file_stats),
+                    "L1" => stats.content_l1 = Some(file_stats),
+                    "L2" => stats.content_l2 = Some(file_stats),
+                    _ => {}
+                }
+            }
+        }
+
+        Ok(stats)
+    }
+
+    /// Get directory statistics from the output directory manager
+    pub async fn get_output_directory_statistics(&self) -> TaskResult<crate::tasks::output_directory_manager::DirectoryStatistics> {
+        self.dir_manager.get_directory_statistics().await
+    }
+
+    /// Clean up old content files
+    pub async fn cleanup_old_content_files(&self) -> TaskResult<crate::tasks::output_directory_manager::CleanupResult> {
+        self.dir_manager.cleanup_old_files().await
+    }
+
+    /// Organize content files into subdirectories
+    pub async fn organize_content_files(&self) -> TaskResult<crate::tasks::output_directory_manager::OrganizationResult> {
+        self.dir_manager.organize_files().await
+    }
+
+    /// Clear all content files from the output directory
+    pub async fn clear_all_content_files(&self) -> TaskResult<crate::tasks::output_directory_manager::ClearResult> {
+        self.dir_manager.clear_directory().await
+    }
+
+    /// Create a backup of the output directory
+    pub async fn backup_output_directory(&self, backup_path: &Path) -> TaskResult<crate::tasks::output_directory_manager::BackupResult> {
+        self.dir_manager.create_backup(backup_path).await
+    }
+
+    /// Validate and resolve file path conflicts
+    pub async fn validate_output_path(
+        &self,
+        file_path: &Path,
+        content_size: usize,
+    ) -> TaskResult<PathBuf> {
+        self.dir_manager.validate_and_resolve_path(
+            file_path,
+            content_size,
+            ConflictResolution::BackupAndOverwrite,
+        ).await
+    }
+}
+
+/// Statistics for content files
+#[derive(Debug, Clone, Default)]
+pub struct ContentStatistics {
+    pub content_a: Option<FileStatistics>,
+    pub content_l1: Option<FileStatistics>,
+    pub content_l2: Option<FileStatistics>,
+}
+
+/// Statistics for a single file
+#[derive(Debug, Clone)]
+pub struct FileStatistics {
+    pub file_type: String,
+    pub size_bytes: usize,
+    pub line_count: usize,
+    pub word_count: usize,
+    pub char_count: usize,
+}
+
+/// Information about chunk context range
+#[derive(Debug)]
+struct ChunkContextInfo {
+    start_chunk: i32,
+    end_chunk: i32,
+    chunk_count: usize,
+}
+
+impl ContentStatistics {
+    /// Get total size across all files
+    pub fn total_size_bytes(&self) -> usize {
+        let mut total = 0;
+        if let Some(ref stats) = self.content_a {
+            total += stats.size_bytes;
+        }
+        if let Some(ref stats) = self.content_l1 {
+            total += stats.size_bytes;
+        }
+        if let Some(ref stats) = self.content_l2 {
+            total += stats.size_bytes;
+        }
+        total
+    }
+
+    /// Get total line count across all files
+    pub fn total_line_count(&self) -> usize {
+        let mut total = 0;
+        if let Some(ref stats) = self.content_a {
+            total += stats.line_count;
+        }
+        if let Some(ref stats) = self.content_l1 {
+            total += stats.line_count;
+        }
+        if let Some(ref stats) = self.content_l2 {
+            total += stats.line_count;
+        }
+        total
     }
 }
 
