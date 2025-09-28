@@ -68,6 +68,8 @@ url = { workspace = true }
 
 # Logging and tracing
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
 
 # Gitignore pattern matching
 ignore = { workspace = true }

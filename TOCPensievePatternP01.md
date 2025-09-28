@@ -14,10 +14,6 @@ URL | TableName
 https://github.com/sunface/rust-course
 https://github.com/cloudflare/pingora
 https://github.com/basecamp/once-campfire
-
-
-
-# Yet to be done
 https://github.com/basecamp/once-campfire
 https://github.com/rust-lang/rust
 https://github.com/rust-lang/rustlings

@@ -1,5 +1,7 @@
 use thiserror::Error;
-use tracing::{error, warn, debug, info};
+use tracing::{error, warn, debug, info, instrument};
+use std::time::Duration;
+
 
 /// Main error type for the code ingestion system with actionable error messages
 #[derive(Error, Debug)]
@@ -122,6 +124,16 @@ pub enum CodeIngestError {
         operation: String, 
         timeout_seconds: u64, 
         suggestion: String,
+    },
+
+    #[error("Batch processing failed: processed {processed}/{total} items - {message}\n💡 Suggestion: {suggestion}")]
+    BatchProcessingFailed {
+        processed: usize,
+        total: usize,
+        message: String,
+        suggestion: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 }
 
@@ -1762,6 +1774,558 @@ mod tests {
                 assert!(cause.contains("Test git error"));
             }
             _ => panic!("Expected GitCloneFailed"),
+        }
+    }
+}
+/// Error recovery strategies for different types of failures
+#[derive(Debug, Clone)]
+pub struct ErrorRecoveryStrategy {
+    pub max_retries: u32,
+    pub base_delay: Duration,
+    pub max_delay: Duration,
+    pub backoff_multiplier: f64,
+    pub recoverable_errors: Vec<String>,
+}
+
+impl Default for ErrorRecoveryStrategy {
+    fn default() -> Self {
+        Self {
+            max_retries: 3,
+            base_delay: Duration::from_millis(100),
+            max_delay: Duration::from_secs(30),
+            backoff_multiplier: 2.0,
+            recoverable_errors: vec![
+                "connection".to_string(),
+                "timeout".to_string(),
+                "network".to_string(),
+                "temporary".to_string(),
+            ],
+        }
+    }
+}
+
+impl ErrorRecoveryStrategy {
+    /// Create a strategy for database operations
+    pub fn database() -> Self {
+        Self {
+            max_retries: 5,
+            base_delay: Duration::from_millis(200),
+            max_delay: Duration::from_secs(10),
+            backoff_multiplier: 1.5,
+            recoverable_errors: vec![
+                "connection".to_string(),
+                "timeout".to_string(),
+                "deadlock".to_string(),
+                "lock".to_string(),
+            ],
+        }
+    }
+
+    /// Create a strategy for network operations
+    pub fn network() -> Self {
+        Self {
+            max_retries: 3,
+            base_delay: Duration::from_secs(1),
+            max_delay: Duration::from_secs(60),
+            backoff_multiplier: 2.0,
+            recoverable_errors: vec![
+                "network".to_string(),
+                "timeout".to_string(),
+                "dns".to_string(),
+                "connection".to_string(),
+                "502".to_string(),
+                "503".to_string(),
+                "504".to_string(),
+            ],
+        }
+    }
+
+    /// Create a strategy for filesystem operations
+    pub fn filesystem() -> Self {
+        Self {
+            max_retries: 2,
+            base_delay: Duration::from_millis(50),
+            max_delay: Duration::from_secs(5),
+            backoff_multiplier: 2.0,
+            recoverable_errors: vec![
+                "busy".to_string(),
+                "locked".to_string(),
+                "temporary".to_string(),
+            ],
+        }
+    }
+
+    /// Calculate delay for retry attempt
+    pub fn calculate_delay(&self, attempt: u32) -> Duration {
+        let delay = self.base_delay.as_millis() as f64 * self.backoff_multiplier.powi(attempt as i32);
+        let delay = Duration::from_millis(delay as u64);
+        std::cmp::min(delay, self.max_delay)
+    }
+
+    /// Check if error is recoverable based on error message
+    pub fn is_recoverable(&self, error_message: &str) -> bool {
+        let message_lower = error_message.to_lowercase();
+        self.recoverable_errors.iter().any(|pattern| message_lower.contains(pattern))
+    }
+}
+
+/// Enhanced error context with recovery information
+#[derive(Debug, Clone)]
+pub struct ErrorContext {
+    pub operation: String,
+    pub component: String,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub retry_count: u32,
+    pub recovery_strategy: Option<ErrorRecoveryStrategy>,
+    pub user_context: Option<String>,
+    pub system_context: Option<String>,
+}
+
+impl ErrorContext {
+    pub fn new(operation: impl Into<String>, component: impl Into<String>) -> Self {
+        Self {
+            operation: operation.into(),
+            component: component.into(),
+            timestamp: chrono::Utc::now(),
+            retry_count: 0,
+            recovery_strategy: None,
+            user_context: None,
+            system_context: None,
+        }
+    }
+
+    pub fn with_recovery_strategy(mut self, strategy: ErrorRecoveryStrategy) -> Self {
+        self.recovery_strategy = Some(strategy);
+        self
+    }
+
+    pub fn with_user_context(mut self, context: impl Into<String>) -> Self {
+        self.user_context = Some(context.into());
+        self
+    }
+
+    pub fn with_system_context(mut self, context: impl Into<String>) -> Self {
+        self.system_context = Some(context.into());
+        self
+    }
+
+    pub fn increment_retry(&mut self) {
+        self.retry_count += 1;
+    }
+
+    pub fn should_retry(&self, error_message: &str) -> bool {
+        if let Some(strategy) = &self.recovery_strategy {
+            self.retry_count < strategy.max_retries && strategy.is_recoverable(error_message)
+        } else {
+            false
+        }
+    }
+
+    pub fn next_retry_delay(&self) -> Option<Duration> {
+        self.recovery_strategy.as_ref().map(|strategy| strategy.calculate_delay(self.retry_count))
+    }
+}
+
+/// Retry executor with exponential backoff
+pub struct RetryExecutor {
+    strategy: ErrorRecoveryStrategy,
+}
+
+impl RetryExecutor {
+    pub fn new(strategy: ErrorRecoveryStrategy) -> Self {
+        Self { strategy }
+    }
+
+    /// Execute operation with retry logic
+    #[instrument(skip(self, operation))]
+    pub async fn execute<F, Fut, T, E>(&self, mut operation: F) -> Result<T, E>
+    where
+        F: FnMut() -> Fut,
+        Fut: std::future::Future<Output = Result<T, E>>,
+        E: std::fmt::Display,
+    {
+        let mut attempt = 0;
+        
+        loop {
+            match operation().await {
+                Ok(result) => {
+                    if attempt > 0 {
+                        info!("Operation succeeded after {} retries", attempt);
+                    }
+                    return Ok(result);
+                }
+                Err(error) => {
+                    let error_message = error.to_string();
+                    
+                    if attempt >= self.strategy.max_retries || !self.strategy.is_recoverable(&error_message) {
+                        error!("Operation failed after {} attempts: {}", attempt + 1, error_message);
+                        return Err(error);
+                    }
+                    
+                    let delay = self.strategy.calculate_delay(attempt);
+                    warn!("Operation failed (attempt {}), retrying in {:?}: {}", 
+                          attempt + 1, delay, error_message);
+                    
+                    tokio::time::sleep(delay).await;
+                    attempt += 1;
+                }
+            }
+        }
+    }
+}
+
+/// Error aggregator for batch operations
+#[derive(Debug, Default)]
+pub struct ErrorAggregator {
+    errors: Vec<(String, Box<dyn std::error::Error + Send + Sync>)>,
+    warnings: Vec<String>,
+    context: Option<String>,
+}
+
+impl ErrorAggregator {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_context(mut self, context: impl Into<String>) -> Self {
+        self.context = Some(context.into());
+        self
+    }
+
+    pub fn add_error(&mut self, operation: impl Into<String>, error: Box<dyn std::error::Error + Send + Sync>) {
+        let operation = operation.into();
+        error!("Error in operation '{}': {}", operation, error);
+        self.errors.push((operation, error));
+    }
+
+    pub fn add_warning(&mut self, warning: impl Into<String>) {
+        let warning = warning.into();
+        warn!("Warning: {}", warning);
+        self.warnings.push(warning);
+    }
+
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
+    }
+
+    pub fn has_warnings(&self) -> bool {
+        !self.warnings.is_empty()
+    }
+
+    pub fn error_count(&self) -> usize {
+        self.errors.len()
+    }
+
+    pub fn warning_count(&self) -> usize {
+        self.warnings.len()
+    }
+
+    pub fn into_result<T>(self, success_value: T) -> Result<T, CodeIngestError> {
+        if self.has_errors() {
+            let error_summary = self.errors.iter()
+                .map(|(op, err)| format!("{}: {}", op, err))
+                .collect::<Vec<_>>()
+                .join("; ");
+            
+            let suggestion = if self.errors.len() == 1 {
+                "Check the specific error above and retry the operation".to_string()
+            } else {
+                format!("Multiple errors occurred ({}). Check logs and retry failed operations individually", self.errors.len())
+            };
+
+            Err(CodeIngestError::BatchProcessingFailed {
+                processed: 0, // This should be set by the caller
+                total: self.errors.len(),
+                message: error_summary,
+                suggestion,
+                source: None,
+            })
+        } else {
+            if self.has_warnings() {
+                info!("Operation completed with {} warnings", self.warnings.len());
+            }
+            Ok(success_value)
+        }
+    }
+
+    pub fn log_summary(&self) {
+        if self.has_errors() || self.has_warnings() {
+            let context = self.context.as_deref().unwrap_or("batch operation");
+            info!("Summary for {}: {} errors, {} warnings", 
+                  context, self.error_count(), self.warning_count());
+        }
+    }
+}
+
+/// Circuit breaker for preventing cascading failures
+#[derive(Debug)]
+pub struct CircuitBreaker {
+    failure_threshold: u32,
+    recovery_timeout: Duration,
+    failure_count: std::sync::atomic::AtomicU32,
+    last_failure_time: std::sync::Mutex<Option<std::time::Instant>>,
+    state: std::sync::Mutex<CircuitBreakerState>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum CircuitBreakerState {
+    Closed,  // Normal operation
+    Open,    // Failing fast
+    HalfOpen, // Testing recovery
+}
+
+impl CircuitBreaker {
+    pub fn new(failure_threshold: u32, recovery_timeout: Duration) -> Self {
+        Self {
+            failure_threshold,
+            recovery_timeout,
+            failure_count: std::sync::atomic::AtomicU32::new(0),
+            last_failure_time: std::sync::Mutex::new(None),
+            state: std::sync::Mutex::new(CircuitBreakerState::Closed),
+        }
+    }
+
+    /// Execute operation through circuit breaker
+    #[instrument(skip(self, operation))]
+    pub async fn execute<F, Fut, T, E>(&self, operation: F) -> Result<T, CircuitBreakerError<E>>
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = Result<T, E>>,
+        E: std::fmt::Display,
+    {
+        // Check if circuit is open
+        {
+            let mut state = self.state.lock().unwrap();
+            match *state {
+                CircuitBreakerState::Open => {
+                    let last_failure = self.last_failure_time.lock().unwrap();
+                    if let Some(last_time) = *last_failure {
+                        if last_time.elapsed() > self.recovery_timeout {
+                            *state = CircuitBreakerState::HalfOpen;
+                            debug!("Circuit breaker transitioning to half-open state");
+                        } else {
+                            debug!("Circuit breaker is open, failing fast");
+                            return Err(CircuitBreakerError::CircuitOpen);
+                        }
+                    }
+                }
+                CircuitBreakerState::HalfOpen => {
+                    debug!("Circuit breaker in half-open state, testing operation");
+                }
+                CircuitBreakerState::Closed => {
+                    // Normal operation
+                }
+            }
+        }
+
+        // Execute operation
+        match operation().await {
+            Ok(result) => {
+                // Success - reset failure count and close circuit
+                self.failure_count.store(0, std::sync::atomic::Ordering::Relaxed);
+                *self.state.lock().unwrap() = CircuitBreakerState::Closed;
+                debug!("Operation succeeded, circuit breaker closed");
+                Ok(result)
+            }
+            Err(error) => {
+                // Failure - increment count and potentially open circuit
+                let failures = self.failure_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                *self.last_failure_time.lock().unwrap() = Some(std::time::Instant::now());
+                
+                if failures >= self.failure_threshold {
+                    *self.state.lock().unwrap() = CircuitBreakerState::Open;
+                    warn!("Circuit breaker opened after {} failures", failures);
+                }
+                
+                Err(CircuitBreakerError::OperationFailed(error))
+            }
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum CircuitBreakerError<E> {
+    #[error("Circuit breaker is open, failing fast")]
+    CircuitOpen,
+    #[error("Operation failed: {0}")]
+    OperationFailed(E),
+}
+
+/// Enhanced error reporting with structured context
+pub struct ErrorReporter {
+    component: String,
+}
+
+impl ErrorReporter {
+    pub fn new(component: impl Into<String>) -> Self {
+        Self {
+            component: component.into(),
+        }
+    }
+
+    /// Report error with full context
+    #[instrument(skip(self, error))]
+    pub fn report_error<E>(&self, error: &E, context: &ErrorContext) -> String
+    where
+        E: std::error::Error,
+    {
+        let error_id = uuid::Uuid::new_v4();
+        
+        error!(
+            error_id = %error_id,
+            component = %self.component,
+            operation = %context.operation,
+            retry_count = context.retry_count,
+            "Error occurred: {}", error
+        );
+
+        // Log error chain
+        let mut source = error.source();
+        let mut chain_depth = 0;
+        while let Some(err) = source {
+            chain_depth += 1;
+            debug!(
+                error_id = %error_id,
+                chain_depth = chain_depth,
+                "Error source: {}", err
+            );
+            source = err.source();
+        }
+
+        // Log context information
+        if let Some(user_context) = &context.user_context {
+            debug!(error_id = %error_id, "User context: {}", user_context);
+        }
+        
+        if let Some(system_context) = &context.system_context {
+            debug!(error_id = %error_id, "System context: {}", system_context);
+        }
+
+        format!("Error ID: {} - {}", error_id, error)
+    }
+
+    /// Report warning with context
+    #[instrument(skip(self))]
+    pub fn report_warning(&self, message: &str, context: Option<&ErrorContext>) {
+        if let Some(ctx) = context {
+            warn!(
+                component = %self.component,
+                operation = %ctx.operation,
+                "Warning: {}", message
+            );
+        } else {
+            warn!(component = %self.component, "Warning: {}", message);
+        }
+    }
+
+    /// Report info with context
+    #[instrument(skip(self))]
+    pub fn report_info(&self, message: &str, context: Option<&ErrorContext>) {
+        if let Some(ctx) = context {
+            info!(
+                component = %self.component,
+                operation = %ctx.operation,
+                "Info: {}", message
+            );
+        } else {
+            info!(component = %self.component, "Info: {}", message);
+        }
+    }
+}
+
+/// Convenience macros for error handling with context
+#[macro_export]
+macro_rules! with_error_context {
+    ($operation:expr, $component:expr, $result:expr) => {{
+        let context = $crate::error::ErrorContext::new($operation, $component);
+        match $result {
+            Ok(value) => Ok(value),
+            Err(error) => {
+                let reporter = $crate::error::ErrorReporter::new($component);
+                let error_id = reporter.report_error(&error, &context);
+                Err(error)
+            }
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! retry_with_backoff {
+    ($strategy:expr, $operation:expr) => {{
+        let executor = $crate::error::RetryExecutor::new($strategy);
+        executor.execute($operation).await
+    }};
+}
+
+/// Performance metrics for error analysis
+#[derive(Debug, Default)]
+pub struct ErrorMetrics {
+    pub total_errors: std::sync::atomic::AtomicU64,
+    pub errors_by_type: std::sync::Mutex<std::collections::HashMap<String, u64>>,
+    pub recovery_attempts: std::sync::atomic::AtomicU64,
+    pub successful_recoveries: std::sync::atomic::AtomicU64,
+}
+
+impl ErrorMetrics {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn record_error(&self, error_type: &str) {
+        self.total_errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        
+        let mut errors_by_type = self.errors_by_type.lock().unwrap();
+        *errors_by_type.entry(error_type.to_string()).or_insert(0) += 1;
+    }
+
+    pub fn record_recovery_attempt(&self) {
+        self.recovery_attempts.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub fn record_successful_recovery(&self) {
+        self.successful_recoveries.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub fn get_error_rate(&self) -> f64 {
+        let total = self.total_errors.load(std::sync::atomic::Ordering::Relaxed);
+        let attempts = self.recovery_attempts.load(std::sync::atomic::Ordering::Relaxed);
+        
+        if attempts > 0 {
+            total as f64 / attempts as f64
+        } else {
+            0.0
+        }
+    }
+
+    pub fn get_recovery_rate(&self) -> f64 {
+        let successful = self.successful_recoveries.load(std::sync::atomic::Ordering::Relaxed);
+        let attempts = self.recovery_attempts.load(std::sync::atomic::Ordering::Relaxed);
+        
+        if attempts > 0 {
+            successful as f64 / attempts as f64
+        } else {
+            0.0
+        }
+    }
+
+    #[instrument(skip(self))]
+    pub fn log_metrics(&self) {
+        let total_errors = self.total_errors.load(std::sync::atomic::Ordering::Relaxed);
+        let recovery_attempts = self.recovery_attempts.load(std::sync::atomic::Ordering::Relaxed);
+        let successful_recoveries = self.successful_recoveries.load(std::sync::atomic::Ordering::Relaxed);
+        
+        info!(
+            total_errors = total_errors,
+            recovery_attempts = recovery_attempts,
+            successful_recoveries = successful_recoveries,
+            error_rate = self.get_error_rate(),
+            recovery_rate = self.get_recovery_rate(),
+            "Error metrics summary"
+        );
+
+        let errors_by_type = self.errors_by_type.lock().unwrap();
+        for (error_type, count) in errors_by_type.iter() {
+            debug!(error_type = %error_type, count = count, "Error type frequency");
         }
     }
 }

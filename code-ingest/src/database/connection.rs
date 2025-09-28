@@ -282,11 +282,30 @@ impl Database {
     }
 
     async fn create_pool(database_url: &str) -> DatabaseResult<PgPool> {
+        // Optimized connection pool configuration for high-performance ingestion
+        let cpu_count = num_cpus::get();
+        let max_connections = std::cmp::max(cpu_count * 2, 20); // Scale with CPU cores, minimum 20
+        
         let pool_options = PgPoolOptions::new()
-            .max_connections(10)
+            .max_connections(max_connections as u32)
+            .min_connections(5) // Keep minimum connections warm
             .acquire_timeout(Duration::from_secs(30))
-            .idle_timeout(Duration::from_secs(600))
-            .max_lifetime(Duration::from_secs(1800));
+            .idle_timeout(Duration::from_secs(300)) // Reduced idle timeout for better resource usage
+            .max_lifetime(Duration::from_secs(3600)) // Increased lifetime for better connection reuse
+            .test_before_acquire(false) // Skip health checks for performance
+            .after_connect(|conn, _meta| {
+                Box::pin(async move {
+                    // Optimize PostgreSQL connection settings for bulk operations
+                    sqlx::query("SET synchronous_commit = off").execute(conn).await?;
+                    sqlx::query("SET wal_buffers = '16MB'").execute(conn).await?;
+                    sqlx::query("SET checkpoint_completion_target = 0.9").execute(conn).await?;
+                    sqlx::query("SET shared_buffers = '256MB'").execute(conn).await?;
+                    sqlx::query("SET effective_cache_size = '1GB'").execute(conn).await?;
+                    sqlx::query("SET work_mem = '64MB'").execute(conn).await?;
+                    sqlx::query("SET maintenance_work_mem = '256MB'").execute(conn).await?;
+                    Ok(())
+                })
+            });
 
         let pool = pool_options
             .connect(database_url)
@@ -296,6 +315,7 @@ impl Database {
                 cause: e.to_string(),
             })?;
 
+        info!("Created optimized connection pool with {} max connections", max_connections);
         Ok(pool)
     }
 

@@ -61,6 +61,8 @@ url = "2.4"
 
 # Logging and tracing
 tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt", "std"] }
+tracing-appender = "0.2"
 
 # Gitignore pattern matching
 ignore = "0.4"

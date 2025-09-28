@@ -6,5 +6,6 @@ pub mod error;
 pub mod git;
 pub mod help;
 pub mod ingestion;
+pub mod logging;
 pub mod processing;
 pub mod tasks;

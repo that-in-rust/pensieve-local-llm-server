@@ -2,9 +2,11 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use crate::help::HelpSystem;
-use crate::error::{CodeIngestError, CodeIngestResult};
-use crate::config::{Config, ConfigManager, merge_config_with_cli, MergedConfig};
+use crate::error::CodeIngestError;
+use crate::config::{Config, ConfigManager, merge_config_with_cli};
+use crate::logging::{LoggingConfig, init_logging, ProgressReporter, PerformanceMetrics, MonitoringContext};
 use colored::*;
+use tracing::{info, warn, error, debug, instrument};
 
 #[derive(Parser)]
 #[command(name = "code-ingest")]
@@ -35,6 +37,22 @@ pub struct Cli {
     /// Configuration file path (default: ~/.config/code-ingest/config.toml)
     #[arg(long, global = true, help = "Path to configuration file")]
     config: Option<PathBuf>,
+    
+    /// Log level (trace, debug, info, warn, error)
+    #[arg(long, global = true, help = "Set logging level")]
+    log_level: Option<String>,
+    
+    /// Enable JSON formatted logs
+    #[arg(long, global = true, help = "Output logs in JSON format")]
+    json_logs: bool,
+    
+    /// Enable verbose logging (equivalent to --log-level debug)
+    #[arg(short, long, global = true, help = "Enable verbose logging")]
+    verbose: bool,
+    
+    /// Disable progress reporting
+    #[arg(long, global = true, help = "Disable progress reporting")]
+    no_progress: bool,
 }
 
 #[derive(Subcommand)]
@@ -267,6 +285,22 @@ pub enum Commands {
         db_path: Option<PathBuf>,
     },
 
+    /// Configuration management commands
+    /// 
+    /// Examples:
+    ///   # Show current configuration
+    ///   code-ingest config show
+    ///   
+    ///   # Create default configuration file
+    ///   code-ingest config init
+    ///   
+    ///   # Set default database path
+    ///   code-ingest config set database.default_path /path/to/db
+    Config {
+        #[command(subcommand)]
+        action: ConfigAction,
+    },
+
     /// Generate hierarchical task lists from database table for systematic code analysis
     /// 
     /// Creates structured markdown files with hierarchical task numbering for systematic
@@ -288,13 +322,11 @@ pub enum Commands {
         table_name: String,
         
         /// Number of hierarchy levels in the task structure (1-8)
-        #[arg(long, default_value = "4", value_parser = clap::value_parser!(usize).range(1..=8), 
-              help = "Number of hierarchical levels (1-8, default: 4)")]
+        #[arg(long, default_value = "4", help = "Number of hierarchical levels (1-8, default: 4)")]
         levels: usize,
         
         /// Number of groups per hierarchy level (1-20)
-        #[arg(long, default_value = "7", value_parser = clap::value_parser!(usize).range(1..=20),
-              help = "Number of groups per level (1-20, default: 7)")]
+        #[arg(long, default_value = "7", help = "Number of groups per level (1-20, default: 7)")]
         groups: usize,
         
         /// Output markdown file path for generated tasks
@@ -307,14 +339,43 @@ pub enum Commands {
         prompt_file: PathBuf,
         
         /// Chunk size in lines of code (LOC) for processing large files
-        #[arg(long, value_parser = clap::value_parser!(usize).range(50..=10000),
-              help = "Split large files into chunks of specified LOC (50-10000)")]
+        #[arg(long, help = "Split large files into chunks of specified LOC (50-10000)")]
         chunks: Option<usize>,
         
         /// Database path (can also be set globally)
         #[arg(long, help = "Path to PostgreSQL database directory")]
         db_path: Option<PathBuf>,
     },
+}
+
+#[derive(Subcommand)]
+pub enum ConfigAction {
+    /// Show current configuration
+    Show,
+    
+    /// Initialize default configuration file
+    Init {
+        /// Force overwrite existing configuration
+        #[arg(long)]
+        force: bool,
+    },
+    
+    /// Set a configuration value
+    Set {
+        /// Configuration key (e.g., database.default_path)
+        key: String,
+        /// Configuration value
+        value: String,
+    },
+    
+    /// Get a configuration value
+    Get {
+        /// Configuration key (e.g., database.default_path)
+        key: String,
+    },
+    
+    /// Show configuration file path
+    Path,
 }
 
 impl Default for Cli {
@@ -339,7 +400,41 @@ impl Cli {
         config_manager.load_config()
     }
 
+    /// Initialize logging based on CLI arguments
+    fn init_logging(&self) -> Result<()> {
+        use crate::logging::{LoggingConfig, init_logging};
+        
+        let mut logging_config = LoggingConfig::default();
+        
+        // Set log level based on CLI arguments
+        if self.verbose {
+            logging_config.level = "debug".to_string();
+        } else if let Some(ref level) = self.log_level {
+            logging_config.level = level.clone();
+        }
+        
+        // Set JSON format if requested
+        logging_config.json_format = self.json_logs;
+        
+        // Disable progress reporting if requested
+        logging_config.progress_reporting = !self.no_progress;
+        
+        // Try to load additional logging config from file
+        if let Ok(config) = self.load_config() {
+            // Merge with file-based logging configuration if available
+            // This would require extending the Config struct to include logging settings
+        }
+        
+        init_logging(&logging_config).map_err(|e| anyhow::anyhow!("Failed to initialize logging: {}", e))?;
+        
+        tracing::info!("Code Ingest starting with log level: {}", logging_config.level);
+        Ok(())
+    }
+
     pub async fn run(&self) -> Result<()> {
+        // Initialize logging based on CLI arguments
+        self.init_logging()?;
+        
         match &self.command {
             Some(command) => self.execute_command(command).await,
             None => {
@@ -484,6 +579,9 @@ impl Cli {
                 let db_path = db_path.clone().or_else(|| self.db_path.clone());
                 self.execute_extract_content(table_name.clone(), output_dir.clone(), db_path).await
             }
+            Commands::Config { action } => {
+                self.execute_config_command(action).await
+            }
             Commands::GenerateHierarchicalTasks { 
                 table_name, 
                 levels, 
@@ -507,6 +605,7 @@ impl Cli {
         }
     }
 
+    #[instrument(skip(self))]
     async fn execute_ingest(&self, source: String, folder_flag: bool, db_path: Option<PathBuf>) -> Result<()> {
         use crate::database::{Database, SchemaManager};
         use crate::ingestion::{IngestionEngine, IngestionConfig};
@@ -515,30 +614,42 @@ impl Cli {
         use indicatif::{ProgressBar, ProgressStyle};
         use std::sync::Arc;
         
+        // Initialize monitoring context
+        let monitoring = MonitoringContext::new("ingestion", None);
+        monitoring.performance.checkpoint("validation_start").await;
+        
         // Validate inputs based on source type and folder flag
+        info!(source = %source, folder_flag = folder_flag, "Starting ingestion validation");
+        
         if folder_flag {
             // Local folder ingestion mode
             if !source.starts_with('/') {
+                error!("Invalid local path: must be absolute path starting with '/'");
                 anyhow::bail!("When using --folder-flag, source must be an absolute path (starting with '/'). Got: {}", source);
             }
             
             let path = std::path::Path::new(&source);
             if !path.exists() {
+                error!(path = %source, "Local folder does not exist");
                 anyhow::bail!("Local folder does not exist: {}", source);
             }
             
             if !path.is_dir() {
+                error!(path = %source, "Path is not a directory");
                 anyhow::bail!("Path is not a directory: {}", source);
             }
             
+            info!("Local folder ingestion mode enabled");
             println!("📁 Local folder ingestion mode enabled");
         } else {
             // GitHub repository ingestion mode
             if source.starts_with('/') || source.starts_with('.') {
+                error!("Local paths require --folder-flag parameter");
                 anyhow::bail!("Local paths require --folder-flag parameter. Use: --folder-flag for local directory ingestion");
             }
             
             if let Err(e) = HelpSystem::validate_repository_url(&source) {
+                error!(error = %e, "Repository URL validation failed");
                 eprintln!("{}", format!("❌ {}", e).red());
                 println!();
                 HelpSystem::suggest_next_steps(&e).iter().for_each(|suggestion| {
@@ -547,11 +658,15 @@ impl Cli {
                 return Err(e.into());
             }
             
+            info!("GitHub repository ingestion mode enabled");
             println!("🌐 GitHub repository ingestion mode");
         }
+        
+        monitoring.performance.checkpoint("validation_complete").await;
 
         if let Some(ref path) = db_path {
             if let Err(e) = HelpSystem::validate_database_path(path) {
+                error!(path = ?path, error = %e, "Database path validation failed");
                 eprintln!("{}", format!("❌ {}", e).red());
                 println!();
                 HelpSystem::suggest_next_steps(&e).iter().for_each(|suggestion| {
@@ -561,22 +676,31 @@ impl Cli {
             }
         }
         
+        info!("Starting ingestion from: {}", source);
         println!("{}", format!("🚀 Starting ingestion from: {}", source).bright_green());
         println!();
         
         // Get database connection
+        monitoring.performance.checkpoint("database_connection_start").await;
         let database = if let Some(path) = db_path {
+            info!(db_path = ?path, "Connecting to database from path");
             Database::from_path(&path).await?
         } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            info!("Connecting to database from DATABASE_URL");
             Database::new(&database_url).await?
         } else {
+            error!("No database path provided");
             anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
         };
+        monitoring.performance.checkpoint("database_connection_complete").await;
 
         // Initialize database schema
+        monitoring.performance.checkpoint("schema_init_start").await;
+        info!("Initializing database schema");
         println!("📋 Initializing database schema...");
         let schema_manager = SchemaManager::new(database.pool().clone());
         schema_manager.initialize_schema().await?;
+        monitoring.performance.checkpoint("schema_init_complete").await;
         
         // Create progress bar
         let progress = ProgressBar::new_spinner();
@@ -596,7 +720,9 @@ impl Cli {
         let engine = IngestionEngine::new(config, Arc::new(database), file_processor);
         
         // Start ingestion with progress callback
+        monitoring.performance.checkpoint("ingestion_start").await;
         progress.set_message("Starting ingestion...");
+        info!("Starting file ingestion");
         
         let progress_callback = {
             let progress = progress.clone();
@@ -606,12 +732,43 @@ impl Cli {
                     batch_progress.files_processed, 
                     batch_progress.total_files
                 ));
+                
+                // Log progress periodically
+                if batch_progress.files_processed % 100 == 0 {
+                    info!(
+                        files_processed = batch_progress.files_processed,
+                        total_files = batch_progress.total_files,
+                        "Ingestion progress update"
+                    );
+                }
             })
         };
         
-        let result = engine.ingest_source(&source, Some(progress_callback)).await?;
+        let result = monitoring.performance.time_async("total_ingestion", || {
+            engine.ingest_source(&source, Some(progress_callback))
+        }).await?;
+        
+        monitoring.performance.checkpoint("ingestion_complete").await;
         
         progress.finish_and_clear();
+        
+        // Complete monitoring and generate reports
+        monitoring.memory.check_memory().await;
+        monitoring.complete_and_report().await;
+        
+        // Log comprehensive results
+        info!(
+            repository = %source,
+            table_name = %result.table_name,
+            files_processed = result.files_processed,
+            files_failed = result.files_failed,
+            files_skipped = result.files_skipped,
+            processing_time_seconds = result.processing_time.as_secs_f64(),
+            batches_processed = result.batch_stats.batches_processed,
+            avg_file_duration_ms = result.batch_stats.avg_file_duration.as_millis(),
+            peak_memory_mb = result.batch_stats.peak_memory_bytes as f64 / (1024.0 * 1024.0),
+            "Ingestion completed successfully"
+        );
         
         // Display results
         println!("✅ Ingestion completed successfully!");
@@ -2309,6 +2466,153 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         Ok(())
     }
 
+    /// Execute configuration management commands
+    async fn execute_config_command(&self, action: &ConfigAction) -> Result<()> {
+        let config_manager = if let Some(config_path) = &self.config {
+            ConfigManager::with_path(config_path.clone())
+        } else {
+            ConfigManager::new()
+        };
+        
+        match action {
+            ConfigAction::Show => {
+                let config = config_manager.load_config()?;
+                let toml_content = toml::to_string_pretty(&config)?;
+                
+                println!("📋 Current Configuration:");
+                println!("   File: {}", config_manager.config_path().display());
+                println!("   Exists: {}", if config_manager.config_exists() { "✅" } else { "❌" });
+                println!();
+                println!("{}", toml_content);
+            }
+            
+            ConfigAction::Init { force } => {
+                if config_manager.config_exists() && !force {
+                    anyhow::bail!("Configuration file already exists: {}. Use --force to overwrite.", 
+                                 config_manager.config_path().display());
+                }
+                
+                config_manager.create_default_config()?;
+                println!("✅ Created default configuration file: {}", config_manager.config_path().display());
+                println!();
+                println!("📝 Edit the file to customize your settings:");
+                println!("   Database path, task generation defaults, etc.");
+            }
+            
+            ConfigAction::Set { key, value } => {
+                let mut config = config_manager.load_config()?;
+                
+                // Simple key-value setting for common configurations
+                match key.as_str() {
+                    "database.default_path" => {
+                        let path = PathBuf::from(value);
+                        if let Some(ref mut db_config) = config.database {
+                            db_config.default_path = Some(path.clone());
+                        } else {
+                            config.database = Some(crate::config::DatabaseConfig {
+                                default_path: Some(path.clone()),
+                                timeout_seconds: Some(30),
+                            });
+                        }
+                        println!("✅ Set database.default_path = {}", path.display());
+                    }
+                    "task_generation.default_levels" => {
+                        let levels: usize = value.parse()?;
+                        if !(1..=8).contains(&levels) {
+                            anyhow::bail!("Levels must be between 1 and 8, got: {}", levels);
+                        }
+                        if let Some(ref mut task_config) = config.task_generation {
+                            task_config.default_levels = Some(levels);
+                        } else {
+                            config.task_generation = Some(crate::config::TaskGenerationConfig {
+                                default_levels: Some(levels),
+                                ..Default::default()
+                            });
+                        }
+                        println!("✅ Set task_generation.default_levels = {}", levels);
+                    }
+                    "task_generation.default_groups" => {
+                        let groups: usize = value.parse()?;
+                        if !(1..=20).contains(&groups) {
+                            anyhow::bail!("Groups must be between 1 and 20, got: {}", groups);
+                        }
+                        if let Some(ref mut task_config) = config.task_generation {
+                            task_config.default_groups = Some(groups);
+                        } else {
+                            config.task_generation = Some(crate::config::TaskGenerationConfig {
+                                default_groups: Some(groups),
+                                ..Default::default()
+                            });
+                        }
+                        println!("✅ Set task_generation.default_groups = {}", groups);
+                    }
+                    "task_generation.default_prompt_file" => {
+                        let path = PathBuf::from(value);
+                        if let Some(ref mut task_config) = config.task_generation {
+                            task_config.default_prompt_file = Some(path.clone());
+                        } else {
+                            config.task_generation = Some(crate::config::TaskGenerationConfig {
+                                default_prompt_file: Some(path.clone()),
+                                ..Default::default()
+                            });
+                        }
+                        println!("✅ Set task_generation.default_prompt_file = {}", path.display());
+                    }
+                    _ => {
+                        anyhow::bail!("Unknown configuration key: {}. Supported keys: database.default_path, task_generation.default_levels, task_generation.default_groups, task_generation.default_prompt_file", key);
+                    }
+                }
+                
+                config_manager.save_config(&config)?;
+                println!("💾 Configuration saved to: {}", config_manager.config_path().display());
+            }
+            
+            ConfigAction::Get { key } => {
+                let config = config_manager.load_config()?;
+                
+                match key.as_str() {
+                    "database.default_path" => {
+                        if let Some(path) = config.database.as_ref().and_then(|db| db.default_path.as_ref()) {
+                            println!("{}", path.display());
+                        } else {
+                            println!("(not set)");
+                        }
+                    }
+                    "task_generation.default_levels" => {
+                        if let Some(levels) = config.task_generation.as_ref().and_then(|tg| tg.default_levels) {
+                            println!("{}", levels);
+                        } else {
+                            println!("4"); // Default value
+                        }
+                    }
+                    "task_generation.default_groups" => {
+                        if let Some(groups) = config.task_generation.as_ref().and_then(|tg| tg.default_groups) {
+                            println!("{}", groups);
+                        } else {
+                            println!("7"); // Default value
+                        }
+                    }
+                    "task_generation.default_prompt_file" => {
+                        if let Some(path) = config.task_generation.as_ref().and_then(|tg| tg.default_prompt_file.as_ref()) {
+                            println!("{}", path.display());
+                        } else {
+                            println!(".kiro/steering/spec-S04-steering-doc-analysis.md"); // Default value
+                        }
+                    }
+                    _ => {
+                        anyhow::bail!("Unknown configuration key: {}", key);
+                    }
+                }
+            }
+            
+            ConfigAction::Path => {
+                println!("{}", config_manager.config_path().display());
+            }
+        }
+        
+        Ok(())
+    }
+
     /// Validate parameters for generate-hierarchical-tasks command
     fn validate_hierarchical_task_parameters(
         &self,
@@ -2431,18 +2735,18 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         println!("   Database timeout: {}s", merged_config.timeout_seconds);
         println!();
         
-        // Validate prompt file exists
-        if !prompt_file.exists() {
-            anyhow::bail!("Prompt file not found: {}", prompt_file.display());
+        // Validate prompt file exists (using merged config)
+        if !merged_config.prompt_file.exists() {
+            anyhow::bail!("Prompt file not found: {}", merged_config.prompt_file.display());
         }
         
-        // Get database connection
-        let database = if let Some(path) = db_path {
+        // Get database connection using merged configuration
+        let database = if let Some(path) = merged_config.db_path {
             crate::database::Database::from_path(&path).await?
         } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
             crate::database::Database::new(&database_url).await?
         } else {
-            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+            anyhow::bail!("No database path provided. Use --db-path, set in config file, or set DATABASE_URL environment variable");
         };
 
         // Create progress bar
@@ -2466,7 +2770,7 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         }
 
         // Handle chunking if requested
-        let working_table_name = if let Some(chunk_size) = chunks {
+        let working_table_name = if let Some(chunk_size) = merged_config.chunks {
             println!("🔄 Chunking enabled with size: {} LOC", chunk_size);
             
             // Step 1.5: Create chunked table
@@ -2502,7 +2806,7 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         progress.set_message("Creating hierarchical task structure...");
         progress.set_position(60);
         
-        let task_divider = HierarchicalTaskDivider::new(levels, groups)?;
+        let task_divider = HierarchicalTaskDivider::new(merged_config.levels, merged_config.groups)?;
         let hierarchy = task_divider.create_hierarchy(content_triples.clone())?;
         
         // Step 4: Generate markdown
@@ -2510,7 +2814,7 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         progress.set_position(80);
         
         let output_dir_path = std::path::PathBuf::from("gringotts/WorkArea");
-        let markdown_generator = L1L8MarkdownGenerator::new(prompt_file, output_dir_path);
+        let markdown_generator = L1L8MarkdownGenerator::new(merged_config.prompt_file, output_dir_path);
         let markdown_content = markdown_generator.generate_hierarchical_markdown(&hierarchy, &working_table_name).await?;
         
         // Step 5: Write output file
@@ -2533,8 +2837,8 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         println!("📊 Generation Summary:");
         println!("   Table: {}", table_name);
         println!("   Total Tasks: {}", hierarchy.total_tasks);
-        println!("   Hierarchy Levels: {}", levels);
-        println!("   Groups per Level: {}", groups);
+        println!("   Hierarchy Levels: {}", merged_config.levels);
+        println!("   Groups per Level: {}", merged_config.groups);
         println!("   Content Files: {}", content_triples.len() * 3);
         println!("   Output File: {}", output.display());
         

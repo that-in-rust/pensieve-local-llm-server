@@ -5,6 +5,7 @@ pub mod binary_processor;
 pub mod pipeline;
 pub mod streaming;
 pub mod performance;
+pub mod concurrent;
 pub mod chunking;
 pub mod chunk_database;
 
@@ -15,7 +16,8 @@ pub use converter::{Converter, ConverterConfig};
 pub use binary_processor::{BinaryProcessor, BinaryProcessorConfig};
 pub use pipeline::{ContentExtractionPipeline, PipelineConfig, ProcessingStats};
 pub use streaming::{StreamingProcessor, StreamingConfig, StreamingProgress, StreamingStats};
-pub use performance::{PerformanceMonitor, PerformanceConfig, PerformanceSnapshot, PerformanceStats, OptimizationRecommendation};
+pub use performance::{PerformanceMonitor, PerformanceMetrics, PerformanceThresholds, PerformanceSummary, ConcurrencyController, LatencyTracker, MemoryPool, BatchSizeController};
+pub use concurrent::{ConcurrentProcessor, ConcurrentConfig, ConcurrentResult, ParallelBatchProcessor};
 pub use chunking::{ChunkingEngine, ChunkingConfig, ChunkData, ChunkMetadata, ChunkingResult, ChunkContext, ContextLevel};
 pub use chunk_database::{ChunkDatabaseManager, ChunkDatabaseConfig, ChunkDatabaseResult, ChunkedTableStats, ValidationResult};
 

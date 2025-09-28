@@ -484,43 +484,89 @@ impl SchemaManager {
     }
 
     async fn create_ingestion_table_indexes(&self, table_name: &str) -> DatabaseResult<()> {
+        let safe_name = table_name.to_lowercase().replace("-", "_");
+        
+        // Performance-optimized indexes for high-speed queries
         let indexes = vec![
-            format!("CREATE INDEX IF NOT EXISTS idx_{}_filepath ON \"{}\"(filepath)", 
-                   table_name.to_lowercase(), table_name),
-            format!("CREATE INDEX IF NOT EXISTS idx_{}_extension ON \"{}\"(extension)", 
-                   table_name.to_lowercase(), table_name),
-            format!("CREATE INDEX IF NOT EXISTS idx_{}_file_type ON \"{}\"(file_type)", 
-                   table_name.to_lowercase(), table_name),
-            format!("CREATE INDEX IF NOT EXISTS idx_{}_created_at ON \"{}\"(created_at)", 
-                   table_name.to_lowercase(), table_name),
-            // New indexes for multi-scale context columns
-            format!("CREATE INDEX IF NOT EXISTS idx_{}_parent_filepath ON \"{}\"(parent_filepath)", 
-                   table_name.to_lowercase(), table_name),
+            // Primary query indexes
+            format!("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{}_filepath ON \"{}\"(filepath)", 
+                   safe_name, table_name),
+            format!("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{}_extension ON \"{}\"(extension)", 
+                   safe_name, table_name),
+            format!("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{}_file_type ON \"{}\"(file_type)", 
+                   safe_name, table_name),
+            format!("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{}_created_at ON \"{}\"(created_at)", 
+                   safe_name, table_name),
+            format!("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{}_parent_filepath ON \"{}\"(parent_filepath)", 
+                   safe_name, table_name),
+            
+            // Performance indexes for common queries
+            format!("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{}_ingestion_id ON \"{}\"(ingestion_id)", 
+                   safe_name, table_name),
+            format!("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{}_file_size ON \"{}\"(file_size_bytes)", 
+                   safe_name, table_name),
+            format!("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{}_line_count ON \"{}\"(line_count)", 
+                   safe_name, table_name),
+            
+            // Composite indexes for complex queries
+            format!("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{}_type_ext ON \"{}\"(file_type, extension)", 
+                   safe_name, table_name),
+            format!("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{}_parent_type ON \"{}\"(parent_filepath, file_type)", 
+                   safe_name, table_name),
+            
+            // Partial indexes for performance
+            format!("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{}_large_files ON \"{}\"(filepath) WHERE line_count > 1000", 
+                   safe_name, table_name),
+            format!("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{}_text_files ON \"{}\"(filepath) WHERE file_type = 'direct_text'", 
+                   safe_name, table_name),
         ];
 
-        // Create full-text search index on content
+        // Create full-text search index on content with optimized configuration
         let fts_index = format!(
-            "CREATE INDEX IF NOT EXISTS idx_{}_content_fts ON \"{}\" USING gin(to_tsvector('english', content_text))",
-            table_name.to_lowercase(), table_name
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{}_content_fts ON \"{}\" USING gin(to_tsvector('english', COALESCE(content_text, '')))",
+            safe_name, table_name
         );
         
-        // Create JSONB index for ast_patterns
+        // Create JSONB index for ast_patterns with optimized GIN
         let ast_patterns_index = format!(
-            "CREATE INDEX IF NOT EXISTS idx_{}_ast_patterns ON \"{}\" USING gin(ast_patterns)",
-            table_name.to_lowercase(), table_name
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{}_ast_patterns ON \"{}\" USING gin(ast_patterns jsonb_path_ops)",
+            safe_name, table_name
         );
         
-        for index_sql in indexes.into_iter().chain(std::iter::once(fts_index)).chain(std::iter::once(ast_patterns_index)) {
-            sqlx::query(&index_sql)
-                .execute(&self.pool)
-                .await
-                .map_err(|e| DatabaseError::QueryFailed {
-                    query: index_sql.clone(),
-                    cause: e.to_string(),
-                })?;
+        // Create BRIN indexes for large tables (time-series optimization)
+        let brin_indexes = vec![
+            format!("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{}_created_at_brin ON \"{}\" USING brin(created_at)", 
+                   safe_name, table_name),
+            format!("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_{}_file_id_brin ON \"{}\" USING brin(file_id)", 
+                   safe_name, table_name),
+        ];
+        
+        // Execute all indexes
+        for index_sql in indexes.into_iter()
+            .chain(std::iter::once(fts_index))
+            .chain(std::iter::once(ast_patterns_index))
+            .chain(brin_indexes.into_iter()) {
+            
+            // Use a timeout for index creation to prevent hanging
+            let result = tokio::time::timeout(
+                Duration::from_secs(300), // 5 minute timeout
+                sqlx::query(&index_sql).execute(&self.pool)
+            ).await;
+            
+            match result {
+                Ok(Ok(_)) => {
+                    debug!("Created index: {}", index_sql.split("idx_").nth(1).unwrap_or("unknown"));
+                }
+                Ok(Err(e)) => {
+                    warn!("Failed to create index: {} - {}", index_sql, e);
+                }
+                Err(_) => {
+                    warn!("Index creation timed out: {}", index_sql);
+                }
+            }
         }
 
-        debug!("Created indexes for table: {}", table_name);
+        info!("Completed index creation for table: {}", table_name);
         Ok(())
     }
 

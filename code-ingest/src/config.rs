@@ -57,6 +57,18 @@ pub struct TaskGenerationConfig {
     pub default_output_dir: Option<PathBuf>,
 }
 
+impl Default for TaskGenerationConfig {
+    fn default() -> Self {
+        Self {
+            default_levels: Some(4),
+            default_groups: Some(7),
+            default_prompt_file: Some(PathBuf::from(".kiro/steering/spec-S04-steering-doc-analysis.md")),
+            default_chunk_size: None,
+            default_output_dir: Some(PathBuf::from(".")),
+        }
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {

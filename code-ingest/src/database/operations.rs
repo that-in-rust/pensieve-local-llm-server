@@ -446,47 +446,129 @@ impl DatabaseOperations {
         ingestion_id: i64,
         files: &[ProcessedFile],
     ) -> DatabaseResult<usize> {
-        // First, insert all files with basic data and calculated parent_filepath
-        let insert_sql = format!(
-            r#"
-            INSERT INTO "{}" (
+        if files.is_empty() {
+            return Ok(0);
+        }
+
+        // Use COPY for maximum performance with large batches
+        if files.len() > 100 {
+            return self.insert_file_chunk_copy(transaction, table_name, ingestion_id, files).await;
+        }
+
+        // Use multi-row INSERT for smaller batches
+        let mut query_builder = sqlx::QueryBuilder::new(format!(
+            r#"INSERT INTO "{}" (
                 ingestion_id, filepath, filename, extension, file_size_bytes,
                 line_count, word_count, token_count, content_text, file_type,
                 conversion_command, relative_path, absolute_path, parent_filepath
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-            "#,
+            )"#,
             table_name
-        );
+        ));
 
-        let mut inserted = 0;
+        query_builder.push_values(files, |mut b, file| {
+            let parent_filepath = self.calculate_parent_filepath(&file.filepath);
+            
+            b.push_bind(ingestion_id)
+                .push_bind(&file.filepath)
+                .push_bind(&file.filename)
+                .push_bind(&file.extension)
+                .push_bind(file.file_size_bytes)
+                .push_bind(file.line_count)
+                .push_bind(file.word_count)
+                .push_bind(file.token_count)
+                .push_bind(&file.content_text)
+                .push_bind(file.file_type.as_str())
+                .push_bind(&file.conversion_command)
+                .push_bind(&file.relative_path)
+                .push_bind(&file.absolute_path)
+                .push_bind(&parent_filepath);
+        });
+
+        let query = query_builder.build();
+        let result = query.execute(&mut **transaction).await
+            .map_err(|e| DatabaseError::BatchInsertionFailed {
+                cause: format!("Failed to insert batch of {} files: {}", files.len(), e),
+            })?;
+
+        Ok(result.rows_affected() as usize)
+    }
+
+    /// High-performance COPY-based insertion for large batches
+    async fn insert_file_chunk_copy(
+        &self,
+        transaction: &mut Transaction<'_, Postgres>,
+        table_name: &str,
+        ingestion_id: i64,
+        files: &[ProcessedFile],
+    ) -> DatabaseResult<usize> {
+        use std::io::Write;
+        
+        // Create a temporary CSV buffer
+        let mut csv_data = Vec::new();
+        
         for file in files {
             let parent_filepath = self.calculate_parent_filepath(&file.filepath);
             
-            sqlx::query(&insert_sql)
-                .bind(ingestion_id)
-                .bind(&file.filepath)
-                .bind(&file.filename)
-                .bind(&file.extension)
-                .bind(file.file_size_bytes)
-                .bind(file.line_count)
-                .bind(file.word_count)
-                .bind(file.token_count)
-                .bind(&file.content_text)
-                .bind(file.file_type.as_str())
-                .bind(&file.conversion_command)
-                .bind(&file.relative_path)
-                .bind(&file.absolute_path)
-                .bind(&parent_filepath)
-                .execute(&mut **transaction)
-                .await
-                .map_err(|e| DatabaseError::BatchInsertionFailed {
-                    cause: format!("Failed to insert file {}: {}", file.filepath, e),
-                })?;
+            // Escape and format data for COPY
+            let row = format!(
+                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                ingestion_id,
+                self.escape_copy_field(&file.filepath),
+                self.escape_copy_field(&file.filename),
+                file.extension.as_ref().map(|e| self.escape_copy_field(e)).unwrap_or_else(|| "\\N".to_string()),
+                file.file_size_bytes,
+                file.line_count.map(|c| c.to_string()).unwrap_or_else(|| "\\N".to_string()),
+                file.word_count.map(|c| c.to_string()).unwrap_or_else(|| "\\N".to_string()),
+                file.token_count.map(|c| c.to_string()).unwrap_or_else(|| "\\N".to_string()),
+                file.content_text.as_ref().map(|c| self.escape_copy_field(c)).unwrap_or_else(|| "\\N".to_string()),
+                file.file_type.as_str(),
+                file.conversion_command.as_ref().map(|c| self.escape_copy_field(c)).unwrap_or_else(|| "\\N".to_string()),
+                self.escape_copy_field(&file.relative_path),
+                self.escape_copy_field(&file.absolute_path),
+                self.escape_copy_field(&parent_filepath)
+            );
             
-            inserted += 1;
+            csv_data.write_all(row.as_bytes()).map_err(|e| DatabaseError::BatchInsertionFailed {
+                cause: format!("Failed to prepare COPY data: {}", e),
+            })?;
         }
 
-        Ok(inserted)
+        // Execute COPY command
+        let copy_sql = format!(
+            r#"COPY "{}" (
+                ingestion_id, filepath, filename, extension, file_size_bytes,
+                line_count, word_count, token_count, content_text, file_type,
+                conversion_command, relative_path, absolute_path, parent_filepath
+            ) FROM STDIN WITH (FORMAT text, DELIMITER E'\t', NULL '\\N')"#,
+            table_name
+        );
+
+        let mut copy_in = transaction.copy_in_raw(&copy_sql).await
+            .map_err(|e| DatabaseError::BatchInsertionFailed {
+                cause: format!("Failed to start COPY: {}", e),
+            })?;
+
+        copy_in.send(csv_data).await
+            .map_err(|e| DatabaseError::BatchInsertionFailed {
+                cause: format!("Failed to send COPY data: {}", e),
+            })?;
+
+        let rows_affected = copy_in.finish().await
+            .map_err(|e| DatabaseError::BatchInsertionFailed {
+                cause: format!("Failed to finish COPY: {}", e),
+            })?;
+
+        debug!("COPY inserted {} rows for {} files", rows_affected, files.len());
+        Ok(files.len())
+    }
+
+    /// Escape field for PostgreSQL COPY format
+    fn escape_copy_field(&self, field: &str) -> String {
+        field
+            .replace('\\', "\\\\")
+            .replace('\t', "\\t")
+            .replace('\n', "\\n")
+            .replace('\r', "\\r")
     }
 
     fn extract_column_value(&self, row: &sqlx::postgres::PgRow, column_index: usize) -> DatabaseResult<String> {
