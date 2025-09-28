@@ -29,8 +29,27 @@ Format e.g. of final task
   - 3. TableName_RowNum_Content_L2.md as C
 - a terminal command to generate the following list of tasks for each row -  knowing that the whole task list needs to just has 7 first level tasks and 7 second level tasks and so on till 4 levels
 
-
 - [ ] 5. Analyze <TableName> row <row_iterator> 
   - **Content**: `.raw_data_202509/<TableName>_<row_iterator>_Content.txt` as A + `.raw_data_202509/<TableName>_<row_iterator>_Content_L1.txt` as B + `.raw_data_<TableName>_<row_iterator>_Content_L2.txt` as C
   - **Prompt**: `.kiro/steering/spec-S04-steering-doc-analysis.md` where you try to find insights of A alone ; A in context of B ; B in cotext of C ; A in context B & C
   - **Output**: `gringotts/WorkArea/<TableName>_<row_iterator>.md`
+
+
+## So final task generation command looks like this
+``` bash
+code-ingest generate-hierarchical-tasks INGEST_20250928101039 --levels 4 --groups 7 --output INGEST_20250928101039_tasks.md
+```
+
+
+# Advanced Scope - Advanced Task Generator
+
+## Moving one step ahead
+
+Current generate-hierarchical-tasks has following format
+
+code-ingest generate-hierarchical-tasks <TableName> --levels <UserOptionLevels> --groups <UserOptionGroupCount> --output TableName_tasks.md --prompt-file <UserOptionPromptFilePathFileName>
+
+
+
+# Ultra Pro Max Scope - Ultra Pro Max Task Generator
+

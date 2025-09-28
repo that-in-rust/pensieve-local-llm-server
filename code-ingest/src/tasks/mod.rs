@@ -3,6 +3,17 @@
 //! This module implements the 7-part division algorithm for distributing analysis tasks
 //! across multiple groups with Kiro-compatible numbering and markdown generation.
 
+pub mod database_query_engine;
+pub mod content_extractor;
+pub mod hierarchical_task_divider;
+
+pub use database_query_engine::{DatabaseQueryEngine, TableValidation, DatabaseConnectionStats};
+pub use content_extractor::{ContentExtractor, ContentTriple, RowMetadata};
+pub use hierarchical_task_divider::{
+    HierarchicalTaskDivider, TaskHierarchy, TaskLevel, HierarchicalTaskGroup, 
+    AnalysisTask, AnalysisStage
+};
+
 use crate::error::{TaskError, TaskResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

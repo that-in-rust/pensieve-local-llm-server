@@ -216,6 +216,12 @@ pub enum DatabaseError {
 
     #[error("Batch insertion failed: {cause}")]
     BatchInsertionFailed { cause: String },
+
+    #[error("Table not found: {table_name}")]
+    TableNotFound { table_name: String },
+
+    #[error("Invalid table name: {table_name} - {cause}")]
+    InvalidTableName { table_name: String, cause: String },
 }
 
 /// Errors related to file processing and content extraction
