@@ -28,7 +28,7 @@ This document contains 72 analysis tasks divided into 7 groups for systematic pr
 
 - [-] 1. Task Group 1
   - Analyze direct_text files in this group
-- [-] 1.1 Analyze ./xsv/tests/tests.rs
+- [x] 1.1 Analyze ./xsv/tests/tests.rs
   - **File**: `./xsv/tests/tests.rs`
   - **Type**: rs
   - **Lines**: 188
