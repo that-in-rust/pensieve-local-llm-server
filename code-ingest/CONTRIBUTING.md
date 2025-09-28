@@ -52,7 +52,7 @@ We welcome several types of contributions:
 
 ### Finding Work
 
-- Check [GitHub Issues](https://github.com/your-org/code-ingest/issues) for open tasks
+- Check [GitHub Issues](https://github.com/that-in-rust/code-ingest/issues) for open tasks
 - Look for issues labeled `good first issue` for newcomers
 - Issues labeled `help wanted` are great for contributors
 - Feel free to propose new features by opening an issue first
@@ -437,8 +437,8 @@ Security-sensitive changes require additional review:
 
 ### Community
 
-- [GitHub Discussions](https://github.com/your-org/code-ingest/discussions) - Questions and ideas
-- [Issue Tracker](https://github.com/your-org/code-ingest/issues) - Bug reports and feature requests
+- [GitHub Discussions](https://github.com/that-in-rust/code-ingest/discussions) - Questions and ideas
+- [Issue Tracker](https://github.com/that-in-rust/code-ingest/issues) - Bug reports and feature requests
 - [Discord](https://discord.gg/code-ingest) - Real-time chat
 
 ## 📄 License

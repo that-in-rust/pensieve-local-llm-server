@@ -702,9 +702,9 @@ code-ingest ingest <repo> --db-path ./analysis 2>&1 | tail -100
 
 ### Report Issues
 
-1. **GitHub Issues**: https://github.com/your-org/code-ingest/issues
-2. **Discussions**: https://github.com/your-org/code-ingest/discussions
-3. **Email**: support@your-org.com
+1. **GitHub Issues**: https://github.com/that-in-rust/code-ingest/issues
+2. **Discussions**: https://github.com/that-in-rust/code-ingest/discussions
+3. **Email**: support@that-in-rust.com
 
 ### Include in Bug Reports
 
@@ -718,6 +718,6 @@ code-ingest ingest <repo> --db-path ./analysis 2>&1 | tail -100
 ### Community Resources
 
 - **Documentation**: https://docs.code-ingest.dev
-- **Examples**: https://github.com/your-org/code-ingest/tree/main/examples
+- **Examples**: https://github.com/that-in-rust/code-ingest/tree/main/examples
 - **FAQ**: https://docs.code-ingest.dev/faq
 - **Discord**: https://discord.gg/code-ingest

@@ -2,8 +2,8 @@
 
 A high-performance Rust-based code ingestion system that transforms GitHub repositories into queryable PostgreSQL databases for lightning-fast semantic code analysis.
 
-[![CI](https://github.com/your-org/code-ingest/workflows/CI/badge.svg)](https://github.com/your-org/code-ingest/actions)
-[![Coverage](https://codecov.io/gh/your-org/code-ingest/branch/main/graph/badge.svg)](https://codecov.io/gh/your-org/code-ingest)
+[![CI](https://github.com/that-in-rust/code-ingest/workflows/CI/badge.svg)](https://github.com/that-in-rust/code-ingest/actions)
+[![Coverage](https://codecov.io/gh/that-in-rust/code-ingest/branch/main/graph/badge.svg)](https://codecov.io/gh/that-in-rust/code-ingest)
 [![Crates.io](https://img.shields.io/crates/v/code-ingest.svg)](https://crates.io/crates/code-ingest)
 
 ## 🚀 Quick Start
@@ -105,13 +105,13 @@ cargo install code-ingest
 
 #### From Source
 ```bash
-git clone https://github.com/your-org/code-ingest.git
+git clone https://github.com/that-in-rust/code-ingest.git
 cd code-ingest/code-ingest
 cargo install --path .
 ```
 
 #### Pre-built Binaries
-Download from [GitHub Releases](https://github.com/your-org/code-ingest/releases)
+Download from [GitHub Releases](https://github.com/that-in-rust/code-ingest/releases)
 
 ### Database Setup
 
@@ -329,7 +329,7 @@ USING gin(to_tsvector('english', content_text));
 ### Building from Source
 
 ```bash
-git clone https://github.com/your-org/code-ingest.git
+git clone https://github.com/that-in-rust/code-ingest.git
 cd code-ingest/code-ingest
 
 # Install dependencies
@@ -476,7 +476,7 @@ See the [examples directory](examples/) for complete tutorials and use case scen
 ### Quick Installation
 ```bash
 # Automated installation (recommended)
-curl -sSL https://raw.githubusercontent.com/your-org/code-ingest/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/that-in-rust/code-ingest/main/install.sh | bash
 
 # Or install manually
 cargo install code-ingest
@@ -516,9 +516,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 - 📖 [Documentation](https://docs.rs/code-ingest)
-- 🐛 [Issue Tracker](https://github.com/your-org/code-ingest/issues)
-- 💬 [Discussions](https://github.com/your-org/code-ingest/discussions)
-- 📧 Email: support@your-org.com
+- 🐛 [Issue Tracker](https://github.com/that-in-rust/code-ingest/issues)
+- 💬 [Discussions](https://github.com/that-in-rust/code-ingest/discussions)
+- 📧 Email: support@that-in-rust.com
 
 ---
 

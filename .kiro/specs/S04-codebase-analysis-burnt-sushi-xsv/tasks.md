@@ -3,6 +3,9 @@
 ## Overview
 Convert the S04 Knowledge Arbitrage design into systematic tasks for analyzing the burnt-sushi/xsv codebase using L1-L8 extraction methodology. Each task builds incrementally and focuses on extracting tactical implementations, strategic architecture, and foundational evolution insights.
 
+# SPEC CLASSIFICATION : Analysis Spec
+This is an analysis only Spec - we will be using tools and scripts but will not be making enhancements
+
 ## Database Configuration
 - **Source Database**: `/Users/neetipatni/desktop/PensieveDB01`
 - **Source Table**: `INGEST_20250928062949` (XSV codebase already ingested)

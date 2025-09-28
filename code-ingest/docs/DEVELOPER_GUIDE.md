@@ -49,7 +49,7 @@ Complete guide for developers who want to contribute to or extend code-ingest.
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/code-ingest.git
+git clone https://github.com/that-in-rust/code-ingest.git
 cd code-ingest/code-ingest
 
 # Build in debug mode

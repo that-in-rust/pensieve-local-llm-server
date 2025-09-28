@@ -182,5 +182,5 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 - **Documentation**: [docs/](docs/)
 - **Examples**: [examples/](examples/)
-- **Issues**: [GitHub Issues](https://github.com/your-org/code-ingest/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/code-ingest/discussions)
+- **Issues**: [GitHub Issues](https://github.com/that-in-rust/code-ingest/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/that-in-rust/code-ingest/discussions)
