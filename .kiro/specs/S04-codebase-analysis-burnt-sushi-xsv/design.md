@@ -441,12 +441,13 @@ CREATE TABLE analysis_meta (
 #[derive(Serialize, Deserialize, Debug)]
 pub struct KnowledgeArbitrageOutput {
     pub metadata: AnalysisMetadata,
-    pub tactical_implementation: TacticalInsights,    // L1-L3
-    pub strategic_architecture: StrategyInsights,     // L4-L6
-    pub foundational_evolution: FoundationInsights,   // L7-L8
-    pub cross_scale_patterns: CrossScalePatterns,
-    pub horcrux_codex_entries: Vec<HorcruxEntry>,
-    pub visualizations: Vec<MermaidDiagram>,
+    pub tactical_implementation: TacticalInsights,    // L1-L3 (Requirement 1)
+    pub strategic_architecture: StrategyInsights,     // L4-L6 (Requirement 2)
+    pub foundational_evolution: FoundationInsights,   // L7-L8 (Requirement 3)
+    pub cross_scale_patterns: CrossScalePatterns,     // Requirement 5: Triple-comparison results
+    pub horcrux_codex_entries: Vec<HorcruxEntry>,     // Requirement 7: LLM training data
+    pub visualizations: Vec<MermaidDiagram>,          // Requirement 8: Mermaid diagrams
+    pub expert_council_validation: ExpertCouncilResults, // Requirement 6: Multi-persona analysis
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -454,15 +455,66 @@ pub struct AnalysisMetadata {
     pub xsv_commit_hash: String,
     pub analysis_timestamp: DateTime<Utc>,
     pub database_table: String,
+    pub database_path: String,                        // Requirement 8.4: source database path
     pub files_analyzed: u32,
     pub extraction_completeness: ExtractionCompleteness,
+    pub analysis_methodology: String,                 // Requirement 8.4: methodology tracking
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TacticalInsights {
-    pub micro_optimizations: Vec<MicroOptimization>,  // L1
-    pub design_patterns: Vec<DesignPattern>,          // L2
-    pub micro_libraries: Vec<MicroLibraryOpportunity>, // L3
+    pub micro_optimizations: Vec<MicroOptimization>,  // L1: Requirement 1.1
+    pub design_patterns: Vec<DesignPattern>,          // L2: Requirement 1.2
+    pub micro_libraries: Vec<MicroLibraryOpportunity>, // L3: Requirement 1.3
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StrategyInsights {
+    pub macro_opportunities: Vec<MacroOpportunity>,   // L4: Requirement 2.1
+    pub lld_decisions: Vec<LowLevelDesignDecision>,   // L5: Requirement 2.2
+    pub domain_architecture: Vec<DomainArchPattern>, // L6: Requirement 2.3
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FoundationInsights {
+    pub language_limitations: Vec<LanguageLimitation>, // L7: Requirement 3.1
+    pub intent_archaeology: Vec<IntentArchaeology>,     // L8: Requirement 3.2
+    pub historical_constraints: Vec<HistoricalConstraint>, // L8: Requirement 3.3
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CrossScalePatterns {
+    // Requirement 5: Triple-comparison analysis results
+    pub individual_vs_module: Vec<ComparisonInsight>,
+    pub individual_vs_system: Vec<ComparisonInsight>,
+    pub module_vs_system: Vec<ComparisonInsight>,
+    pub scaling_patterns: Vec<ScalingPattern>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ExpertCouncilResults {
+    // Requirement 6: Multi-persona analysis results
+    pub domain_expert_insights: Vec<DomainInsight>,
+    pub strategic_analyst_insights: Vec<StrategyInsight>,
+    pub implementation_specialist_insights: Vec<ImplInsight>,
+    pub ux_advocate_insights: Vec<UXInsight>,
+    pub skeptical_challenges: Vec<SkepticalChallenge>,
+    pub challenge_responses: Vec<ChallengeResponse>,
+    pub verification_questions: Vec<VerificationQuestion>, // Requirement 6.4
+    pub validation_results: Vec<ValidationResult>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct HorcruxEntry {
+    // Requirement 7.4: Structured training data format
+    pub entry_id: String,
+    pub insight_category: String,
+    pub context: MultiScaleContext,
+    pub rationale: String,
+    pub code_example: Option<String>,
+    pub verification_metadata: VerificationMetadata,
+    pub transferability_score: u8,
+    pub performance_impact: PerformanceImpact,
 }
 ```
 
@@ -626,42 +678,121 @@ pub async fn validate_insights_with_expert_council(
 }
 ```
 
+## Database Configuration
+
+### Target Database Location
+- **Database Path**: `/Users/neetipatni/desktop/PensieveDB01` (Requirements Scope)
+- **Source Table**: `INGEST_20250928062949` (XSV codebase already ingested)
+- **Results Table**: `QUERYRESULT_xsv_knowledge_arbitrage` (to be created)
+- **Metadata Table**: `analysis_meta` (to be created)
+
+### Enhanced Ingestion Requirements
+The design assumes that **Requirement 4** (Enhanced Ingestion with Multi-Scale Context Windows) will be implemented as enhancements to the existing ingestion process, not as post-processing steps. This design decision prioritizes:
+
+1. **Analytics-Ready Access**: Single-query access to all context levels
+2. **Performance**: Avoid expensive JOIN operations during analysis
+3. **Redundancy Acceptance**: Storage efficiency traded for query efficiency
+4. **Systematic Processing**: Built-in support for chunked analysis
+
 ## Implementation Phases
 
-### Phase 1: Database Enhancement (Week 1)
-- Implement parent_filepath calculation
-- Add l1_window_content and l2_window_content columns
-- Populate hierarchical context data
-- Verify data integrity and performance
+### Phase 1: Enhanced Ingestion Implementation (Week 1)
+- **Requirement 4**: Implement automatic multi-scale context window generation during ingestion
+- Add parent_filepath and grandfather_filepath calculation logic
+- Implement l1_window_content and l2_window_content population
+- Add ast_patterns extraction with common Rust patterns
+- Implement chunk_boundaries generation for systematic processing
+- Verify enhanced ingestion with XSV codebase re-ingestion
 
-### Phase 2: Semantic Search Integration (Week 1)
-- Integrate ast-grep with existing codebase
-- Implement XSV-specific pattern library
-- Store semantic search results in database
-- Test pattern extraction accuracy
+### Phase 2: Triple-Comparison Framework (Week 1)
+- **Requirement 5**: Implement three-way comparative analysis
+- Build individual↔module↔system comparison engine
+- Implement scaling pattern identification
+- Create efficient single-row context access patterns
+- Validate cross-scale consistency detection
 
 ### Phase 3: L1-L8 Extraction Engine (Week 2)
-- Implement tactical implementation extraction (L1-L3)
+- **Requirements 1-3**: Implement complete knowledge arbitrage extraction
+- Build tactical implementation extraction (L1-L3) with <30s performance contract
 - Implement strategic architecture analysis (L4-L6)
-- Implement foundational evolution insights (L7-L8)
-- Validate extraction quality
+- Build foundational evolution insights (L7-L8) with Git archaeology
+- Integrate semantic search with ast-grep patterns
 
-### Phase 4: Triple-Comparison Framework (Week 2)
-- Implement individual↔module↔system comparisons
-- Generate scaling pattern analysis
-- Validate cross-scale consistency
-- Optimize comparison performance
+### Phase 4: Multi-Persona Expert Council (Week 2)
+- **Requirement 6**: Implement systematic chunked processing
+- Build expert council with 5 mandatory personas
+- Implement challenge-response cycle with Skeptical Engineer
+- Create verification question generation (5-10 per insight)
+- Build progress tracking for systematic chunk processing
 
-### Phase 5: Output Generation (Week 3)
-- Generate Horcrux Codex training data
-- Create Mermaid visualizations
-- Generate markdown reports
-- Implement export functionality
+### Phase 5: Task-Based Output Generation (Week 3)
+- **Requirements 7-8**: Implement structured output generation
+- Build optimization arbitrage, cross-paradigm translation, and unsafe compendium task generators
+- Implement Horcrux Codex preparation with JSONB formatting
+- Create Mermaid visualization generation from analysis results
+- Integrate code-ingest export functionality
 
-### Phase 6: Validation and Refinement (Week 3)
-- Expert council validation
-- Performance optimization
-- Documentation completion
-- Final quality assurance
+### Phase 6: Validation and Quality Assurance (Week 3)
+- Complete metadata tracking with all required fields (Requirement 8.4)
+- Validate L1-L8 extraction completeness metrics
+- Perform end-to-end testing with XSV codebase
+- Generate comprehensive analysis reports
+- Final quality assurance and documentation
+
+## Design Rationales and Key Decisions
+
+### 1. Enhanced Ingestion vs Post-Processing (Requirement 4)
+**Decision**: Implement multi-scale context windows during ingestion rather than as post-processing steps.
+
+**Rationale**: 
+- **Performance**: Single-query access to all context levels eliminates expensive JOINs
+- **Analytics-First**: Optimizes for analysis workload over storage efficiency
+- **Systematic Processing**: Built-in chunk boundaries enable systematic progress tracking
+- **Redundancy Acceptance**: Storage cost traded for query performance and simplicity
+
+### 2. Task-Based Architecture (Requirements 7-8)
+**Decision**: Structure all outputs as executable tasks rather than direct generation.
+
+**Rationale**:
+- **Systematic Execution**: Enables step-by-step progress tracking and validation
+- **Reproducibility**: Each task can be re-executed independently
+- **Quality Control**: Tasks can include validation steps and quality checks
+- **Integration**: Aligns with code-ingest task-based workflow patterns
+
+### 3. Multi-Persona Expert Council (Requirement 6)
+**Decision**: Mandatory Skeptical Engineer challenges for all insights.
+
+**Rationale**:
+- **Bias Mitigation**: Prevents confirmation bias in pattern recognition
+- **Quality Assurance**: Forces validation of claims against evidence
+- **Systematic Rigor**: Ensures comprehensive analysis rather than cherry-picking
+- **Knowledge Arbitrage**: Challenges assumptions to extract deeper insights
+
+### 4. Performance Contracts (Requirement 1.4)
+**Decision**: <30 second performance contract for L1-L3 extraction across entire XSV codebase.
+
+**Rationale**:
+- **Interactive Analysis**: Enables rapid iteration and exploration
+- **Scalability Validation**: Proves approach works for larger codebases
+- **Resource Efficiency**: Demonstrates practical applicability
+- **Quality Gate**: Performance degradation indicates architectural issues
+
+### 5. Triple-Comparison Framework (Requirement 5)
+**Decision**: Store all three context levels (individual, module, system) in single database row.
+
+**Rationale**:
+- **Query Efficiency**: Eliminates complex JOINs for multi-scale analysis
+- **Pattern Recognition**: Enables immediate cross-scale pattern identification
+- **Systematic Analysis**: Ensures consistent context availability for all files
+- **Analytics Optimization**: Optimizes for analysis workload over normalization
+
+### 6. Git Archaeology Integration (Requirement 3.2)
+**Decision**: Separate Git context extraction from code analysis.
+
+**Rationale**:
+- **Data Source Separation**: Git history requires different access patterns than code content
+- **Historical Accuracy**: Preserves temporal context and decision rationale
+- **Constraint Documentation**: Captures external factors influencing design decisions
+- **Intent Preservation**: Maintains "why" context for architectural decisions
 
 This design provides a comprehensive foundation for transforming the XSV codebase analysis from traditional file processing into systematic Knowledge Arbitrage extraction, directly supporting the mission to achieve top-5 Rust programmer mastery through decades of accumulated engineering wisdom.
