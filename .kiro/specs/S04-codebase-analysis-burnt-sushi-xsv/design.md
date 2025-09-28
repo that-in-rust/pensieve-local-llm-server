@@ -92,16 +92,12 @@ sequenceDiagram
 
 **Purpose**: Transform flat file storage into hierarchical context-aware database
 
-**Interface**:
-```rust
-pub trait DatabaseEnhancer {
-    async fn add_parent_filepath_column(&self) -> Result<()>;
-    async fn populate_l1_window_content(&self) -> Result<()>;
-    async fn populate_l2_window_content(&self) -> Result<()>;
-    async fn add_ast_patterns_column(&self) -> Result<()>;
-    async fn verify_enhancement_integrity(&self) -> Result<EnhancementReport>;
-}
-```
+**Key Capabilities**:
+- Automatic parent_filepath calculation using simple path logic
+- L1 window content aggregation by directory
+- L2 window content aggregation by parent directory  
+- AST pattern extraction using ast-grep
+- Data integrity verification
 
 **Implementation Strategy**:
 - Simple path logic: go back by 1 slash for parent_filepath
