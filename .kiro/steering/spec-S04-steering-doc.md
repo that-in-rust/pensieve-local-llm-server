@@ -152,4 +152,99 @@ Focus: Complex state management and data structures in non-systems domains.
 
 ## The Output Strategy
 
-Put into the file defined by the calling function
+The extracted knowledge (L1-L8) is being organized into specialized repositories (e.g., Optimization Arbitrage, Cross-Paradigm Translation, The Unsafe Compendium, Visualization Atlas (Mermaid diagrams)) and a proprietary LLM training dataset (*The Horcrux Codex*).
+
+## Multi-Scale Context Window Analysis Framework
+
+### Strategic Breakthrough: Hierarchical Knowledge Extraction
+
+**Core Innovation**: Multi-scale context windows that mirror how expert programmers naturally understand codebases - from individual functions to system architecture. This approach creates a multiplier effect for L1-L8 knowledge extraction by analyzing code within its natural hierarchical relationships.
+
+### Implementation Structure
+
+```
+Grandfather filepath | filepath | filename | Content | Window L1 Content | Window L2 Content
+cd../filepath1      | filepath1| filename1| Code1   | Code1 + Code2     | Code1+Code2+Code3+Code4
+cd../filepath1      | filepath1| filename2| Code2   | Code1 + Code2     | Code1+Code2+Code3+Code4
+cd../filepath1      | filepath2| filename3| Code3   | Code3 + Code4     | Code1+Code2+Code3+Code4
+cd../filepath1      | filepath2| filename4| Code4   | Code3 + Code4     | Code1+Code2+Code3+Code4
+```
+
+### XSV Codebase Application Example
+
+**Individual File Level (Code1-4)**:
+- `./xsv/src/cmd/sort.rs` - Individual sorting algorithm optimizations
+- `./xsv/src/cmd/join.rs` - Join operation memory management
+- `./xsv/src/util.rs` - Shared utility functions
+- `./xsv/src/index.rs` - CSV indexing implementation
+
+**Window L1 Content (Directory-Level Aggregation)**:
+- All `./xsv/src/cmd/*.rs` files concatenated → Reveals command composition patterns, shared error handling, and CLI design philosophy
+- All `./xsv/src/*.rs` core files → Shows fundamental CSV processing abstractions and performance contracts
+
+**Window L2 Content (System-Level Aggregation)**:
+- Entire `./xsv/src/` codebase → Exposes architectural invariants, cross-cutting concerns, and system-wide optimization strategies
+
+### L1-L8 Extraction at Each Scale
+
+#### L1-L3 Tactical Implementation
+- **File Level**: Micro-optimizations (SIMD usage, memory allocation patterns)
+- **Directory Level**: Module composition patterns and shared abstractions
+- **System Level**: Architectural patterns suitable for micro-library extraction
+
+#### L4-L6 Strategic Architecture
+- **File Level**: Domain-specific optimizations
+- **Directory Level**: Component interaction patterns and invariants
+- **System Level**: Platform-level opportunities and hardware interaction strategies
+
+#### L7-L8 Foundational Evolution
+- **File Level**: Local language workarounds
+- **Directory Level**: Repeated patterns indicating language limitations
+- **System Level**: Architectural decisions driven by ecosystem constraints
+
+### Knowledge Arbitrage Multiplier Effect
+
+**Single Pattern → Multi-Scale Value**:
+1. **Code1**: Buffer reuse optimization in sort.rs
+2. **Window L1**: Same pattern across all cmd/*.rs files → Systematic memory management philosophy
+3. **Window L2**: Pattern influences entire CSV processing pipeline → Transferable architectural principle
+
+### Competitive Advantage
+
+This hierarchical approach provides **context-aware pattern recognition** that no other analysis tool offers. Instead of isolated file analysis, we extract architectural narratives that reveal:
+
+- How performance optimizations cascade through system layers
+- Which patterns are domain-specific versus universally applicable
+- Where design decisions represent transferable wisdom for The Horcrux Codex
+
+### Implementation for XSV Analysis
+
+**Phase 1: Hierarchical Content Extraction**
+```sql
+-- Individual files
+SELECT filepath, filename, content_text FROM "INGEST_20250928062949"
+
+-- Window L1: Directory-level concatenation
+SELECT 
+  SUBSTRING(filepath FROM 1 FOR POSITION('/' IN REVERSE(filepath))-1) as directory_path,
+  STRING_AGG(content_text, '\n--- FILE SEPARATOR ---\n' ORDER BY filename) as window_l1_content
+FROM "INGEST_20250928062949" 
+GROUP BY directory_path
+
+-- Window L2: System-level concatenation  
+SELECT STRING_AGG(content_text, '\n--- MODULE SEPARATOR ---\n') as window_l2_content
+FROM "INGEST_20250928062949"
+WHERE filepath LIKE './xsv/src/%'
+```
+
+**Phase 2: Multi-Scale L1-L8 Analysis**
+- Apply extraction methodology at each context level
+- Cross-reference patterns across scales
+- Identify emergent architectural principles
+
+**Phase 3: Horcrux Codex Integration**
+- Structure insights as hierarchical training data
+- Include context metadata for each scale
+- Enable LLM fine-tuning on architectural reasoning patterns
+
+This framework transforms raw code analysis into systematic architectural wisdom extraction, creating the foundation for achieving top-5 Rust programmer mastery through Knowledge Arbitrage.
