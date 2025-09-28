@@ -1,12 +1,31 @@
 # Implementation Plan
 
+# Table Structure
+
+column_name        | data_type               
+-------------------+-------------------------
+file_id            | bigint                  
+ingestion_id       | bigint                  
+filepath           | character varying       
+filename           | character varying       
+extension          | character varying       
+file_size_bytes    | bigint                  
+line_count         | integer   
+
+Ingestion
+``` bash
+  ./target/release/code-ingest ingest git_url --db-path /Users/neetipatni/desktop/PensieveDB01
+```
+
 ## Phase 1: Database Setup and Verification
 
-- [-] 1. Verify xsv ingestion database exists and is accessible
-  - Connect to database at /Users/neetipatni/desktop/PensieveDB01
-  - Verify INGEST_20250928062949 table exists with 59 files
-  - Confirm multi-scale context columns (parent_filepath, l1_window_content, l2_window_content, ast_patterns) are populated
-  - _Requirements: 4.1, 4.2, 4.3, 4.4_
+- [-] 1. Do a fresh ingestion of - the repo - https://github.com/BurntSushi/xsv + Ingest PG Database to be stored at - /Users/neetipatni/desktop/PensieveDB01 + Result PG database to be stored at -  /Users/neetipatni/desktop/PensieveDB01
+  - Run
+  ``` bash
+  ./target/release/code-ingest ingest https://github.com/BurntSushi/xsv --db-path /Users/neetipatni/desktop/PensieveDB01
+  ```
+  - [ ] Note down the table name and validate the count of rows and column list
+
 
 - [ ] 4. Generate systematic analysis tasks using code-ingest
   - Run: `code-ingest generate-tasks --sql "SELECT * FROM INGEST_20250928062949" --prompt-file ./xsv-l1-l8-analysis-prompt.md --output-table QUERYRESULT_xsv_knowledge_arbitrage --tasks-file ./xsv-analysis-tasks.md --db-path /Users/neetipatni/desktop/PensieveDB01`
