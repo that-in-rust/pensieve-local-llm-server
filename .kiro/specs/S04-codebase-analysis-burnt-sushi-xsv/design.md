@@ -1,5 +1,9 @@
 # Design Document
 
+# SPEC CLASSIFICATION : Analysis Spec
+This is an analysis only Spec - we will be using tools and scripts but will not be making enhancements
+
+
 ## Overview
 
 The S04 Knowledge Arbitrage system implements a revolutionary multi-scale context window approach to extract L1-L8 insights from the burnt-sushi/xsv codebase. This system transforms traditional file-by-file analysis into hierarchical knowledge extraction that mirrors how expert programmers understand code architecture.
@@ -250,6 +254,49 @@ pub struct OverlapMetadata {
 }
 ```
 
+### 6. Task-Based Output Generation Engine
+
+**Purpose**: Generate structured outputs for specialized repositories and The Horcrux Codex (Requirements 7 & 8)
+
+**Interface**:
+```rust
+pub trait OutputGenerator {
+    // Requirement 7: Task-Based Knowledge Arbitrage Output Generation
+    async fn generate_optimization_arbitrage_tasks(&self, analysis_results: &AnalysisResults) -> Result<TasksDocument>;
+    async fn generate_cross_paradigm_translation_tasks(&self, ecosystem_patterns: &EcosystemPatterns) -> Result<TasksDocument>;
+    async fn generate_unsafe_compendium_tasks(&self, unsafe_analysis: &UnsafeAnalysis) -> Result<TasksDocument>;
+    async fn generate_horcrux_codex_preparation_tasks(&self, insights: &KnowledgeArbitrageOutput) -> Result<TasksDocument>;
+    
+    // Requirement 8: Task-Based Visualization and Export System
+    async fn generate_visualization_tasks(&self, analysis_results: &AnalysisResults) -> Result<TasksDocument>;
+    async fn generate_export_tasks(&self, export_config: &ExportConfiguration) -> Result<TasksDocument>;
+    async fn generate_metadata_tasks(&self, analysis_metadata: &AnalysisMetadata) -> Result<TasksDocument>;
+}
+
+pub trait HorcruxCodexFormatter {
+    // Requirement 7.4: Format insights as structured training data
+    async fn format_insights_for_llm_training(&self, insights: &[Insight]) -> Result<Vec<HorcruxEntry>>;
+    async fn add_context_and_rationale(&self, entry: &mut HorcruxEntry, context: &MultiScaleContext) -> Result<()>;
+    async fn generate_verification_metadata(&self, entry: &HorcruxEntry) -> Result<VerificationMetadata>;
+    async fn store_in_jsonb_format(&self, entries: &[HorcruxEntry]) -> Result<serde_json::Value>;
+}
+
+pub trait VisualizationGenerator {
+    // Requirement 8.1 & 8.2: Mermaid diagram generation from analysis results
+    async fn generate_module_dependency_diagrams(&self, results: &QueryResults) -> Result<Vec<MermaidDiagram>>;
+    async fn generate_data_flow_pipeline_diagrams(&self, pipeline_analysis: &PipelineAnalysis) -> Result<Vec<MermaidDiagram>>;
+    async fn generate_performance_optimization_diagrams(&self, perf_analysis: &PerformanceAnalysis) -> Result<Vec<MermaidDiagram>>;
+    async fn generate_bottleneck_analysis_diagrams(&self, bottlenecks: &BottleneckAnalysis) -> Result<Vec<MermaidDiagram>>;
+}
+
+pub trait CodeIngestExporter {
+    // Requirement 8.3: Use code-ingest export functionality
+    async fn export_to_markdown(&self, results: &AnalysisResults) -> Result<MarkdownExport>;
+    async fn export_to_json(&self, results: &AnalysisResults) -> Result<JsonExport>;
+    async fn export_horcrux_dataset(&self, entries: &[HorcruxEntry]) -> Result<HorcruxDataset>;
+}
+```
+
 ## Data Models
 
 ### Task-Based Database Schema
@@ -354,12 +401,20 @@ CREATE INDEX idx_horcrux_entry ON QUERYRESULT_xsv_knowledge_arbitrage USING gin(
 
 #### Analysis Metadata Table
 ```sql
--- analysis_meta - Track task execution and results
+-- analysis_meta - Track task execution and results (Requirement 8.4)
 CREATE TABLE analysis_meta (
     analysis_id BIGSERIAL PRIMARY KEY,
     source_table VARCHAR NOT NULL,    -- 'INGEST_20250928062949'
     results_table VARCHAR NOT NULL,   -- 'QUERYRESULT_xsv_knowledge_arbitrage'
     analysis_type VARCHAR NOT NULL,   -- 'L1_L8_knowledge_arbitrage'
+    
+    -- Requirement 8.4: Complete metadata storage
+    analysis_methodology VARCHAR NOT NULL, -- 'Knowledge_Arbitrage_L1_L8'
+    xsv_version VARCHAR,              -- XSV codebase version
+    xsv_commit_hash VARCHAR,          -- Specific commit analyzed
+    analysis_timestamp TIMESTAMP NOT NULL,
+    source_database_path VARCHAR NOT NULL, -- '/Users/neetipatni/desktop/PensieveDB01'
+    source_table_reference VARCHAR NOT NULL, -- 'INGEST_20250928062949'
     
     -- Execution metadata
     start_timestamp TIMESTAMP NOT NULL,
@@ -371,9 +426,10 @@ CREATE TABLE analysis_meta (
     tasks_completed TEXT[],           -- List of completed task IDs
     tasks_failed TEXT[],              -- List of failed task IDs
     
-    -- Quality metrics
+    -- Quality metrics (Requirement 8.4: L1-L8 extraction completeness)
     extraction_completeness JSONB,    -- L1-L8 completion percentages
     validation_results JSONB,         -- Expert council validation
+    chunked_processing_stats JSONB,   -- Requirement 6: chunk processing metrics
     
     created_at TIMESTAMP DEFAULT NOW()
 );
