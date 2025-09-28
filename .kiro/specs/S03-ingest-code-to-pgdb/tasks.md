@@ -174,8 +174,8 @@
   - Write developer documentation for extending the system
   - _Requirements: User experience and adoption_
 
-- [ ] 12. Package and distribute
-- [ ] 12.1 Create release artifacts
+- [-] 12. Package and distribute
+- [-] 12.1 Create release artifacts
   - Set up cargo build for optimized release binaries
   - Create installation scripts for different platforms
   - Add version management and release automation

@@ -2,6 +2,20 @@
 name = "code-ingest"
 version = "0.1.0"
 edition = "2021"
+authors = ["Code Ingest Team <team@code-ingest.dev>"]
+description = "A high-performance Rust tool for ingesting GitHub repositories into PostgreSQL databases for fast code analysis"
+homepage = "https://github.com/your-org/code-ingest"
+repository = "https://github.com/your-org/code-ingest"
+license = "MIT OR Apache-2.0"
+keywords = ["code-analysis", "github", "postgresql", "rust", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+readme = "README.md"
+exclude = [
+    "tests/fixtures/*",
+    "benches/test-data/*",
+    ".github/*",
+    "docs/images/*"
+]
 
 [[bin]]
 name = "code-ingest"
@@ -87,3 +101,55 @@ mockall = "0.12"
 serial_test = "3.0"
 assert_cmd = "2.0"
 predicates = "3.0"
+
+# Release profile optimizations
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# Development profile with some optimizations for faster builds
+[profile.dev]
+opt-level = 0
+debug = true
+overflow-checks = true
+
+# Profile for benchmarks
+[profile.bench]
+opt-level = 3
+lto = true
+codegen-units = 1
+debug = false
+
+# Metadata for package managers
+[package.metadata.deb]
+maintainer = "Code Ingest Team <team@code-ingest.dev>"
+copyright = "2024, Code Ingest Team <team@code-ingest.dev>"
+license-file = ["LICENSE-MIT", "4"]
+extended-description = """\
+A high-performance Rust tool for ingesting GitHub repositories into PostgreSQL 
+databases for fast code analysis. Supports intelligent file classification, 
+content extraction, and provides SQL interfaces for code exploration."""
+depends = "$auto, postgresql-client"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/code-ingest", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/code-ingest/", "644"],
+    ["docs/CLI_REFERENCE.md", "usr/share/doc/code-ingest/", "644"],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/code-ingest", dest = "/usr/bin/code-ingest", mode = "755" },
+    { source = "README.md", dest = "/usr/share/doc/code-ingest/README.md", mode = "644" },
+    { source = "docs/CLI_REFERENCE.md", dest = "/usr/share/doc/code-ingest/CLI_REFERENCE.md", mode = "644" },
+]
+
+[package.metadata.wix]
+upgrade-guid = "12345678-1234-1234-1234-123456789012"
+path-guid = "87654321-4321-4321-4321-210987654321"
+license = false
+eula = false
