@@ -44,52 +44,52 @@
     - Create error handling and recovery strategies for ingestion failures
     - _Requirements: 3.1, 3.4, 4.4_
 
-- [-] 4. Develop chunking engine for large file processing
-  - [-] 4.1 Implement core chunking algorithm
+- [x] 4. Develop chunking engine for large file processing
+  - [x] 4.1 Implement core chunking algorithm
     - Write LOC-based file splitting logic with configurable chunk sizes
     - Implement chunk boundary detection that preserves code structure
     - Create ChunkData structures with proper metadata (start_line, end_line, chunk_number)
     - _Requirements: 2.2, 2.3_
 
-  - [ ] 4.2 Build context generation system
+  - [x] 4.2 Build context generation system
     - Implement L1 context generation (previous + current + next chunk concatenation)
     - Write L2 context generation (±2 chunks concatenation logic)
     - Create context boundary handling for first/last chunks in files
     - _Requirements: 2.4, 2.5_
 
-  - [ ] 4.3 Integrate chunking with database operations
+  - [x] 4.3 Integrate chunking with database operations
     - Write chunked table population with proper foreign key relationships
     - Implement batch insertion for chunked data to optimize performance
     - Create size threshold checking (LOC < chunk_size → single chunk processing)
     - _Requirements: 2.1, 2.6_
 
-- [ ] 5. Create task generation and hierarchical structure builder
-  - [ ] 5.1 Implement task hierarchy calculation
+- [x] 5. Create task generation and hierarchical structure builder
+  - [x] 5.1 Implement task hierarchy calculation
     - Write algorithm to distribute database rows across hierarchical levels
     - Implement task numbering system (1.1, 1.2, 2.1, etc.) with proper formatting
     - Create task distribution logic that balances groups across levels
     - _Requirements: 1.1, 4.1_
 
-  - [ ] 5.2 Build task structure generation
+  - [x] 5.2 Build task structure generation
     - Implement Task and TaskLevel data structures with proper relationships
     - Write task description generation with content file references
     - Create prompt file integration and reference generation
     - _Requirements: 1.3, 4.2_
 
-  - [ ] 5.3 Create markdown task list writer
+  - [x] 5.3 Create markdown task list writer
     - Implement markdown formatting with proper checkbox syntax and indentation
     - Write hierarchical task rendering with content, prompt, and output references
     - Create file output handling with proper path management
     - _Requirements: 1.1, 1.4_
 
-- [ ] 6. Implement content file generation system
-  - [ ] 6.1 Create basic content file generator
+- [-] 6. Implement content file generation system
+  - [x] 6.1 Create basic content file generator
     - Write ContentGenerator for three-tier file creation (A, L1, L2)
     - Implement file naming conventions with proper path handling
     - Create content extraction from database rows with proper formatting
     - _Requirements: 1.2, 1.4_
 
-  - [ ] 6.2 Implement chunked content file generation
+  - [-] 6.2 Implement chunked content file generation
     - Write chunked content file creation with modified naming patterns
     - Implement context file generation using chunking engine output
     - Create content file validation and error handling

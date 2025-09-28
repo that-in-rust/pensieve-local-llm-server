@@ -5,7 +5,7 @@
 
 use crate::error::{DatabaseError, DatabaseResult};
 use chrono::{DateTime, Utc};
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use tracing::{debug, info, warn};
 
 /// Schema manager for database table operations

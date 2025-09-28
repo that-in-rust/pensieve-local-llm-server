@@ -1359,6 +1359,7 @@ mod tests {
                     relative_path: "file1.rs".to_string(),
                     absolute_path: "/test/file1.rs".to_string(),
                     skipped: false,
+                    skip_reason: None,
                 },
             ];
             

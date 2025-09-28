@@ -74,6 +74,30 @@ pub struct ChunkingResult {
     pub was_chunked: bool,
 }
 
+/// Context level for chunk context generation
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContextLevel {
+    /// L1: Previous + Current + Next chunk (±1 chunk)
+    L1,
+    /// L2: ±2 chunks concatenation
+    L2,
+}
+
+/// Context data for a chunk
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChunkContext {
+    /// L1 context: previous + current + next chunk content
+    pub l1_content: String,
+    /// L2 context: ±2 chunks content
+    pub l2_content: String,
+    /// Indicates if this is a boundary chunk (first/last)
+    pub is_boundary: bool,
+    /// Number of chunks included in L1 context
+    pub l1_chunk_count: usize,
+    /// Number of chunks included in L2 context
+    pub l2_chunk_count: usize,
+}
+
 /// Core chunking engine
 #[derive(Debug, Clone)]
 pub struct ChunkingEngine {
@@ -303,6 +327,95 @@ impl ChunkingEngine {
         }
 
         score
+    }
+
+    /// Generate context for a specific chunk
+    /// 
+    /// Creates L1 and L2 context by concatenating surrounding chunks.
+    /// L1: previous + current + next chunk
+    /// L2: ±2 chunks around current chunk
+    pub fn generate_context(&self, chunks: &[ChunkData], current_index: usize) -> ProcessingResult<ChunkContext> {
+        if current_index >= chunks.len() {
+            return Err(ProcessingError::ChunkingFailed {
+                reason: format!("Invalid chunk index: {} >= {}", current_index, chunks.len()),
+            });
+        }
+
+        let l1_content = self.generate_context_level(chunks, current_index, ContextLevel::L1);
+        let l2_content = self.generate_context_level(chunks, current_index, ContextLevel::L2);
+
+        let is_boundary = current_index == 0 || current_index == chunks.len() - 1;
+        
+        // Calculate actual chunk counts for L1 and L2
+        let l1_range = self.calculate_context_range(chunks.len(), current_index, ContextLevel::L1);
+        let l2_range = self.calculate_context_range(chunks.len(), current_index, ContextLevel::L2);
+        
+        let l1_chunk_count = l1_range.1 - l1_range.0 + 1;
+        let l2_chunk_count = l2_range.1 - l2_range.0 + 1;
+
+        Ok(ChunkContext {
+            l1_content,
+            l2_content,
+            is_boundary,
+            l1_chunk_count,
+            l2_chunk_count,
+        })
+    }
+
+    /// Generate context content for a specific level
+    fn generate_context_level(&self, chunks: &[ChunkData], current_index: usize, level: ContextLevel) -> String {
+        let (start_idx, end_idx) = self.calculate_context_range(chunks.len(), current_index, level);
+        
+        chunks[start_idx..=end_idx]
+            .iter()
+            .map(|chunk| chunk.content.as_str())
+            .collect::<Vec<_>>()
+            .join("\n\n") // Separate chunks with double newline for clarity
+    }
+
+    /// Calculate the range of chunks to include for context generation
+    fn calculate_context_range(&self, total_chunks: usize, current_index: usize, level: ContextLevel) -> (usize, usize) {
+        let context_radius = match level {
+            ContextLevel::L1 => 1,
+            ContextLevel::L2 => 2,
+        };
+
+        let start_idx = current_index.saturating_sub(context_radius);
+        let end_idx = std::cmp::min(current_index + context_radius, total_chunks - 1);
+
+        (start_idx, end_idx)
+    }
+
+    /// Generate context for all chunks in a chunking result
+    /// 
+    /// Returns a vector of contexts in the same order as the chunks
+    pub fn generate_all_contexts(&self, chunks: &[ChunkData]) -> ProcessingResult<Vec<ChunkContext>> {
+        let mut contexts = Vec::with_capacity(chunks.len());
+        
+        for i in 0..chunks.len() {
+            let context = self.generate_context(chunks, i)?;
+            contexts.push(context);
+        }
+
+        Ok(contexts)
+    }
+
+    /// Create chunks with embedded context data
+    /// 
+    /// This is a convenience method that creates chunks and immediately generates
+    /// their context data, returning enhanced chunk data with context.
+    pub fn chunk_content_with_context(
+        &self,
+        content: &str,
+        file_id: String,
+        filepath: String,
+        filename: String,
+        extension: Option<String>,
+    ) -> ProcessingResult<(ChunkingResult, Vec<ChunkContext>)> {
+        let chunking_result = self.chunk_content(content, file_id, filepath, filename, extension)?;
+        let contexts = self.generate_all_contexts(&chunking_result.chunks)?;
+        
+        Ok((chunking_result, contexts))
     }
 
     /// Get the configuration used by this chunking engine
@@ -655,6 +768,213 @@ impl TestTrait for TestStruct {
                 // Not the last chunk
                 assert!(chunk.metadata.line_count >= engine.config.min_chunk_size as u32);
             }
+        }
+    }
+
+    #[test]
+    fn test_context_generation_l1() {
+        let engine = ChunkingEngine::with_chunk_size(5);
+        let content = create_test_content(15); // Will create 3 chunks of 5 lines each
+        
+        let result = engine.chunk_content(
+            &content,
+            "test_file".to_string(),
+            "test.txt".to_string(),
+            "test.txt".to_string(),
+            Some("txt".to_string()),
+        ).unwrap();
+
+        assert_eq!(result.chunks.len(), 3);
+        
+        // Test L1 context for middle chunk (index 1)
+        let context = engine.generate_context(&result.chunks, 1).unwrap();
+        
+        // L1 should include chunks 0, 1, 2 (all chunks in this case)
+        assert_eq!(context.l1_chunk_count, 3);
+        assert_eq!(context.l2_chunk_count, 3); // Same as L1 since we only have 3 chunks
+        assert!(!context.is_boundary); // Middle chunk is not a boundary
+        
+        // L1 content should contain all three chunks
+        assert!(context.l1_content.contains("line 1"));  // From chunk 0
+        assert!(context.l1_content.contains("line 8"));  // From chunk 1
+        assert!(context.l1_content.contains("line 15")); // From chunk 2
+    }
+
+    #[test]
+    fn test_context_generation_l2() {
+        let engine = ChunkingEngine::with_chunk_size(3);
+        let content = create_test_content(21); // Will create 7 chunks of 3 lines each
+        
+        let result = engine.chunk_content(
+            &content,
+            "test_file".to_string(),
+            "test.txt".to_string(),
+            "test.txt".to_string(),
+            Some("txt".to_string()),
+        ).unwrap();
+
+        assert_eq!(result.chunks.len(), 7);
+        
+        // Test L2 context for middle chunk (index 3)
+        let context = engine.generate_context(&result.chunks, 3).unwrap();
+        
+        // L1 should include chunks 2, 3, 4 (±1 from index 3)
+        assert_eq!(context.l1_chunk_count, 3);
+        
+        // L2 should include chunks 1, 2, 3, 4, 5 (±2 from index 3)
+        assert_eq!(context.l2_chunk_count, 5);
+        assert!(!context.is_boundary); // Middle chunk is not a boundary
+        
+        // L2 content should include more chunks than L1
+        assert!(context.l2_content.len() > context.l1_content.len());
+    }
+
+    #[test]
+    fn test_context_generation_boundary_chunks() {
+        let engine = ChunkingEngine::with_chunk_size(5);
+        let content = create_test_content(15); // Will create 3 chunks
+        
+        let result = engine.chunk_content(
+            &content,
+            "test_file".to_string(),
+            "test.txt".to_string(),
+            "test.txt".to_string(),
+            Some("txt".to_string()),
+        ).unwrap();
+
+        // Test first chunk (boundary)
+        let first_context = engine.generate_context(&result.chunks, 0).unwrap();
+        assert!(first_context.is_boundary);
+        assert_eq!(first_context.l1_chunk_count, 2); // chunks 0, 1
+        
+        // Test last chunk (boundary)
+        let last_context = engine.generate_context(&result.chunks, 2).unwrap();
+        assert!(last_context.is_boundary);
+        assert_eq!(last_context.l1_chunk_count, 2); // chunks 1, 2
+    }
+
+    #[test]
+    fn test_context_range_calculation() {
+        let engine = ChunkingEngine::default();
+        
+        // Test L1 context range
+        let (start, end) = engine.calculate_context_range(10, 5, ContextLevel::L1);
+        assert_eq!(start, 4); // 5 - 1
+        assert_eq!(end, 6);   // 5 + 1
+        
+        // Test L2 context range
+        let (start, end) = engine.calculate_context_range(10, 5, ContextLevel::L2);
+        assert_eq!(start, 3); // 5 - 2
+        assert_eq!(end, 7);   // 5 + 2
+        
+        // Test boundary conditions
+        let (start, end) = engine.calculate_context_range(5, 0, ContextLevel::L1);
+        assert_eq!(start, 0); // Can't go below 0
+        assert_eq!(end, 1);   // 0 + 1
+        
+        let (start, end) = engine.calculate_context_range(5, 4, ContextLevel::L1);
+        assert_eq!(start, 3); // 4 - 1
+        assert_eq!(end, 4);   // Can't go above 4 (last index)
+    }
+
+    #[test]
+    fn test_generate_all_contexts() {
+        let engine = ChunkingEngine::with_chunk_size(4);
+        let content = create_test_content(12); // Will create 3 chunks
+        
+        let result = engine.chunk_content(
+            &content,
+            "test_file".to_string(),
+            "test.txt".to_string(),
+            "test.txt".to_string(),
+            Some("txt".to_string()),
+        ).unwrap();
+
+        let contexts = engine.generate_all_contexts(&result.chunks).unwrap();
+        
+        assert_eq!(contexts.len(), result.chunks.len());
+        
+        // Check that boundary chunks are correctly identified
+        assert!(contexts[0].is_boundary);                    // First chunk
+        assert!(!contexts[1].is_boundary);                   // Middle chunk
+        assert!(contexts[contexts.len() - 1].is_boundary);   // Last chunk
+    }
+
+    #[test]
+    fn test_chunk_content_with_context() {
+        let engine = ChunkingEngine::with_chunk_size(6);
+        let content = create_test_content(18); // Will create 3 chunks
+        
+        let (result, contexts) = engine.chunk_content_with_context(
+            &content,
+            "test_file".to_string(),
+            "test.txt".to_string(),
+            "test.txt".to_string(),
+            Some("txt".to_string()),
+        ).unwrap();
+
+        assert_eq!(result.chunks.len(), contexts.len());
+        assert_eq!(result.chunks.len(), 3);
+        
+        // Verify that contexts are generated for all chunks
+        for (i, context) in contexts.iter().enumerate() {
+            assert!(context.l1_chunk_count > 0);
+            assert!(context.l2_chunk_count > 0);
+            assert!(!context.l1_content.is_empty());
+            assert!(!context.l2_content.is_empty());
+            
+            // Boundary check
+            let expected_boundary = i == 0 || i == contexts.len() - 1;
+            assert_eq!(context.is_boundary, expected_boundary);
+        }
+    }
+
+    #[test]
+    fn test_context_generation_single_chunk() {
+        let engine = ChunkingEngine::with_chunk_size(100);
+        let content = create_test_content(50); // Will create 1 chunk (smaller than chunk_size)
+        
+        let result = engine.chunk_content(
+            &content,
+            "test_file".to_string(),
+            "test.txt".to_string(),
+            "test.txt".to_string(),
+            Some("txt".to_string()),
+        ).unwrap();
+
+        assert_eq!(result.chunks.len(), 1);
+        assert!(!result.was_chunked);
+        
+        let context = engine.generate_context(&result.chunks, 0).unwrap();
+        
+        // Single chunk context
+        assert!(context.is_boundary);
+        assert_eq!(context.l1_chunk_count, 1);
+        assert_eq!(context.l2_chunk_count, 1);
+        assert_eq!(context.l1_content, context.l2_content); // Same content for single chunk
+    }
+
+    #[test]
+    fn test_context_generation_invalid_index() {
+        let engine = ChunkingEngine::with_chunk_size(5);
+        let content = create_test_content(10);
+        
+        let result = engine.chunk_content(
+            &content,
+            "test_file".to_string(),
+            "test.txt".to_string(),
+            "test.txt".to_string(),
+            Some("txt".to_string()),
+        ).unwrap();
+
+        // Test invalid index
+        let context_result = engine.generate_context(&result.chunks, 999);
+        assert!(context_result.is_err());
+        
+        if let Err(ProcessingError::ChunkingFailed { reason }) = context_result {
+            assert!(reason.contains("Invalid chunk index"));
+        } else {
+            panic!("Expected ChunkingFailed error");
         }
     }
 }

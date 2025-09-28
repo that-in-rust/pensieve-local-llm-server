@@ -36,7 +36,7 @@ impl Default for CloneConfig {
             credentials: None,
             timeout: Duration::from_secs(300), // 5 minutes
             show_progress: true,
-            max_size_mb: 1000, // 1GB default limit
+            max_size_mb: 5000, // 1GB default limit
         }
     }
 }

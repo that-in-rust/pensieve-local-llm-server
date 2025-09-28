@@ -251,6 +251,9 @@ pub enum Commands {
         /// Prompt file for analysis instructions
         #[arg(long, default_value = ".kiro/steering/spec-S04-steering-doc-analysis.md")]
         prompt_file: PathBuf,
+        /// Chunk size in lines of code (LOC) for large file processing
+        #[arg(long)]
+        chunks: Option<usize>,
         /// Database path (can also be set globally)
         #[arg(long)]
         db_path: Option<PathBuf>,
@@ -418,6 +421,7 @@ impl Cli {
                 groups, 
                 output, 
                 prompt_file, 
+                chunks,
                 db_path 
             } => {
                 let db_path = db_path.clone().or_else(|| self.db_path.clone());
@@ -427,6 +431,7 @@ impl Cli {
                     *groups,
                     output.clone(),
                     prompt_file.clone(),
+                    *chunks,
                     db_path,
                 ).await
             }
@@ -2218,6 +2223,7 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         groups: usize,
         output: PathBuf,
         prompt_file: PathBuf,
+        chunks: Option<usize>,
         db_path: Option<PathBuf>,
     ) -> Result<()> {
         use crate::tasks::{DatabaseQueryEngine, ContentExtractor, HierarchicalTaskDivider, L1L8MarkdownGenerator};
@@ -2229,6 +2235,9 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         println!("   Groups per level: {}", groups);
         println!("   Output file: {}", output.display().to_string().bright_yellow());
         println!("   Prompt file: {}", prompt_file.display().to_string().bright_blue());
+        if let Some(chunk_size) = chunks {
+            println!("   Chunk size: {} LOC", chunk_size.to_string().bright_green());
+        }
         println!();
         
         // Validate prompt file exists
@@ -2264,6 +2273,31 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         if row_count == 0 {
             anyhow::bail!("Table '{}' is empty. Cannot generate tasks from empty table.", table_name);
         }
+
+        // Handle chunking if requested
+        let working_table_name = if let Some(chunk_size) = chunks {
+            println!("🔄 Chunking enabled with size: {} LOC", chunk_size);
+            
+            // Step 1.5: Create chunked table
+            progress.set_message("Creating chunked table...");
+            progress.set_position(20);
+            
+            use crate::processing::{ChunkDatabaseManager, ChunkDatabaseConfig};
+            let chunk_manager = ChunkDatabaseManager::with_pool(database.pool().clone());
+            let chunk_result = chunk_manager.process_table_with_chunking(&table_name, chunk_size).await?;
+            
+            println!("✅ Chunking completed:");
+            println!("   Chunked table: {}", chunk_result.chunked_table_name.bright_cyan());
+            println!("   Base rows processed: {}", chunk_result.base_rows_processed);
+            println!("   Chunks created: {}", chunk_result.chunks_inserted);
+            println!("   Files chunked: {}", chunk_result.files_chunked);
+            println!("   Files below threshold: {}", chunk_result.files_below_threshold);
+            println!();
+            
+            chunk_result.chunked_table_name
+        } else {
+            table_name.clone()
+        };
         
         // Step 2: Extract content to A/B/C files
         progress.set_message("Extracting content to A/B/C files...");
@@ -2271,7 +2305,7 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         
         let output_dir = std::path::PathBuf::from(".raw_data_202509");
         let extractor = ContentExtractor::new(database.pool().clone().into(), output_dir);
-        let content_triples = extractor.extract_all_rows(&table_name).await?;
+        let content_triples = extractor.extract_all_rows(&working_table_name).await?;
         
         // Step 3: Create hierarchical task structure
         progress.set_message("Creating hierarchical task structure...");
@@ -2286,7 +2320,7 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         
         let output_dir_path = std::path::PathBuf::from("gringotts/WorkArea");
         let markdown_generator = L1L8MarkdownGenerator::new(prompt_file, output_dir_path);
-        let markdown_content = markdown_generator.generate_hierarchical_markdown(&hierarchy, &table_name).await?;
+        let markdown_content = markdown_generator.generate_hierarchical_markdown(&hierarchy, &working_table_name).await?;
         
         // Step 5: Write output file
         progress.set_message("Writing output file...");

@@ -5,17 +5,30 @@
 
 pub mod database_query_engine;
 pub mod content_extractor;
+pub mod content_generator;
 pub mod hierarchical_task_divider;
+pub mod hierarchical_generator;
 pub mod l1l8_markdown_generator;
+pub mod markdown_writer;
 pub mod models;
+pub mod task_structure_builder;
 
 pub use database_query_engine::{DatabaseQueryEngine, TableValidation, DatabaseConnectionStats};
 pub use content_extractor::{ContentExtractor, ContentTriple, RowMetadata};
+pub use content_generator::{ContentGenerator, ContentFileSet, RowData};
 pub use hierarchical_task_divider::{
     HierarchicalTaskDivider, TaskHierarchy, TaskLevel, HierarchicalTaskGroup, 
     AnalysisTask, AnalysisStage
 };
+pub use hierarchical_generator::{
+    HierarchicalTaskGenerator, TaskDistribution, TaskNumbering, DatabaseRow
+};
 pub use l1l8_markdown_generator::L1L8MarkdownGenerator;
+pub use task_structure_builder::{
+    TaskStructureBuilder, EnhancedTask, PromptReference, TaskRelationship, 
+    RelationshipType, TaskStructure as EnhancedTaskStructure, TaskStructureMetadata, TaskStructureStatistics
+};
+pub use markdown_writer::{MarkdownWriter, MarkdownConfig, MarkdownUtils};
 
 // Re-export the new core data models
 pub use models::{

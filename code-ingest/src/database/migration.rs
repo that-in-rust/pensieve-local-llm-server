@@ -216,11 +216,12 @@ impl MigrationManager {
                         }
                     })?;
                     
+                    let checksum = Self::calculate_checksum(&sql);
                     let migration = Migration {
                         version: file_name.to_string(),
                         description: format!("Migration from file: {}", path.display()),
                         sql,
-                        checksum: Self::calculate_checksum(&sql),
+                        checksum,
                     };
                     
                     self.register_migration(migration);
