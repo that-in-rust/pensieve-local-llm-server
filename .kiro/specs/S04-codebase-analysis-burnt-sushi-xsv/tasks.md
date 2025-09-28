@@ -14,7 +14,7 @@ line_count         | integer
 
 - the repo : https://github.com/BurntSushi/xsv
 - the prompt file : .kiro/steering/spec-S04-steering-doc-analysis.md
-
+- Ingested TableName
 
 
 Ingestion
@@ -50,16 +50,10 @@ Running SQL Query
 - [ ] 4. Generate systematic analysis tasks using code-ingest
   - Run
   ``` bash
-  ./target/release/code-ingest generate-tasks --sql 'SELECT * FROM "INGEST_20250928062949"' --prompt-file /Users/neetipatni/Desktop/Game20250927/pensieve/.kiro/steering/spec-S04-steering-doc-analysis.md --output-table QUERYRESULT_xsv_$%Y%M%D%H%S --tasks-file ./xsv-analysis-tasks.md --db-path /Users/neetipatni/desktop/PensieveDB01
-  ``
-  - Verify generated tasks.md file contains systematic analysis prompts for all 59 files
-  - Confirm tasks are structured for chunked processing with 300-500 line segments and 10-20 line overlap
-  - _Requirements: 6.1, 7.1, 7.2, 7.3, 7.4_
+  ./target/release/code-ingest task-generator --table "INGEST_20250928101039" --db-path /Users/neetipatni/desktop/PensieveDB01 --output-file .kiro/specs/S04-codebase-analysis-burnt-sushi-xsv/xsv-analysis-tasks.md
+  ```
 
-
-- [ ] 9. Validate analysis completeness and quality
-  - Verify all 59 files have been processed through L1-L8 analysis
-  - Confirm all requirements have corresponding analysis results
-  - Validate export functionality and data integrity
-  - Generate final analysis report with metrics and insights summary
-  - _Requirements: 1.4, 2.4, 3.4_
+- [ ] 5. Analyze INGEST_20250928101039 row 35 
+  - **Content**: `.raw_data_202509/INGEST_20250928101039_35_Content.txt` as A + `.raw_data_202509/INGEST_20250928101039_35_Content_L1.txt` as B + `.raw_data_202509/INGEST_20250928101039_35_Content_L2.txt` as C
+  - **Prompt**: `.kiro/steering/spec-S04-steering-doc-analysis.md` where you try to find insights of A alone ; A in context of B ; B in cotext of C ; A in context B & C
+  - **Output**: `gringotts/WorkArea/INGEST_20250928101039_35.md`

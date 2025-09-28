@@ -1,3 +1,6 @@
+# Special case
+.raw_data_202509
+
 # Compiled files
 /target/
 **/*.rs.bk

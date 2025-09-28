@@ -38,7 +38,7 @@ This document contains 72 analysis tasks divided into 7 groups for systematic pr
   - **Type**: rs
   - **Lines**: 159
   - **Task ID**: 1.2
-- [ ] 1.3 Analyze ./xsv/src/cmd/cat.rs
+- [x] 1.3 Analyze ./xsv/src/cmd/cat.rs
   - **File**: `./xsv/src/cmd/cat.rs`
   - **Type**: rs
   - **Lines**: 132
