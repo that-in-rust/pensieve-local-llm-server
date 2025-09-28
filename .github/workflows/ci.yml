@@ -317,8 +317,8 @@ jobs:
         cd code-ingest
         cargo doc --all-features --no-deps 2>&1 | grep -i "warning\|error" && exit 1 || exit 0
 
-  release:
-    name: Release Build
+  release-check:
+    name: Release Readiness Check
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     needs: [test, coverage, security, build]
@@ -333,18 +333,30 @@ jobs:
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
     
-    - name: Build release binary
+    - name: Install release tools
       run: |
-        cd code-ingest
-        cargo build --release --all-features
+        cargo install cargo-deb cargo-generate-rpm
     
-    - name: Create release archive
+    - name: Test release build script
       run: |
-        cd code-ingest/target/release
-        tar -czf code-ingest-linux-x86_64.tar.gz code-ingest
+        chmod +x scripts/build-release.sh
+        ./scripts/build-release.sh --target x86_64-unknown-linux-gnu
     
-    - name: Upload release artifact
+    - name: Verify version consistency
+      run: |
+        chmod +x scripts/version-bump.sh
+        CARGO_VERSION=$(./scripts/version-bump.sh current)
+        TAG_VERSION=${GITHUB_REF#refs/tags/v}
+        
+        if [[ "$CARGO_VERSION" != "$TAG_VERSION" ]]; then
+          echo "Version mismatch: Cargo.toml has $CARGO_VERSION, tag is $TAG_VERSION"
+          exit 1
+        fi
+        
+        echo "Version check passed: $CARGO_VERSION"
+    
+    - name: Upload release artifacts for testing
       uses: actions/upload-artifact@v3
       with:
-        name: code-ingest-linux-x86_64
-        path: code-ingest/target/release/code-ingest-linux-x86_64.tar.gz
+        name: release-test-artifacts
+        path: target/dist/*
