@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Generate structured task lists from ingested codebase data to enable systematic analysis. Transform database query results into Kiro-compatible markdown files with hierarchical task numbering.
+Generate structured task lists from ingested codebase data to enable systematic analysis. Transform database query results into Kiro-compatible markdown files with hierarchical task numbering. Support both basic file-level analysis and advanced chunked analysis for large files, with flexible ingestion from git repositories or local folders.
 
 ## Example Scenario
 
@@ -46,7 +46,7 @@ code-ingest generate-hierarchical-tasks INGEST_20250928101039 --levels 4 --group
 
 ## Advanced commands
 
-1. Feature Request 1:
+### 1. Feature Request 1:
 
 current version of generate-hierarchical-tasks command:
 code-ingest generate-hierarchical-tasks <TableName> --levels <UserOptionLevels> --groups <UserOptionGroupCount> --output TableName_tasks.md --prompt-file <UserOptionPromptFilePathFileName>
@@ -73,3 +73,72 @@ When User sends the above command, following things happen
   - **Content**: `.raw_data_202509/<TableName_UserOptionChunkSizeInLOC>_<row_iterator>_Content.txt` as A + `.raw_data_202509/<TableName>_<row_iterator>_Content_L1.txt` as B + `.raw_data_<TableName>_<row_iterator>_Content_L2.txt` as C
   - **Prompt**: `.kiro/steering/spec-S04-steering-doc-analysis.md` where you try to find insights of A alone ; A in context of B ; B in cotext of C ; A in context B & C
   - **Output**: `gringotts/WorkArea/<TableName_UserOptionChunkSizeInLOC>_<row_iterator>.md`
+
+### 2. Feature Request 2:
+
+
+#### Current ingestion command looks like this
+
+
+``` bash
+./target/release/code-ingest ingest https://github.com/BurntSushi/xsv --db-path /Users/neetipatni/desktop/PensieveDB01
+```
+#### Advanced ingestion command looks like this
+
+``` bash
+./target/release/code-ingest ingest /Users/neetipatni/Desktop/refGitHub --folder-flag Y --db-path /Users/neetipatni/desktop/PensieveDB01
+
+```
+so essentially the format is
+``` bash
+./target/release/code-ingest ingest <AbsoluteFolderPathUserOption> --folder-flag Y --db-path <AbsoluteDatabaseFolderPath>
+
+```
+
+## Requirements
+
+### Requirement 1: Basic Task Generation
+
+**User Story:** As a codebase analyst, I want to generate hierarchical task lists from database tables, so that I can systematically analyze code files with structured workflows.
+
+#### Acceptance Criteria
+
+1. WHEN I run `code-ingest generate-hierarchical-tasks <TableName> --levels <N> --groups <M> --output <filename>` THEN the system SHALL generate a markdown file with N hierarchical levels and M groups per level
+2. WHEN processing database rows THEN the system SHALL create three content files per row: Content.txt, Content_L1.txt, and Content_L2.txt in `.raw_data_202509/` directory
+3. WHEN generating tasks THEN each task SHALL reference the analysis prompt from `.kiro/steering/spec-S04-steering-doc-analysis.md`
+4. WHEN task execution completes THEN output SHALL be written to `gringotts/WorkArea/<TableName>_<row_iterator>.md`
+
+### Requirement 2: Chunked Analysis for Large Files
+
+**User Story:** As a codebase analyst, I want to break large files into manageable chunks, so that I can analyze complex codebases without overwhelming context windows.
+
+#### Acceptance Criteria
+
+1. WHEN I run `code-ingest generate-hierarchical-tasks <TableName> --chunks <LOC> --levels <N> --groups <M> --output <filename> --prompt-file <path>` THEN the system SHALL create a new table `<TableName_LOC>` with chunked data
+2. WHEN a file has LOC >= chunk size THEN the system SHALL split the file into chunks of specified LOC size with sequential chunk numbers
+3. WHEN creating chunked content THEN the system SHALL preserve filepath, parent_filepath, and filename while adding Chunk_Number column
+4. WHEN generating L1 context THEN the system SHALL concatenate previous and next chunk content
+5. WHEN generating L2 context THEN the system SHALL concatenate content from 2 chunks before and 2 chunks after current chunk
+6. WHEN a file has LOC < chunk size THEN the system SHALL process it as a single chunk identical to original table processing
+
+### Requirement 3: Local Folder Ingestion
+
+**User Story:** As a codebase analyst, I want to ingest code from local folders, so that I can analyze private repositories and local codebases without requiring git hosting.
+
+#### Acceptance Criteria
+
+1. WHEN I run `code-ingest ingest <AbsoluteFolderPath> --folder-flag Y --db-path <DatabasePath>` THEN the system SHALL recursively process all files in the specified folder
+2. WHEN processing local folders THEN the system SHALL validate that the absolute path exists and is accessible
+3. WHEN ingesting from folders THEN the system SHALL maintain the same database schema as git repository ingestion
+4. WHEN folder ingestion completes THEN the system SHALL create the same table structure as repository-based ingestion
+
+### Requirement 4: Enhanced Command Interface
+
+**User Story:** As a codebase analyst, I want flexible command options, so that I can customize analysis workflows for different project types and sizes.
+
+#### Acceptance Criteria
+
+1. WHEN using basic generation THEN the system SHALL support `--levels`, `--groups`, and `--output` parameters
+2. WHEN using chunked analysis THEN the system SHALL additionally support `--chunks` and `--prompt-file` parameters  
+3. WHEN using local ingestion THEN the system SHALL support `--folder-flag Y` parameter for folder-based processing
+4. WHEN invalid parameters are provided THEN the system SHALL display helpful error messages with correct usage examples
