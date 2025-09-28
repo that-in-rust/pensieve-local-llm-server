@@ -154,42 +154,99 @@ pub trait TripleComparator {
 2. **Individual vs L2**: How file patterns relate to system architecture  
 3. **L1 vs L2**: How module patterns scale to system-wide principles
 
-### 4. L1-L8 Extraction Engine
+### 4. L1-L8 Extraction Engine with Performance Contracts
 
-**Purpose**: Systematic knowledge arbitrage across all extraction levels
+**Purpose**: Systematic knowledge arbitrage across all extraction levels with measurable performance contracts
 
 **Interface**:
 ```rust
 pub trait KnowledgeExtractor {
-    // Tactical Implementation (L1-L3)
-    async fn extract_micro_optimizations(&self) -> Result<L1Report>;
-    async fn extract_design_patterns(&self) -> Result<L2Report>;
-    async fn identify_micro_libraries(&self) -> Result<L3Report>;
+    // Tactical Implementation (L1-L3) - Requirement 1
+    async fn extract_micro_optimizations(&self, context: &MultiScaleContext) -> Result<L1Report>;
+    async fn extract_design_patterns(&self, context: &MultiScaleContext) -> Result<L2Report>;
+    async fn identify_micro_libraries(&self, context: &MultiScaleContext) -> Result<L3Report>;
     
-    // Strategic Architecture (L4-L6)
-    async fn identify_macro_opportunities(&self) -> Result<L4Report>;
-    async fn analyze_architecture_decisions(&self) -> Result<L5Report>;
-    async fn examine_hardware_interaction(&self) -> Result<L6Report>;
+    // Strategic Architecture (L4-L6) - Requirement 2
+    async fn identify_macro_opportunities(&self, context: &MultiScaleContext) -> Result<L4Report>;
+    async fn analyze_architecture_decisions(&self, context: &MultiScaleContext) -> Result<L5Report>;
+    async fn examine_hardware_interaction(&self, context: &MultiScaleContext) -> Result<L6Report>;
     
-    // Foundational Evolution (L7-L8)
-    async fn identify_language_limitations(&self) -> Result<L7Report>;
-    async fn perform_intent_archaeology(&self) -> Result<L8Report>;
+    // Foundational Evolution (L7-L8) - Requirement 3
+    async fn identify_language_limitations(&self, context: &MultiScaleContext) -> Result<L7Report>;
+    async fn perform_intent_archaeology(&self, git_context: &GitArchaeologyContext) -> Result<L8Report>;
+    
+    // Performance Contract (Requirement 1.4): Complete L1-L3 extraction in <30 seconds
+    async fn extract_tactical_implementation_batch(&self, file_batch: &[FileContext]) -> Result<TacticalImplementationReport>;
+}
+
+// Requirement 3: Intent Archaeology with Git Context
+pub trait IntentArchaeologist {
+    async fn analyze_commit_history(&self, file_path: &str) -> Result<CommitAnalysis>;
+    async fn extract_issue_discussions(&self, commit_refs: &[String]) -> Result<IssueContext>;
+    async fn identify_rejected_alternatives(&self, pr_discussions: &[PullRequestContext]) -> Result<AlternativeAnalysis>;
+    async fn document_constraint_driven_tradeoffs(&self, historical_context: &HistoricalContext) -> Result<TradeoffAnalysis>;
+}
+
+#[derive(Debug, Clone)]
+pub struct MultiScaleContext {
+    pub individual_content: String,    // content_text
+    pub module_content: String,        // l1_window_content  
+    pub system_content: String,        // l2_window_content
+    pub ast_patterns: serde_json::Value, // ast_patterns JSONB
+}
+
+#[derive(Debug, Clone)]
+pub struct GitArchaeologyContext {
+    pub commit_history: Vec<CommitInfo>,
+    pub issue_references: Vec<IssueInfo>,
+    pub pr_discussions: Vec<PullRequestInfo>,
+    pub constraint_timeline: Vec<ConstraintEvent>,
 }
 ```
 
-### 5. Multi-Persona Expert Council
+### 5. Multi-Persona Expert Council with Systematic Chunked Processing
 
-**Purpose**: Challenge assumptions and ensure comprehensive analysis
+**Purpose**: Challenge assumptions and ensure comprehensive analysis through systematic chunked processing (Requirement 6)
 
 **Interface**:
 ```rust
 pub trait ExpertCouncil {
-    async fn activate_domain_expert(&self, context: &AnalysisContext) -> Result<DomainInsights>;
-    async fn activate_strategic_analyst(&self, context: &AnalysisContext) -> Result<StrategyInsights>;
-    async fn activate_implementation_specialist(&self, context: &AnalysisContext) -> Result<ImplInsights>;
-    async fn activate_ux_advocate(&self, context: &AnalysisContext) -> Result<UXInsights>;
-    async fn activate_skeptical_engineer(&self, context: &AnalysisContext) -> Result<SkepticalChallenges>;
-    async fn synthesize_council_insights(&self, all_insights: Vec<Insight>) -> Result<RefinedInsights>;
+    // Requirement 6: Multi-persona analysis for each chunk
+    async fn activate_domain_expert(&self, chunk: &CodeChunk) -> Result<DomainInsights>;
+    async fn activate_strategic_analyst(&self, chunk: &CodeChunk) -> Result<StrategyInsights>;
+    async fn activate_implementation_specialist(&self, chunk: &CodeChunk) -> Result<ImplInsights>;
+    async fn activate_ux_advocate(&self, chunk: &CodeChunk) -> Result<UXInsights>;
+    async fn activate_skeptical_engineer(&self, chunk: &CodeChunk) -> Result<SkepticalChallenges>;
+    
+    // Requirement 6: Mandatory challenge-response cycle
+    async fn process_skeptical_challenges(&self, insights: Vec<Insight>, challenges: SkepticalChallenges) -> Result<ChallengeResponses>;
+    async fn synthesize_council_insights(&self, insights: Vec<Insight>, responses: ChallengeResponses) -> Result<RefinedInsights>;
+    
+    // Requirement 6: Verification question generation
+    async fn generate_verification_questions(&self, insights: &RefinedInsights) -> Result<Vec<VerificationQuestion>>;
+    async fn validate_claims_against_context(&self, questions: &[VerificationQuestion], context: &MultiScaleContext) -> Result<ValidationReport>;
+}
+
+pub trait ChunkedProcessor {
+    // Requirement 6: Systematic chunked processing
+    async fn segment_content_into_chunks(&self, content: &str) -> Result<Vec<CodeChunk>>;
+    async fn process_chunk_with_expert_council(&self, chunk: &CodeChunk) -> Result<ChunkAnalysisResult>;
+    async fn track_processing_progress(&self, chunk_id: &str, status: ProcessingStatus) -> Result<()>;
+}
+
+#[derive(Debug, Clone)]
+pub struct CodeChunk {
+    pub chunk_id: String,
+    pub content: String,
+    pub line_range: (usize, usize),
+    pub overlap_metadata: OverlapMetadata,
+    pub context_level: ContextLevel, // Individual, L1, L2
+}
+
+#[derive(Debug, Clone)]
+pub struct OverlapMetadata {
+    pub previous_chunk_overlap: Option<(usize, usize)>, // 10-20 line overlap
+    pub next_chunk_overlap: Option<(usize, usize)>,
 }
 ```
 
@@ -207,6 +264,7 @@ pub trait ExpertCouncil {
 #### Enhanced Source Table (Built into Ingestion)
 ```sql
 -- Enhanced ingestion table schema (built during ingestion process)
+-- Requirement 4: Enhanced Ingestion with Multi-Scale Context Windows
 CREATE TABLE INGEST_YYYYMMDDHHMMSS (
     -- Original columns
     file_id BIGSERIAL PRIMARY KEY,
@@ -224,18 +282,25 @@ CREATE TABLE INGEST_YYYYMMDDHHMMSS (
     absolute_path VARCHAR NOT NULL,
     created_at TIMESTAMP DEFAULT NOW(),
     
-    -- Multi-scale context columns (added during ingestion)
-    parent_filepath VARCHAR,          -- Calculated: go back by 1 slash
-    l1_window_content TEXT,           -- Directory-level concatenation  
-    l2_window_content TEXT,           -- System-level concatenation
-    ast_patterns JSONB                -- Pattern matches from ast-grep
+    -- Multi-scale context columns (Requirement 4: automatically populated during ingestion)
+    parent_filepath VARCHAR,          -- Rule: go back by 1 slash, if no slash then equals filepath
+    grandfather_filepath VARCHAR,     -- Parent of parent_filepath for L2 aggregation
+    l1_window_content TEXT,           -- All files within same parent_filepath, ordered alphabetically
+    l2_window_content TEXT,           -- All files within same grandfather_filepath, ordered by parent then filepath
+    ast_patterns JSONB,               -- Common Rust pattern matches for analytics-ready access
+    
+    -- Chunked processing support (Requirement 6)
+    chunk_boundaries JSONB,           -- 300-500 line chunks with 10-20 line overlap metadata
+    processing_metadata JSONB        -- Track systematic processing progress
 );
 
--- Populated automatically during ingestion process:
--- 1. parent_filepath calculated for each file
--- 2. l1_window_content aggregated by directory
--- 3. l2_window_content aggregated by parent directory  
--- 4. ast_patterns extracted using common Rust patterns
+-- Populated automatically during ingestion process (Requirement 4):
+-- 1. parent_filepath: simple rule-based calculation
+-- 2. grandfather_filepath: parent of parent for L2 context
+-- 3. l1_window_content: directory-level file concatenation
+-- 4. l2_window_content: system-level aggregation
+-- 5. ast_patterns: Rust-specific pattern extraction
+-- 6. chunk_boundaries: systematic segmentation for analysis
 ```
 
 #### Results Table (Created by Tasks)

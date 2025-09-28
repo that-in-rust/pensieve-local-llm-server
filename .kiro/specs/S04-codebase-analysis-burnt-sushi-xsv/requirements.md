@@ -1,5 +1,8 @@
 # Requirements Document
 
+# SPEC CLASSIFICATION : Analysis Spec
+This is an analysis only Spec - we will be using tools and scripts but will not be making enhancements
+
 ## Scope
 Ingestion, task creation and task driven code-base analysis as per SOP below for
 - the repo - https://github.com/BurntSushi/xsv
