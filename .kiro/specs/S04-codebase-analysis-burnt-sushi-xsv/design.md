@@ -43,27 +43,43 @@ graph TD
     end
 ```
 
-### Data Flow Architecture
+### Task-Based Data Flow Architecture
 
 ```mermaid
 sequenceDiagram
-    participant R as XSV Repository
+    participant U as User/Kiro
     participant CI as Code-Ingest
-    participant DB as PostgreSQL
-    participant MSE as Multi-Scale Engine
-    participant AST as ast-grep
-    participant L18 as L1-L8 Extractor
-    participant OUT as Output Generator
+    participant ST as Source Table
+    participant TG as Task Generator
+    participant TE as Task Executor
+    participant RT as Results Table
+    participant EX as Export Engine
     
-    R->>CI: Repository URL
-    CI->>DB: Ingest 59 files
-    DB->>MSE: Raw file content
-    MSE->>DB: Enhanced schema with context windows
-    DB->>AST: Semantic pattern queries
-    AST->>DB: Structured pattern matches
-    DB->>L18: Multi-scale context data
-    L18->>OUT: Knowledge arbitrage insights
-    OUT->>OUT: Generate visualizations & reports
+    Note over U,EX: Phase 1: Data Preparation
+    U->>CI: Already completed: XSV ingested
+    CI->>ST: INGEST_20250928062949 (59 files)
+    
+    Note over U,EX: Phase 2: Task Generation
+    U->>TG: Generate enhancement tasks
+    TG->>TG: Create tasks.md with database enhancement steps
+    TG->>TG: Create tasks.md with L1-L8 analysis steps
+    
+    Note over U,EX: Phase 3: Task Execution
+    U->>TE: Execute Task 1: Enhance database schema
+    TE->>ST: ALTER TABLE add columns
+    TE->>ST: UPDATE with hierarchical content
+    
+    U->>TE: Execute Task 2-8: L1-L8 extraction
+    TE->>ST: Query enhanced data
+    TE->>TE: Apply ast-grep patterns
+    TE->>TE: Perform triple-comparison analysis
+    TE->>RT: INSERT results into QUERYRESULT_xsv_knowledge_arbitrage
+    
+    Note over U,EX: Phase 4: Export and Visualization
+    U->>EX: Export Horcrux Codex entries
+    EX->>RT: Query analysis results
+    EX->>EX: Generate markdown files
+    EX->>EX: Generate mermaid diagrams
 ```
 
 ## Components and Interfaces
@@ -179,60 +195,125 @@ pub trait ExpertCouncil {
 
 ## Data Models
 
-### Enhanced Database Schema
+### Task-Based Database Schema
 
+#### Source Table (Already Exists)
 ```sql
--- Enhanced ingestion table with multi-scale context
-CREATE TABLE enhanced_xsv_analysis (
-    -- Original columns from INGEST_20250928062949
-    file_id BIGSERIAL PRIMARY KEY,
-    ingestion_id BIGINT,
+-- INGEST_20250928062949 - XSV codebase already ingested
+-- Contains: filepath, filename, content_text, extension, etc.
+-- Will be enhanced with additional columns via tasks
+```
+
+#### Enhanced Source Table (Via Tasks)
+```sql
+-- Task 1: Add hierarchical context columns to existing table
+ALTER TABLE "INGEST_20250928062949" ADD COLUMN 
+    parent_filepath VARCHAR,          -- Simple rule: go back by 1 slash
+    l1_window_content TEXT,           -- Directory-level concatenation  
+    l2_window_content TEXT,           -- System-level concatenation
+    ast_patterns JSONB;               -- ast-grep pattern matches
+
+-- Task 2: Populate hierarchical content
+UPDATE "INGEST_20250928062949" SET
+    parent_filepath = CASE 
+        WHEN filepath LIKE '%/%' THEN 
+            LEFT(filepath, LENGTH(filepath) - POSITION('/' IN REVERSE(filepath)))
+        ELSE filepath 
+    END;
+
+-- Task 3: Populate window content using window functions
+WITH windowed_content AS (
+    SELECT 
+        file_id,
+        STRING_AGG(content_text, E'\n--- FILE SEPARATOR ---\n') 
+            OVER (PARTITION BY parent_filepath ORDER BY filepath) as l1_content,
+        STRING_AGG(content_text, E'\n--- MODULE SEPARATOR ---\n') 
+            OVER (PARTITION BY LEFT(parent_filepath, POSITION('/' IN REVERSE(parent_filepath))) 
+                  ORDER BY parent_filepath, filepath) as l2_content
+    FROM "INGEST_20250928062949"
+)
+UPDATE "INGEST_20250928062949" 
+SET 
+    l1_window_content = w.l1_content,
+    l2_window_content = w.l2_content
+FROM windowed_content w
+WHERE "INGEST_20250928062949".file_id = w.file_id;
+```
+
+#### Results Table (Created by Tasks)
+```sql
+-- QUERYRESULT_xsv_knowledge_arbitrage - Created by analysis tasks
+CREATE TABLE QUERYRESULT_xsv_knowledge_arbitrage (
+    result_id BIGSERIAL PRIMARY KEY,
+    source_file_id BIGINT REFERENCES "INGEST_20250928062949"(file_id),
+    analysis_type VARCHAR NOT NULL,   -- 'L1', 'L2', 'L3', etc.
+    
+    -- Core analysis data
     filepath VARCHAR NOT NULL,
     filename VARCHAR NOT NULL,
-    extension VARCHAR,
-    file_size_bytes BIGINT NOT NULL,
-    line_count INTEGER,
-    word_count INTEGER,
-    token_count INTEGER,
-    content_text TEXT,
-    file_type VARCHAR NOT NULL,
-    relative_path VARCHAR NOT NULL,
-    absolute_path VARCHAR NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW(),
+    parent_filepath VARCHAR,
     
-    -- Multi-scale context enhancements
-    parent_filepath VARCHAR NOT NULL,
-    l1_window_content TEXT,           -- Directory-level concatenation
-    l2_window_content TEXT,           -- System-level concatenation
+    -- Extracted insights
+    insight_category VARCHAR NOT NULL, -- 'micro_optimization', 'design_pattern', etc.
+    insight_title VARCHAR NOT NULL,
+    insight_description TEXT NOT NULL,
+    code_example TEXT,
+    pattern_match JSONB,              -- ast-grep match details
     
-    -- Semantic search results
-    ast_patterns JSONB,               -- ast-grep pattern matches
-    semantic_metadata JSONB,          -- Extracted meta-variables
+    -- Knowledge arbitrage metadata
+    performance_impact VARCHAR,       -- 'high', 'medium', 'low'
+    reusability_score INTEGER,        -- 1-10 scale
+    complexity_level VARCHAR,         -- 'beginner', 'intermediate', 'advanced'
+    transferability VARCHAR,          -- 'xsv_specific', 'csv_domain', 'general_rust'
     
-    -- Analysis results
-    l1_insights JSONB,                -- Micro-optimization insights
-    l2_insights JSONB,                -- Design pattern insights
-    l3_insights JSONB,                -- Micro-library opportunities
-    l4_insights JSONB,                -- Macro-library opportunities
-    l5_insights JSONB,                -- Architecture decisions
-    l6_insights JSONB,                -- Hardware interaction patterns
-    l7_insights JSONB,                -- Language limitations
-    l8_insights JSONB,                -- Intent archaeology
+    -- Cross-scale analysis
+    individual_context TEXT,          -- content_text
+    module_context TEXT,              -- l1_window_content
+    system_context TEXT,              -- l2_window_content
+    scaling_pattern VARCHAR,          -- How pattern scales across levels
     
-    -- Comparison analysis
-    triple_comparison_results JSONB,  -- Individual↔L1↔L2 comparisons
-    scaling_patterns JSONB,           -- How patterns scale across levels
+    -- Horcrux Codex preparation
+    horcrux_entry JSONB,              -- Formatted for LLM training
+    verification_questions TEXT[],     -- Fact-checkable questions
     
     -- Metadata
-    analysis_timestamp TIMESTAMP DEFAULT NOW(),
-    analysis_version VARCHAR DEFAULT '1.0'
+    created_at TIMESTAMP DEFAULT NOW(),
+    analysis_version VARCHAR DEFAULT '1.0',
+    task_execution_id VARCHAR         -- Links to specific task run
 );
 
--- Indexes for efficient querying
-CREATE INDEX idx_parent_filepath ON enhanced_xsv_analysis(parent_filepath);
-CREATE INDEX idx_extension ON enhanced_xsv_analysis(extension);
-CREATE INDEX idx_ast_patterns ON enhanced_xsv_analysis USING gin(ast_patterns);
-CREATE INDEX idx_l1_insights ON enhanced_xsv_analysis USING gin(l1_insights);
+-- Indexes for efficient analysis
+CREATE INDEX idx_analysis_type ON QUERYRESULT_xsv_knowledge_arbitrage(analysis_type);
+CREATE INDEX idx_insight_category ON QUERYRESULT_xsv_knowledge_arbitrage(insight_category);
+CREATE INDEX idx_transferability ON QUERYRESULT_xsv_knowledge_arbitrage(transferability);
+CREATE INDEX idx_horcrux_entry ON QUERYRESULT_xsv_knowledge_arbitrage USING gin(horcrux_entry);
+```
+
+#### Analysis Metadata Table
+```sql
+-- analysis_meta - Track task execution and results
+CREATE TABLE analysis_meta (
+    analysis_id BIGSERIAL PRIMARY KEY,
+    source_table VARCHAR NOT NULL,    -- 'INGEST_20250928062949'
+    results_table VARCHAR NOT NULL,   -- 'QUERYRESULT_xsv_knowledge_arbitrage'
+    analysis_type VARCHAR NOT NULL,   -- 'L1_L8_knowledge_arbitrage'
+    
+    -- Execution metadata
+    start_timestamp TIMESTAMP NOT NULL,
+    end_timestamp TIMESTAMP,
+    total_files_analyzed INTEGER,
+    total_insights_extracted INTEGER,
+    
+    -- Task tracking
+    tasks_completed TEXT[],           -- List of completed task IDs
+    tasks_failed TEXT[],              -- List of failed task IDs
+    
+    -- Quality metrics
+    extraction_completeness JSONB,    -- L1-L8 completion percentages
+    validation_results JSONB,         -- Expert council validation
+    
+    created_at TIMESTAMP DEFAULT NOW()
+);
 ```
 
 ### Knowledge Arbitrage Output Schema
