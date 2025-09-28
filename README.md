@@ -43,10 +43,11 @@ cargo build --release
 
 ## Features
 
-- **Code Ingestion**: GitHub repos → PostgreSQL tables
-- **Pattern Analysis**: Extract code patterns and architectural insights  
-- **Multi-Scale Analysis**: File → Module → System context windows
-- **Task Workflow**: Generate analysis tasks, execute in IDE, store results
+- **Enhanced Code Ingestion**: GitHub repos → PostgreSQL tables with multi-scale context windows
+- **Hierarchical Analysis**: Automatic parent_filepath calculation and content aggregation
+- **Pattern Analysis**: Extract code patterns and architectural insights with semantic search ready
+- **Multi-Scale Context**: File → Module → System context windows populated during ingestion
+- **Task Workflow**: Generate analysis tasks, execute in IDE, store results in QUERYRESULT tables
 - **Export System**: Markdown files, JSON data, visualizations
 
 ### File Type Support
@@ -462,6 +463,7 @@ valgrind --tool=massif cargo run --release -- ingest repo --db-path ./analysis
 
 Comprehensive examples for various use cases:
 
+- **[Enhanced Ingestion](examples/xsv-enhanced-ingestion/)** - Multi-scale context windows with XSV codebase example
 - **[Basic Usage](examples/basic_usage.md)** - Getting started with repository ingestion and basic queries
 - **[Security Analysis](examples/security_analysis.md)** - Finding security vulnerabilities and sensitive information
 - **[Architecture Analysis](examples/architecture_analysis.md)** - Understanding codebase structure and design patterns
