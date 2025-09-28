@@ -47,16 +47,16 @@ The analysis serves the strategic objective of becoming one of the top 5 Rust pr
 3. WHEN examining historical context THEN the system SHALL document hardware constraints, team constraints, deadline pressures, and ecosystem maturity factors that influenced design decisions
 4. WHEN generating evolution insights THEN the system SHALL produce recommendations for Rust language evolution and ecosystem development with clear justification from historical analysis
 
-### Requirement 4: Multi-Scale Context Window Database Enhancement
+### Requirement 4: Enhanced Ingestion with Multi-Scale Context Windows
 
-**User Story:** As a knowledge extraction specialist, I want to enhance the ingested database with hierarchical context windows and multi-scale content aggregation, so that I can perform systematic triple-comparison analysis at individual, module, and system levels.
+**User Story:** As a knowledge extraction specialist, I want the ingestion process to automatically create hierarchical context windows and multi-scale content aggregation, so that I can perform systematic triple-comparison analysis without additional database enhancement steps.
 
 #### Acceptance Criteria
 
-1. WHEN enhancing the database schema THEN the system SHALL add parent_filepath column using simple rule: go back by 1 backslash/slash, if no slash then parent_filepath equals filepath
-2. WHEN populating hierarchical content THEN the system SHALL add l1_window_content column containing concatenated content of all files within the same parent_filepath, ordered alphabetically by filepath
-3. WHEN creating system-level context THEN the system SHALL add l2_window_content column containing concatenated content of all files within the same grandfather_filepath (parent of parent_filepath), ordered by parent_filepath then filepath
-4. WHEN storing analytical data THEN the system SHALL accept redundancy in favor of analytics-ready single-query access, enabling immediate multi-scale context without JOINs, following the existing code-ingest task-based workflow pattern
+1. WHEN ingesting repositories THEN the system SHALL automatically add parent_filepath column using simple rule: go back by 1 backslash/slash, if no slash then parent_filepath equals filepath
+2. WHEN completing ingestion THEN the system SHALL automatically populate l1_window_content column containing concatenated content of all files within the same parent_filepath, ordered alphabetically by filepath
+3. WHEN finalizing ingestion THEN the system SHALL automatically populate l2_window_content column containing concatenated content of all files within the same grandfather_filepath (parent of parent_filepath), ordered by parent_filepath then filepath
+4. WHEN storing ingested data THEN the system SHALL include ast_patterns JSONB column with common Rust pattern matches, accepting redundancy in favor of analytics-ready single-query access
 
 ### Requirement 5: Triple-Comparison Analysis Framework
 

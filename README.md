@@ -1,36 +1,31 @@
-# Pensieve - Knowledge Arbitrage System
+# Pensieve
 
-A revolutionary Rust-based knowledge extraction system that transforms stellar codebases into systematic wisdom through L1-L8 analysis methodology. Built on high-performance PostgreSQL ingestion with multi-scale context windows and semantic search capabilities.
+Rust-based code analysis system. Ingests repositories into PostgreSQL, extracts patterns with semantic search, stores insights in queryable format.
 
 [![CI](https://github.com/your-org/code-ingest/workflows/CI/badge.svg)](https://github.com/your-org/code-ingest/actions)
 [![Coverage](https://codecov.io/gh/your-org/code-ingest/branch/main/graph/badge.svg)](https://codecov.io/gh/your-org/code-ingest)
 [![Crates.io](https://img.shields.io/crates/v/code-ingest.svg)](https://crates.io/crates/code-ingest)
 
-## 🚀 Quick Start - Knowledge Arbitrage
+## Quick Start
 
 ```bash
-# Build the system
+# Build
 cargo build --release
 
-# Set up PostgreSQL database
+# Setup database  
 ./target/release/code-ingest pg-start
 
-# Ingest a stellar codebase (XSV example)
-./target/release/code-ingest ingest https://github.com/BurntSushi/xsv --db-path /Users/neetipatni/desktop/PensieveDB01
+# Ingest repository
+./target/release/code-ingest ingest https://github.com/BurntSushi/xsv --db-path ./analysis
 
-# Enhance database with multi-scale context windows
-./target/release/code-ingest sql "ALTER TABLE INGEST_20250928062949 ADD COLUMN parent_filepath VARCHAR" --db-path /Users/neetipatni/desktop/PensieveDB01
-
-# Extract L1-L8 knowledge arbitrage insights
+# Generate analysis tasks
 ./target/release/code-ingest generate-tasks \
   --sql "SELECT * FROM INGEST_20250928062949" \
-  --prompt-file .kiro/specs/S04-codebase-analysis-burnt-sushi-xsv/requirements.md \
-  --output-table QUERYRESULT_xsv_knowledge_arbitrage \
-  --tasks-file ./xsv-analysis-tasks.md \
-  --db-path /Users/neetipatni/desktop/PensieveDB01
+  --output-table QUERYRESULT_analysis \
+  --tasks-file ./tasks.md \
+  --db-path ./analysis
 
-# Execute systematic analysis in Kiro IDE
-# Open xsv-analysis-tasks.md and execute tasks for L1-L8 extraction
+# Execute tasks in IDE, results stored in QUERYRESULT_analysis table
 ```
 
 ## 📋 Table of Contents
@@ -46,22 +41,13 @@ cargo build --release
 - [Troubleshooting](#-troubleshooting)
 - [Contributing](#-contributing)
 
-## ✨ Features - Knowledge Arbitrage System
+## Features
 
-### Revolutionary Capabilities
-- **🧠 L1-L8 Knowledge Extraction**: Systematic wisdom extraction from micro-optimizations to intent archaeology
-- **🔄 Multi-Scale Context Windows**: Hierarchical analysis (Individual → Module → System)
-- **🎯 Semantic Code Search**: AST-aware pattern matching with ast-grep integration
-- **⚡ Triple-Comparison Analysis**: Individual↔Module↔System pattern recognition
-- **🗄️ Analytics-First Database**: Enhanced PostgreSQL with hierarchical context storage
-- **🔍 Task-Based Workflow**: Systematic analysis with results stored in QUERYRESULT tables
-- **🔧 Kiro IDE Integration**: Structured task generation for systematic knowledge arbitrage
-
-### Strategic Mission
-- **🎯 Top-5 Rust Programmer Goal**: Systematic analysis of stellar codebases for mastery
-- **📚 The Horcrux Codex**: Proprietary LLM training dataset from extracted wisdom
-- **🔄 Cross-Paradigm Translation**: Identify patterns from mature ecosystems (C, C++, Haskell, Erlang)
-- **⚡ 10x Improvements**: Focus on paradigm-market fit, not incremental gains
+- **Code Ingestion**: GitHub repos → PostgreSQL tables
+- **Pattern Analysis**: Extract code patterns and architectural insights  
+- **Multi-Scale Analysis**: File → Module → System context windows
+- **Task Workflow**: Generate analysis tasks, execute in IDE, store results
+- **Export System**: Markdown files, JSON data, visualizations
 
 ### File Type Support
 

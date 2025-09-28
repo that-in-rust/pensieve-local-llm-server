@@ -75,7 +75,13 @@ impl SchemaManager {
                 conversion_command VARCHAR,
                 relative_path VARCHAR NOT NULL,
                 absolute_path VARCHAR NOT NULL,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                
+                -- Multi-scale context columns for knowledge arbitrage
+                parent_filepath VARCHAR,
+                l1_window_content TEXT,
+                l2_window_content TEXT,
+                ast_patterns JSONB
             )
             "#,
             table_name
@@ -324,6 +330,9 @@ impl SchemaManager {
                    table_name.to_lowercase(), table_name),
             format!("CREATE INDEX IF NOT EXISTS idx_{}_created_at ON \"{}\"(created_at)", 
                    table_name.to_lowercase(), table_name),
+            // New indexes for multi-scale context columns
+            format!("CREATE INDEX IF NOT EXISTS idx_{}_parent_filepath ON \"{}\"(parent_filepath)", 
+                   table_name.to_lowercase(), table_name),
         ];
 
         // Create full-text search index on content
@@ -332,7 +341,13 @@ impl SchemaManager {
             table_name.to_lowercase(), table_name
         );
         
-        for index_sql in indexes.into_iter().chain(std::iter::once(fts_index)) {
+        // Create JSONB index for ast_patterns
+        let ast_patterns_index = format!(
+            "CREATE INDEX IF NOT EXISTS idx_{}_ast_patterns ON \"{}\" USING gin(ast_patterns)",
+            table_name.to_lowercase(), table_name
+        );
+        
+        for index_sql in indexes.into_iter().chain(std::iter::once(fts_index)).chain(std::iter::once(ast_patterns_index)) {
             sqlx::query(&index_sql)
                 .execute(&self.pool)
                 .await
@@ -389,7 +404,9 @@ impl SchemaManager {
             "file_id", "ingestion_id", "filepath", "filename", "extension",
             "file_size_bytes", "line_count", "word_count", "token_count",
             "content_text", "file_type", "conversion_command", "relative_path",
-            "absolute_path", "created_at"
+            "absolute_path", "created_at", 
+            // New multi-scale context columns
+            "parent_filepath", "l1_window_content", "l2_window_content", "ast_patterns"
         ];
 
         let column_names: Vec<&str> = columns.iter().map(|(name, _, _)| name.as_str()).collect();

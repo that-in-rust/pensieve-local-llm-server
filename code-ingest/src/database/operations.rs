@@ -359,6 +359,78 @@ impl DatabaseOperations {
 
     // Private helper methods
 
+    fn calculate_parent_filepath(&self, filepath: &str) -> String {
+        if let Some(last_slash_pos) = filepath.rfind('/') {
+            filepath[..last_slash_pos].to_string()
+        } else {
+            filepath.to_string()
+        }
+    }
+
+    async fn populate_window_content(
+        &self,
+        transaction: &mut Transaction<'_, Postgres>,
+        table_name: &str,
+    ) -> DatabaseResult<()> {
+        // Update l1_window_content (directory level)
+        let l1_update_sql = format!(
+            r#"
+            UPDATE "{}" SET l1_window_content = subquery.l1_content
+            FROM (
+                SELECT 
+                    file_id,
+                    STRING_AGG(content_text, E'\n--- FILE SEPARATOR ---\n' ORDER BY filepath) 
+                        OVER (PARTITION BY parent_filepath) as l1_content
+                FROM "{}"
+                WHERE content_text IS NOT NULL
+            ) AS subquery
+            WHERE "{}".file_id = subquery.file_id
+            "#,
+            table_name, table_name, table_name
+        );
+
+        sqlx::query(&l1_update_sql)
+            .execute(&mut **transaction)
+            .await
+            .map_err(|e| DatabaseError::QueryFailed {
+                query: "populate l1_window_content".to_string(),
+                cause: e.to_string(),
+            })?;
+
+        // Update l2_window_content (system level - grandfather directory)
+        let l2_update_sql = format!(
+            r#"
+            UPDATE "{}" SET l2_window_content = subquery.l2_content
+            FROM (
+                SELECT 
+                    file_id,
+                    STRING_AGG(content_text, E'\n--- MODULE SEPARATOR ---\n' ORDER BY parent_filepath, filepath) 
+                        OVER (PARTITION BY 
+                            CASE 
+                                WHEN parent_filepath LIKE '%/%' THEN 
+                                    LEFT(parent_filepath, LENGTH(parent_filepath) - POSITION('/' IN REVERSE(parent_filepath)))
+                                ELSE parent_filepath 
+                            END
+                        ) as l2_content
+                FROM "{}"
+                WHERE content_text IS NOT NULL
+            ) AS subquery
+            WHERE "{}".file_id = subquery.file_id
+            "#,
+            table_name, table_name, table_name
+        );
+
+        sqlx::query(&l2_update_sql)
+            .execute(&mut **transaction)
+            .await
+            .map_err(|e| DatabaseError::QueryFailed {
+                query: "populate l2_window_content".to_string(),
+                cause: e.to_string(),
+            })?;
+
+        Ok(())
+    }
+
     async fn insert_file_chunk(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -366,19 +438,22 @@ impl DatabaseOperations {
         ingestion_id: i64,
         files: &[ProcessedFile],
     ) -> DatabaseResult<usize> {
+        // First, insert all files with basic data and calculated parent_filepath
         let insert_sql = format!(
             r#"
             INSERT INTO "{}" (
                 ingestion_id, filepath, filename, extension, file_size_bytes,
                 line_count, word_count, token_count, content_text, file_type,
-                conversion_command, relative_path, absolute_path
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                conversion_command, relative_path, absolute_path, parent_filepath
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             "#,
             table_name
         );
 
         let mut inserted = 0;
         for file in files {
+            let parent_filepath = self.calculate_parent_filepath(&file.filepath);
+            
             sqlx::query(&insert_sql)
                 .bind(ingestion_id)
                 .bind(&file.filepath)
@@ -393,6 +468,7 @@ impl DatabaseOperations {
                 .bind(&file.conversion_command)
                 .bind(&file.relative_path)
                 .bind(&file.absolute_path)
+                .bind(&parent_filepath)
                 .execute(&mut **transaction)
                 .await
                 .map_err(|e| DatabaseError::BatchInsertionFailed {

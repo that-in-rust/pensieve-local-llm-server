@@ -204,40 +204,38 @@ pub trait ExpertCouncil {
 -- Will be enhanced with additional columns via tasks
 ```
 
-#### Enhanced Source Table (Via Tasks)
+#### Enhanced Source Table (Built into Ingestion)
 ```sql
--- Task 1: Add hierarchical context columns to existing table
-ALTER TABLE "INGEST_20250928062949" ADD COLUMN 
-    parent_filepath VARCHAR,          -- Simple rule: go back by 1 slash
+-- Enhanced ingestion table schema (built during ingestion process)
+CREATE TABLE INGEST_YYYYMMDDHHMMSS (
+    -- Original columns
+    file_id BIGSERIAL PRIMARY KEY,
+    ingestion_id BIGINT,
+    filepath VARCHAR NOT NULL,
+    filename VARCHAR NOT NULL,
+    extension VARCHAR,
+    file_size_bytes BIGINT NOT NULL,
+    line_count INTEGER,
+    word_count INTEGER,
+    token_count INTEGER,
+    content_text TEXT,
+    file_type VARCHAR NOT NULL,
+    relative_path VARCHAR NOT NULL,
+    absolute_path VARCHAR NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    
+    -- Multi-scale context columns (added during ingestion)
+    parent_filepath VARCHAR,          -- Calculated: go back by 1 slash
     l1_window_content TEXT,           -- Directory-level concatenation  
     l2_window_content TEXT,           -- System-level concatenation
-    ast_patterns JSONB;               -- ast-grep pattern matches
+    ast_patterns JSONB                -- Pattern matches from ast-grep
+);
 
--- Task 2: Populate hierarchical content
-UPDATE "INGEST_20250928062949" SET
-    parent_filepath = CASE 
-        WHEN filepath LIKE '%/%' THEN 
-            LEFT(filepath, LENGTH(filepath) - POSITION('/' IN REVERSE(filepath)))
-        ELSE filepath 
-    END;
-
--- Task 3: Populate window content using window functions
-WITH windowed_content AS (
-    SELECT 
-        file_id,
-        STRING_AGG(content_text, E'\n--- FILE SEPARATOR ---\n') 
-            OVER (PARTITION BY parent_filepath ORDER BY filepath) as l1_content,
-        STRING_AGG(content_text, E'\n--- MODULE SEPARATOR ---\n') 
-            OVER (PARTITION BY LEFT(parent_filepath, POSITION('/' IN REVERSE(parent_filepath))) 
-                  ORDER BY parent_filepath, filepath) as l2_content
-    FROM "INGEST_20250928062949"
-)
-UPDATE "INGEST_20250928062949" 
-SET 
-    l1_window_content = w.l1_content,
-    l2_window_content = w.l2_content
-FROM windowed_content w
-WHERE "INGEST_20250928062949".file_id = w.file_id;
+-- Populated automatically during ingestion process:
+-- 1. parent_filepath calculated for each file
+-- 2. l1_window_content aggregated by directory
+-- 3. l2_window_content aggregated by parent directory  
+-- 4. ast_patterns extracted using common Rust patterns
 ```
 
 #### Results Table (Created by Tasks)
