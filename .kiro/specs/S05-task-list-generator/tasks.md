@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. Set up project structure and core data models
+- [-] 1. Set up project structure and core data models
   - Create Rust project with proper Cargo.toml dependencies (sqlx, tokio, clap, serde, thiserror, anyhow)
   - Define core data structures: IngestionSource, ChunkMetadata, TaskHierarchy, GenerationConfig
   - Implement basic error types with thiserror for structured error handling

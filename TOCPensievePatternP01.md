@@ -15,5 +15,25 @@ https://github.com/rust-lang/rust-clippy
 https://github.com/rust-lang/rust-by-example
 https://github.com/rust-lang/rustup
 https://github.com/rust-lang/rustfmt
+https://github.com/rust-lang/rfcs
+https://github.com/rust-lang/futures-rs
+https://github.com/rust-lang/miri
+https://github.com/rust-lang/rust-bindgen
+https://github.com/rust-lang/hashbrown
+https://github.com/rust-lang/this-week-in-rust
+https://github.com/rust-lang/async-book
+https://github.com/rust-lang/cc-rs
+https://github.com/rust-lang/chalk
+https://github.com/rust-lang/rustc-dev-guide
+https://github.com/rust-lang/rustc_codegen_cranelift
+https://github.com/rust-lang/polonius
+https://github.com/rust-lang/reference
+https://github.com/rust-lang/rust-playground
+https://github.com/rust-lang/api-guidelines
+https://github.com/rust-lang/docs.rs
+https://github.com/rust-lang/rustc_codegen_gcc
+https://github.com/rust-lang/portable-simd
+
+
 
 
