@@ -105,9 +105,29 @@ impl Drop for Guard {
 }
 ```
 
+## Development Tools
+
+### Code Search & Analysis
+- **Use `ast-grep` instead of `grep`**: Syntax-aware searching for Rust code
+- **Pattern matching**: `ast-grep --pattern 'fn $NAME($$$) { $$$ }'` finds all functions
+- **Structural search**: Find complex patterns like error handling, async usage
+- **Refactoring**: Safe code transformations with AST understanding
+
+```bash
+# Find all unwrap() calls (potential panics)
+ast-grep --pattern '$_.unwrap()'
+
+# Find functions without error handling
+ast-grep --pattern 'fn $NAME($$$) -> $TYPE { $$$ }' --not-pattern 'Result'
+
+# Find async functions
+ast-grep --pattern 'async fn $NAME($$$) { $$$ }'
+```
+
 ## Anti-Patterns
 
 ❌ **Never panic in production**: Use `Result` instead of `unwrap()`  
 ❌ **Don't ignore errors**: Handle with `?` or explicit match  
 ❌ **Avoid unnecessary cloning**: Use references when possible  
-❌ **Don't mix threading types**: `Rc` is not `Send`, use `Arc`
+❌ **Don't mix threading types**: `Rc` is not `Send`, use `Arc`  
+❌ **Don't use grep for code search**: Use `ast-grep` for syntax-aware analysis
