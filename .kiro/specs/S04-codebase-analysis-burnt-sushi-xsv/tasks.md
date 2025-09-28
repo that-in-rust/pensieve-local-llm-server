@@ -12,14 +12,23 @@ extension          | character varying
 file_size_bytes    | bigint                  
 line_count         | integer   
 
+- the repo - https://github.com/BurntSushi/xsv
+
+
+
 Ingestion
 ``` bash
-  ./target/release/code-ingest ingest git_url --db-path /Users/neetipatni/desktop/PensieveDB01
+./target/release/code-ingest ingest https://github.com/BurntSushi/xsv --db-path /Users/neetipatni/desktop/PensieveDB01
 ```
+Running SQL Query
+``` bash
+
+```
+
 
 ## Phase 1: Database Setup and Verification
 
-- [-] 1. Do a fresh ingestion of - the repo - https://github.com/BurntSushi/xsv + Ingest PG Database to be stored at - /Users/neetipatni/desktop/PensieveDB01 + Result PG database to be stored at -  /Users/neetipatni/desktop/PensieveDB01
+- [ ] 1. Do a fresh ingestion of - the repo - https://github.com/BurntSushi/xsv + Ingest PG Database to be stored at - /Users/neetipatni/desktop/PensieveDB01 + Result PG database to be stored at -  /Users/neetipatni/desktop/PensieveDB01
   - Run
   ``` bash
   ./target/release/code-ingest ingest https://github.com/BurntSushi/xsv --db-path /Users/neetipatni/desktop/PensieveDB01
