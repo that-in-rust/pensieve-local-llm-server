@@ -13,34 +13,33 @@ The design leverages our existing code-ingest infrastructure, enhances it with s
 ```mermaid
 graph TD
     A[XSV Repository] --> B[Code-Ingest Tool]
-    B --> C[Enhanced PostgreSQL Database]
-    C --> D[Multi-Scale Context Engine]
-    D --> E[ast-grep Semantic Search]
-    D --> F[Triple-Comparison Analyzer]
-    E --> G[L1-L8 Extraction Engine]
-    F --> G
-    G --> H[Knowledge Arbitrage Outputs]
+    B --> C[INGEST_20250928062949 Table]
+    C --> D[Database Enhancement Tasks]
+    D --> E[Enhanced Source Table]
+    E --> F[L1-L8 Analysis Tasks]
+    F --> G[QUERYRESULT_xsv_knowledge_arbitrage Table]
+    G --> H[Export Tasks]
     H --> I[Horcrux Codex Dataset]
     H --> J[Mermaid Visualizations]
     H --> K[Markdown Reports]
     
-    subgraph "Database Enhancement"
-        C --> C1[Original Schema]
-        C --> C2[parent_filepath Column]
-        C --> C3[l1_window_content Column]
-        C --> C4[l2_window_content Column]
-        C --> C5[ast_patterns JSONB]
+    subgraph "Task-Based Workflow"
+        D --> D1[Task: Add parent_filepath]
+        D --> D2[Task: Add l1_window_content]
+        D --> D3[Task: Add l2_window_content]
+        D --> D4[Task: Add ast_patterns]
+        F --> F1[Task: L1-L3 Extraction]
+        F --> F2[Task: L4-L6 Extraction]
+        F --> F3[Task: L7-L8 Extraction]
+        F --> F4[Task: Triple-Comparison]
+        H --> H1[Task: Generate Horcrux Entries]
+        H --> H2[Task: Generate Visualizations]
     end
     
-    subgraph "L1-L8 Extraction Layers"
-        G --> L1[L1: Micro-Optimizations]
-        G --> L2[L2: Design Patterns]
-        G --> L3[L3: Micro-Libraries]
-        G --> L4[L4: Macro-Libraries]
-        G --> L5[L5: Architecture Decisions]
-        G --> L6[L6: Hardware Interaction]
-        G --> L7[L7: Language Evolution]
-        G --> L8[L8: Intent Archaeology]
+    subgraph "Database Tables"
+        C --> C1[Source: INGEST_20250928062949]
+        G --> G1[Results: QUERYRESULT_xsv_knowledge_arbitrage]
+        G --> G2[Metadata: analysis_meta]
     end
 ```
 
