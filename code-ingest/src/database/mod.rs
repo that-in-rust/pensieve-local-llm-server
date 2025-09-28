@@ -6,6 +6,7 @@
 pub mod connection;
 pub mod exploration;
 pub mod export;
+pub mod migration;
 pub mod models;
 pub mod operations;
 pub mod query_executor;
@@ -17,6 +18,7 @@ pub mod temp_file_manager;
 pub use connection::Database;
 pub use exploration::{DatabaseExplorer, DatabaseInfo, TableListItem, TableSample, TableSchema};
 pub use export::{DatabaseExporter, ExportConfig, ExportResult};
+pub use migration::{MigrationManager, Migration, MigrationResult, MigrationStatus};
 pub use models::{IngestionMeta, IngestedFile, QueryResult as QueryResultModel};
 pub use operations::{DatabaseOperations, QueryResult, BatchInsertResult};
 pub use query_executor::{QueryExecutor, QueryConfig, FormattedQueryOutput};

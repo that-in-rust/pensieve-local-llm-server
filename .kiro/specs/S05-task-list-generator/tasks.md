@@ -6,8 +6,8 @@
   - Implement basic error types with thiserror for structured error handling
   - _Requirements: 1.1, 2.1, 3.1, 4.1_
 
-- [ ] 2. Implement database foundation and schema management
-  - [ ] 2.1 Create database connection and migration system
+- [-] 2. Implement database foundation and schema management
+  - [-] 2.1 Create database connection and migration system
     - Write database connection utilities with SQLx connection pooling
     - Implement schema creation for base tables with proper indexing
     - Create migration system for table versioning and updates

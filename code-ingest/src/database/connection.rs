@@ -82,6 +82,26 @@ impl Database {
         })
     }
 
+    /// Create a new database connection with automatic migration
+    /// 
+    /// This method creates a connection and automatically applies any pending migrations
+    pub async fn new_with_migration(database_url: &str) -> DatabaseResult<Self> {
+        let db = Self::new(database_url).await?;
+        
+        // Run migrations automatically
+        let migration_manager = crate::database::migration::MigrationManager::new(db.pool.clone());
+        let results = migration_manager.migrate().await?;
+        
+        let applied_count = results.iter().filter(|r| r.applied).count();
+        if applied_count > 0 {
+            info!("Applied {} database migrations", applied_count);
+        } else {
+            debug!("No pending migrations to apply");
+        }
+        
+        Ok(db)
+    }
+
     /// Create a database connection from configuration
     pub async fn from_config(config: &DatabaseConfig) -> DatabaseResult<Self> {
         let database_url = Self::build_database_url(config);
@@ -221,6 +241,27 @@ impl Database {
     pub async fn list_ingestion_records(&self) -> DatabaseResult<Vec<crate::ingestion::IngestionRecord>> {
         let operations = crate::database::operations::DatabaseOperations::new(self.pool.clone());
         operations.list_ingestion_records().await
+    }
+
+    /// Run database migrations
+    pub async fn migrate(&self) -> DatabaseResult<Vec<crate::database::migration::MigrationResult>> {
+        let migration_manager = crate::database::migration::MigrationManager::new(self.pool.clone());
+        migration_manager.migrate().await
+    }
+
+    /// Get migration status
+    pub async fn get_migration_status(&self) -> DatabaseResult<Vec<crate::database::migration::MigrationStatus>> {
+        let migration_manager = crate::database::migration::MigrationManager::new(self.pool.clone());
+        migration_manager.get_migration_status().await
+    }
+
+    /// Initialize database schema with migrations
+    pub async fn initialize_schema(&self) -> DatabaseResult<()> {
+        let migration_manager = crate::database::migration::MigrationManager::new(self.pool.clone());
+        migration_manager.initialize().await?;
+        
+        let schema_manager = crate::database::schema::SchemaManager::new(self.pool.clone());
+        schema_manager.initialize_schema().await
     }
 
     // Private helper methods
