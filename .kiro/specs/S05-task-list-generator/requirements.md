@@ -54,7 +54,9 @@ code-ingest generate-hierarchical-tasks <TableName> --levels <UserOptionLevels> 
 code-ingest generate-hierarchical-tasks <TableName> --chunks <UserOptionChunkSizeInLOC> --levels <UserOptionLevels> --groups <UserOptionGroupCount> --output TableName_tasks.md --prompt-file <UserOptionPromptFilePathFileName>
 
 When User sends the above command, following things happen
-- 
+- a new table is created named <TableName_UserOptionChunkSizeInLOC>
+  - this table has 2 big changes from the previous columns
+  - first if 
 
 
 

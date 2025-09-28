@@ -7,7 +7,79 @@ use crate::error::{TaskError, TaskResult};
 use sqlx::{PgPool, Row};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tracing::{debug, info};
+use std::time::{Duration, Instant};
+use tracing::{debug, info, warn};
+use tokio::sync::{mpsc, Semaphore};
+use tokio_stream::{Stream, StreamExt};
+use futures::stream;
+
+/// Configuration for large table processing optimizations
+#[derive(Debug, Clone)]
+pub struct ProcessingConfig {
+    /// Batch size for processing rows (default: 1000)
+    pub batch_size: usize,
+    /// Maximum concurrent operations (default: 4)
+    pub max_concurrent: usize,
+    /// Memory limit in MB (default: 512)
+    pub memory_limit_mb: usize,
+    /// Timeout for individual operations in seconds (default: 300)
+    pub operation_timeout_seconds: u64,
+    /// Enable progress reporting (default: true)
+    pub enable_progress_reporting: bool,
+    /// Progress reporting interval in processed items (default: 100)
+    pub progress_interval: usize,
+}
+
+impl Default for ProcessingConfig {
+    fn default() -> Self {
+        Self {
+            batch_size: 1000,
+            max_concurrent: 4,
+            memory_limit_mb: 512,
+            operation_timeout_seconds: 300,
+            enable_progress_reporting: true,
+            progress_interval: 100,
+        }
+    }
+}
+
+/// Progress information for large table processing
+#[derive(Debug, Clone)]
+pub struct ProcessingProgress {
+    pub processed: usize,
+    pub total: usize,
+    pub current_batch: usize,
+    pub total_batches: usize,
+    pub elapsed_seconds: u64,
+    pub estimated_remaining_seconds: Option<u64>,
+    pub current_memory_usage_mb: Option<usize>,
+}
+
+/// Cancellation token for long-running operations
+#[derive(Debug, Clone)]
+pub struct CancellationToken {
+    sender: mpsc::Sender<()>,
+    receiver: Arc<tokio::sync::Mutex<mpsc::Receiver<()>>>,
+}
+
+impl CancellationToken {
+    pub fn new() -> Self {
+        let (sender, receiver) = mpsc::channel(1);
+        Self {
+            sender,
+            receiver: Arc::new(tokio::sync::Mutex::new(receiver)),
+        }
+    }
+
+    pub async fn cancel(&self) -> Result<(), mpsc::error::SendError<()>> {
+        self.sender.send(()).await
+    }
+
+    pub async fn is_cancelled(&self) -> bool {
+        let mut receiver = self.receiver.lock().await;
+        receiver.try_recv().is_ok()
+    }
+}
 
 /// Content extractor for generating A/B/C analysis files
 #[derive(Clone, Debug)]
@@ -58,6 +130,329 @@ impl ContentExtractor {
     /// * `Self` - New ContentExtractor instance
     pub fn new(db_pool: Arc<PgPool>, output_dir: PathBuf) -> Self {
         Self { db_pool, output_dir }
+    }
+
+    /// Extract all rows from a large table with streaming and progress reporting
+    ///
+    /// This method is optimized for large tables (10,000+ rows) and provides:
+    /// - Streaming processing to minimize memory usage
+    /// - Batch processing for better performance
+    /// - Progress reporting and cancellation support
+    /// - Memory monitoring and limits
+    ///
+    /// # Arguments
+    /// * `table_name` - Name of the table to extract from
+    /// * `config` - Processing configuration for optimization
+    /// * `progress_callback` - Optional callback for progress updates
+    /// * `cancellation_token` - Optional token for operation cancellation
+    ///
+    /// # Returns
+    /// * `TaskResult<Vec<ContentTriple>>` - List of created content file triples
+    pub async fn extract_all_rows_streaming<F>(
+        &self,
+        table_name: &str,
+        config: ProcessingConfig,
+        mut progress_callback: Option<F>,
+        cancellation_token: Option<CancellationToken>,
+    ) -> TaskResult<Vec<ContentTriple>>
+    where
+        F: FnMut(ProcessingProgress) + Send + 'static,
+    {
+        let start_time = Instant::now();
+        debug!("Starting streaming extraction from table: {} with config: {:?}", table_name, config);
+
+        // Validate table name
+        self.validate_table_name(table_name)?;
+
+        // Get total row count for progress tracking
+        let total_rows = self.count_table_rows(table_name).await?;
+        info!("Table '{}' contains {} rows, processing with batch size {}", 
+              table_name, total_rows, config.batch_size);
+
+        if total_rows == 0 {
+            return Ok(Vec::new());
+        }
+
+        // Calculate batch information
+        let total_batches = (total_rows + config.batch_size - 1) / config.batch_size;
+        let mut content_triples = Vec::with_capacity(std::cmp::min(total_rows, 10000));
+        let mut processed = 0;
+
+        // Create semaphore for concurrency control
+        let semaphore = Arc::new(Semaphore::new(config.max_concurrent));
+
+        // Process in batches
+        for batch_num in 0..total_batches {
+            // Check for cancellation
+            if let Some(ref token) = cancellation_token {
+                if token.is_cancelled().await {
+                    return Err(TaskError::AsyncCancelled {
+                        operation: format!("extract_all_rows_streaming for table '{}'", table_name),
+                        suggestion: "Operation was cancelled by user request".to_string(),
+                    });
+                }
+            }
+
+            let offset = batch_num * config.batch_size;
+            let limit = std::cmp::min(config.batch_size, total_rows - offset);
+
+            debug!("Processing batch {}/{}: offset={}, limit={}", 
+                   batch_num + 1, total_batches, offset, limit);
+
+            // Process batch with timeout
+            let batch_result = tokio::time::timeout(
+                Duration::from_secs(config.operation_timeout_seconds),
+                self.process_batch_streaming(
+                    table_name,
+                    offset,
+                    limit,
+                    &semaphore,
+                    &config,
+                )
+            ).await;
+
+            let mut batch_triples = match batch_result {
+                Ok(Ok(triples)) => triples,
+                Ok(Err(e)) => {
+                    return Err(TaskError::BatchProcessingFailed {
+                        processed,
+                        total: total_rows,
+                        cause: e.to_string(),
+                        suggestion: "Reduce batch size or increase timeout".to_string(),
+                        source: Some(Box::new(e)),
+                    });
+                }
+                Err(_) => {
+                    return Err(TaskError::AsyncTimeout {
+                        operation: format!("batch processing for table '{}'", table_name),
+                        timeout_seconds: config.operation_timeout_seconds,
+                        suggestion: "Increase timeout or reduce batch size".to_string(),
+                    });
+                }
+            };
+
+            processed += batch_triples.len();
+            content_triples.append(&mut batch_triples);
+
+            // Check memory usage
+            if let Some(memory_usage) = self.estimate_memory_usage(&content_triples) {
+                if memory_usage > config.memory_limit_mb {
+                    warn!("Memory usage ({} MB) exceeds limit ({} MB)", 
+                          memory_usage, config.memory_limit_mb);
+                    
+                    return Err(TaskError::MemoryLimitExceeded {
+                        operation: format!("content extraction for table '{}'", table_name),
+                        used_mb: memory_usage,
+                        limit_mb: config.memory_limit_mb,
+                        suggestion: format!("Increase memory limit to {} MB or reduce batch size to {}", 
+                                          memory_usage + 100, config.batch_size / 2),
+                    });
+                }
+            }
+
+            // Report progress
+            if config.enable_progress_reporting && processed % config.progress_interval == 0 {
+                if let Some(ref mut callback) = progress_callback {
+                    let elapsed = start_time.elapsed().as_secs();
+                    let estimated_remaining = if processed > 0 {
+                        Some((elapsed * (total_rows - processed) as u64) / processed as u64)
+                    } else {
+                        None
+                    };
+
+                    let progress = ProcessingProgress {
+                        processed,
+                        total: total_rows,
+                        current_batch: batch_num + 1,
+                        total_batches,
+                        elapsed_seconds: elapsed,
+                        estimated_remaining_seconds: estimated_remaining,
+                        current_memory_usage_mb: self.estimate_memory_usage(&content_triples),
+                    };
+
+                    callback(progress);
+                }
+            }
+        }
+
+        let elapsed = start_time.elapsed();
+        info!("Completed streaming extraction from table '{}': {} items in {:.2}s ({:.1} items/sec)", 
+              table_name, processed, elapsed.as_secs_f64(), processed as f64 / elapsed.as_secs_f64());
+
+        Ok(content_triples)
+    }
+
+    /// Process a single batch of rows with concurrency control
+    async fn process_batch_streaming(
+        &self,
+        table_name: &str,
+        offset: usize,
+        limit: usize,
+        semaphore: &Arc<Semaphore>,
+        config: &ProcessingConfig,
+    ) -> TaskResult<Vec<ContentTriple>> {
+        // Query batch of rows
+        let query = format!(
+            "SELECT file_id, filepath, filename, extension, file_size_bytes, 
+                    line_count, word_count, content_text, file_type, 
+                    relative_path, absolute_path 
+             FROM \"{}\" 
+             ORDER BY file_id 
+             LIMIT {} OFFSET {}",
+            table_name, limit, offset
+        );
+
+        debug!("Executing batch query: LIMIT {} OFFSET {}", limit, offset);
+
+        let rows = sqlx::query(&query)
+            .fetch_all(&*self.db_pool)
+            .await
+            .map_err(|e| TaskError::QueryResultProcessingFailed {
+                cause: format!("Failed to fetch batch from table '{}': {}", table_name, e),
+                suggestion: "Check database connection and table accessibility".to_string(),
+                source: Some(Box::new(e)),
+            })?;
+
+        // Process rows concurrently with semaphore control
+        let mut tasks = Vec::new();
+        
+        for (row_idx, row) in rows.iter().enumerate() {
+            let row_number = offset + row_idx + 1; // 1-based numbering
+            let metadata = self.extract_row_metadata(&row)?;
+            let table_name = table_name.to_string();
+            let semaphore = Arc::clone(semaphore);
+            let extractor = self.clone();
+
+            let task = tokio::spawn(async move {
+                let _permit = semaphore.acquire().await.unwrap();
+                extractor.create_content_files(&metadata, row_number, &table_name).await
+            });
+
+            tasks.push(task);
+        }
+
+        // Collect results
+        let mut content_triples = Vec::with_capacity(tasks.len());
+        for task in tasks {
+            match task.await {
+                Ok(Ok(triple)) => content_triples.push(triple),
+                Ok(Err(e)) => return Err(e),
+                Err(e) => {
+                    return Err(TaskError::BatchProcessingFailed {
+                        processed: content_triples.len(),
+                        total: limit,
+                        cause: format!("Task join error: {}", e),
+                        suggestion: "Reduce concurrency or check system resources".to_string(),
+                        source: Some(Box::new(e)),
+                    });
+                }
+            }
+        }
+
+        Ok(content_triples)
+    }
+
+    /// Count rows in a table efficiently
+    async fn count_table_rows(&self, table_name: &str) -> TaskResult<usize> {
+        let query = format!("SELECT COUNT(*) FROM \"{}\"", table_name);
+        
+        let row = sqlx::query(&query)
+            .fetch_one(&*self.db_pool)
+            .await
+            .map_err(|e| TaskError::DatabaseQueryEngineFailed {
+                operation: "count_table_rows".to_string(),
+                cause: e.to_string(),
+                suggestion: "Check table name and database connection".to_string(),
+                source: Some(Box::new(e)),
+            })?;
+
+        let count: i64 = row.try_get(0).map_err(|e| TaskError::DatabaseQueryEngineFailed {
+            operation: "count_table_rows".to_string(),
+            cause: format!("Failed to extract count: {}", e),
+            suggestion: "Check query result format".to_string(),
+            source: Some(Box::new(e)),
+        })?;
+
+        Ok(count as usize)
+    }
+
+    /// Estimate memory usage of content triples in MB
+    fn estimate_memory_usage(&self, content_triples: &[ContentTriple]) -> Option<usize> {
+        if content_triples.is_empty() {
+            return Some(0);
+        }
+
+        // Rough estimation: each ContentTriple uses approximately:
+        // - 3 PathBuf (average 100 bytes each) = 300 bytes
+        // - String fields (average 50 bytes) = 50 bytes
+        // - Metadata overhead = 50 bytes
+        // Total per triple ≈ 400 bytes
+        
+        let estimated_bytes = content_triples.len() * 400;
+        let estimated_mb = estimated_bytes / (1024 * 1024);
+        
+        Some(std::cmp::max(1, estimated_mb)) // Minimum 1 MB
+    }
+
+    /// Create a streaming version of extract_all_rows for very large tables
+    pub fn extract_rows_stream(
+        &self,
+        table_name: &str,
+        batch_size: usize,
+    ) -> impl Stream<Item = TaskResult<ContentTriple>> + '_ {
+        stream::unfold(
+            (0usize, false), // (offset, finished)
+            move |(offset, finished)| async move {
+                if finished {
+                    return None;
+                }
+
+                // Query batch
+                let query = format!(
+                    "SELECT file_id, filepath, filename, extension, file_size_bytes, 
+                            line_count, word_count, content_text, file_type, 
+                            relative_path, absolute_path 
+                     FROM \"{}\" 
+                     ORDER BY file_id 
+                     LIMIT {} OFFSET {}",
+                    table_name, batch_size, offset
+                );
+
+                let rows = match sqlx::query(&query).fetch_all(&*self.db_pool).await {
+                    Ok(rows) => rows,
+                    Err(e) => {
+                        let error = TaskError::StreamingFailed {
+                            operation: format!("stream batch from table '{}'", table_name),
+                            cause: e.to_string(),
+                            suggestion: "Check database connection and table accessibility".to_string(),
+                            source: Some(Box::new(e)),
+                        };
+                        return Some((Err(error), (offset, true)));
+                    }
+                };
+
+                if rows.is_empty() {
+                    return None; // No more data
+                }
+
+                // Process first row in batch
+                if let Some(row) = rows.first() {
+                    let row_number = offset + 1;
+                    let metadata = match self.extract_row_metadata(row) {
+                        Ok(metadata) => metadata,
+                        Err(e) => return Some((Err(e), (offset, true))),
+                    };
+
+                    let result = self.create_content_files(&metadata, row_number, table_name).await;
+                    let next_offset = offset + 1;
+                    let finished = rows.len() < batch_size; // Last batch if less than batch_size
+
+                    Some((result, (next_offset, finished)))
+                } else {
+                    None
+                }
+            }
+        )
     }
 
     /// Extract all rows from a table and create A/B/C content files
@@ -398,6 +793,8 @@ impl ContentExtractor {
 
         context
     }
+
+
 
     /// Extract imports/includes from content based on file type
     fn extract_imports(&self, content: &str, extension: Option<&str>) -> Vec<String> {
@@ -1394,6 +1791,7 @@ pub trait UserRepository {
         if table_name.is_empty() {
             return Err(TaskError::InvalidTaskConfiguration {
                 cause: "Table name cannot be empty".to_string(),
+                suggestion: "Provide a valid table name".to_string(),
             });
         }
 
@@ -1403,27 +1801,144 @@ pub trait UserRepository {
            invalid_strings.iter().any(|s| table_name.contains(s)) {
             return Err(TaskError::InvalidTaskConfiguration {
                 cause: format!("Table name '{}' contains invalid characters", table_name),
+                suggestion: "Use only letters, digits, and underscores in table names".to_string(),
             });
         }
 
         if table_name.len() > 63 {
             return Err(TaskError::InvalidTaskConfiguration {
-                cause: format!("Table name '{}' exceeds maximum length of 63 characters", table_name),
+                cause: format!("Table name '{}' exceeds maximum length", table_name),
+                suggestion: "Use a table name with 63 characters or fewer".to_string(),
             });
         }
 
         if !table_name.chars().next().unwrap().is_ascii_alphabetic() && !table_name.starts_with('_') {
             return Err(TaskError::InvalidTaskConfiguration {
                 cause: format!("Table name '{}' must start with a letter or underscore", table_name),
+                suggestion: "Ensure table name starts with a letter or underscore".to_string(),
             });
         }
 
         if !table_name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
             return Err(TaskError::InvalidTaskConfiguration {
-                cause: format!("Table name '{}' can only contain letters, digits, and underscores", table_name),
+                cause: format!("Table name '{}' contains invalid characters", table_name),
+                suggestion: "Use only letters, digits, and underscores in table names".to_string(),
             });
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn test_processing_config_defaults() {
+        let config = ProcessingConfig::default();
+        
+        assert_eq!(config.batch_size, 1000);
+        assert_eq!(config.max_concurrent, 4);
+        assert_eq!(config.memory_limit_mb, 512);
+        assert_eq!(config.operation_timeout_seconds, 300);
+        assert!(config.enable_progress_reporting);
+        assert_eq!(config.progress_interval, 100);
+    }
+
+    #[test]
+    fn test_processing_progress_structure() {
+        let progress = ProcessingProgress {
+            processed: 500,
+            total: 1000,
+            current_batch: 5,
+            total_batches: 10,
+            elapsed_seconds: 60,
+            estimated_remaining_seconds: Some(60),
+            current_memory_usage_mb: Some(128),
+        };
+
+        assert_eq!(progress.processed, 500);
+        assert_eq!(progress.total, 1000);
+        assert_eq!(progress.current_batch, 5);
+        assert_eq!(progress.total_batches, 10);
+        assert_eq!(progress.elapsed_seconds, 60);
+        assert_eq!(progress.estimated_remaining_seconds, Some(60));
+        assert_eq!(progress.current_memory_usage_mb, Some(128));
+    }
+
+    #[tokio::test]
+    async fn test_cancellation_token() {
+        let token = CancellationToken::new();
+        
+        // Initially not cancelled
+        assert!(!token.is_cancelled().await);
+        
+        // Cancel the token
+        token.cancel().await.unwrap();
+        
+        // Now should be cancelled
+        assert!(token.is_cancelled().await);
+    }
+
+    #[test]
+    fn test_memory_usage_estimation() {
+        // Create a mock ContentExtractor for testing
+        let db_pool = Arc::new(create_mock_pool());
+        let output_dir = PathBuf::from("/tmp/test");
+        let extractor = ContentExtractor::new(db_pool, output_dir);
+
+        // Test empty list
+        let empty_triples = Vec::new();
+        assert_eq!(extractor.estimate_memory_usage(&empty_triples), Some(0));
+
+        // Test with some content triples
+        let content_triples = vec![
+            ContentTriple {
+                content_a: PathBuf::from("/tmp/test_1_Content.txt"),
+                content_b: PathBuf::from("/tmp/test_1_Content_L1.txt"),
+                content_c: PathBuf::from("/tmp/test_1_Content_L2.txt"),
+                row_number: 1,
+                table_name: "test_table".to_string(),
+            },
+            ContentTriple {
+                content_a: PathBuf::from("/tmp/test_2_Content.txt"),
+                content_b: PathBuf::from("/tmp/test_2_Content_L1.txt"),
+                content_c: PathBuf::from("/tmp/test_2_Content_L2.txt"),
+                row_number: 2,
+                table_name: "test_table".to_string(),
+            },
+        ];
+
+        let memory_usage = extractor.estimate_memory_usage(&content_triples);
+        assert!(memory_usage.is_some());
+        assert!(memory_usage.unwrap() >= 1); // Should be at least 1 MB
+    }
+
+    #[test]
+    fn test_processing_config_customization() {
+        let config = ProcessingConfig {
+            batch_size: 500,
+            max_concurrent: 8,
+            memory_limit_mb: 1024,
+            operation_timeout_seconds: 600,
+            enable_progress_reporting: false,
+            progress_interval: 50,
+        };
+
+        assert_eq!(config.batch_size, 500);
+        assert_eq!(config.max_concurrent, 8);
+        assert_eq!(config.memory_limit_mb, 1024);
+        assert_eq!(config.operation_timeout_seconds, 600);
+        assert!(!config.enable_progress_reporting);
+        assert_eq!(config.progress_interval, 50);
+    }
+
+    // Mock function to create a dummy pool for testing
+    fn create_mock_pool() -> sqlx::PgPool {
+        // This is a placeholder - in real tests you'd use a test database
+        // For now, we'll create a minimal pool that won't be used in these unit tests
+        use sqlx::postgres::PgPoolOptions;
+        
+        // This will fail to connect, but that's OK for unit tests that don't use the pool
+        PgPoolOptions::new()
+            .max_connections(1)
+            .connect_lazy("postgresql://test:test@localhost/test")
+            .unwrap()
     }
 }

@@ -213,6 +213,48 @@ pub enum Commands {
         #[arg(long)]
         tables: Option<Vec<String>>,
     },
+
+    /// Count rows in a database table
+    CountRows {
+        /// Table name to count rows from
+        table_name: String,
+        /// Database path (can also be set globally)
+        #[arg(long)]
+        db_path: Option<PathBuf>,
+    },
+
+    /// Extract content from database table to A/B/C files
+    ExtractContent {
+        /// Table name to extract content from
+        table_name: String,
+        /// Output directory for content files
+        #[arg(long, default_value = ".raw_data_202509")]
+        output_dir: PathBuf,
+        /// Database path (can also be set globally)
+        #[arg(long)]
+        db_path: Option<PathBuf>,
+    },
+
+    /// Generate hierarchical tasks from database table
+    GenerateHierarchicalTasks {
+        /// Table name to generate tasks from
+        table_name: String,
+        /// Number of hierarchy levels (default: 4)
+        #[arg(long, default_value = "4")]
+        levels: usize,
+        /// Number of groups per level (default: 7)
+        #[arg(long, default_value = "7")]
+        groups: usize,
+        /// Output markdown file path
+        #[arg(long)]
+        output: PathBuf,
+        /// Prompt file for analysis instructions
+        #[arg(long, default_value = ".kiro/steering/spec-S04-steering-doc-analysis.md")]
+        prompt_file: PathBuf,
+        /// Database path (can also be set globally)
+        #[arg(long)]
+        db_path: Option<PathBuf>,
+    },
 }
 
 impl Default for Cli {
@@ -361,6 +403,32 @@ impl Cli {
             Commands::OptimizeTables { db_path, tables } => {
                 let db_path = db_path.clone().or_else(|| self.db_path.clone());
                 self.execute_optimize_tables(db_path, tables.clone()).await
+            }
+            Commands::CountRows { table_name, db_path } => {
+                let db_path = db_path.clone().or_else(|| self.db_path.clone());
+                self.execute_count_rows(table_name.clone(), db_path).await
+            }
+            Commands::ExtractContent { table_name, output_dir, db_path } => {
+                let db_path = db_path.clone().or_else(|| self.db_path.clone());
+                self.execute_extract_content(table_name.clone(), output_dir.clone(), db_path).await
+            }
+            Commands::GenerateHierarchicalTasks { 
+                table_name, 
+                levels, 
+                groups, 
+                output, 
+                prompt_file, 
+                db_path 
+            } => {
+                let db_path = db_path.clone().or_else(|| self.db_path.clone());
+                self.execute_generate_hierarchical_tasks(
+                    table_name.clone(),
+                    *levels,
+                    *groups,
+                    output.clone(),
+                    prompt_file.clone(),
+                    db_path,
+                ).await
             }
         }
     }
@@ -1996,6 +2064,264 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
             println!("   code-ingest --help");
             println!("   code-ingest troubleshoot");
         }
+    }
+
+    /// Execute count-rows command
+    async fn execute_count_rows(&self, table_name: String, db_path: Option<PathBuf>) -> Result<()> {
+        use crate::tasks::DatabaseQueryEngine;
+        use indicatif::{ProgressBar, ProgressStyle};
+        
+        println!("🔢 Counting rows in table: {}", table_name.bright_cyan());
+        println!();
+        
+        // Get database connection
+        let database = if let Some(path) = db_path {
+            crate::database::Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            crate::database::Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        // Create progress bar
+        let progress = ProgressBar::new_spinner();
+        progress.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.green} [{elapsed_precise}] {msg}")
+                .unwrap()
+        );
+        
+        progress.set_message("Connecting to database...");
+        
+        // Create database query engine
+        let query_engine = DatabaseQueryEngine::new(database.pool().clone().into());
+        
+        progress.set_message("Validating table...");
+        
+        // Validate table exists
+        let validation = query_engine.validate_table(&table_name).await?;
+        if !validation.exists {
+            progress.finish_and_clear();
+            anyhow::bail!("Table '{}' does not exist in the database", table_name);
+        }
+        
+        progress.set_message("Counting rows...");
+        
+        // Count rows
+        let row_count = query_engine.count_rows(&table_name).await?;
+        
+        progress.finish_and_clear();
+        
+        // Display results
+        println!("✅ Row count completed!");
+        println!();
+        println!("📊 Results:");
+        println!("   Table: {}", table_name.bright_cyan());
+        println!("   Row Count: {}", row_count.to_string().bright_green());
+        
+        if !validation.columns.is_empty() {
+            println!("   Columns: {}", validation.columns.len());
+            println!("   Schema: {}", validation.columns.join(", "));
+        }
+        
+        println!();
+        println!("🎯 Next Steps:");
+        if row_count > 0 {
+            println!("   1. Extract content: code-ingest extract-content {}", table_name);
+            println!("   2. Generate tasks: code-ingest generate-hierarchical-tasks {} --output {}_tasks.md", table_name, table_name);
+            println!("   3. Sample data: code-ingest sample --table {}", table_name);
+        } else {
+            println!("   • Table is empty - no content to process");
+        }
+        
+        Ok(())
+    }
+
+    /// Execute extract-content command
+    async fn execute_extract_content(&self, table_name: String, output_dir: PathBuf, db_path: Option<PathBuf>) -> Result<()> {
+        use crate::tasks::ContentExtractor;
+        use indicatif::{ProgressBar, ProgressStyle};
+        
+        println!("📁 Extracting content from table: {}", table_name.bright_cyan());
+        println!("📂 Output directory: {}", output_dir.display().to_string().bright_yellow());
+        println!();
+        
+        // Get database connection
+        let database = if let Some(path) = db_path {
+            crate::database::Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            crate::database::Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        // Create progress bar
+        let progress = ProgressBar::new(100);
+        progress.set_style(
+            ProgressStyle::default_bar()
+                .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos:>7}/{len:7} {msg}")
+                .unwrap()
+                .progress_chars("#>-"),
+        );
+        
+        progress.set_message("Initializing content extractor...");
+        progress.set_position(10);
+        
+        // Create content extractor
+        let extractor = ContentExtractor::new(database.pool().clone().into(), output_dir.clone());
+        
+        progress.set_message("Validating table and counting rows...");
+        progress.set_position(20);
+        
+        // Extract all content
+        let content_triples = extractor.extract_all_rows(&table_name).await?;
+        
+        progress.set_message("Content extraction complete!");
+        progress.set_position(100);
+        progress.finish_with_message("✅ Content extraction completed!");
+        
+        // Display results
+        println!();
+        println!("📊 Extraction Summary:");
+        println!("   Table: {}", table_name);
+        println!("   Files Created: {}", (content_triples.len() * 3).to_string().bright_green());
+        println!("   Content Triples: {}", content_triples.len());
+        println!("   Output Directory: {}", output_dir.display());
+        
+        println!();
+        println!("📁 Generated Files:");
+        for (i, triple) in content_triples.iter().take(5).enumerate() {
+            println!("   Row {}: ", i + 1);
+            println!("     A: {}", triple.content_a.display());
+            println!("     B: {}", triple.content_b.display());
+            println!("     C: {}", triple.content_c.display());
+        }
+        
+        if content_triples.len() > 5 {
+            println!("   ... and {} more content triples", content_triples.len() - 5);
+        }
+        
+        println!();
+        println!("🎯 Next Steps:");
+        println!("   1. Generate hierarchical tasks:");
+        println!("      code-ingest generate-hierarchical-tasks {} --output {}_tasks.md", table_name, table_name);
+        println!("   2. Review generated content files in: {}", output_dir.display());
+        
+        Ok(())
+    }
+
+    /// Execute generate-hierarchical-tasks command
+    async fn execute_generate_hierarchical_tasks(
+        &self,
+        table_name: String,
+        levels: usize,
+        groups: usize,
+        output: PathBuf,
+        prompt_file: PathBuf,
+        db_path: Option<PathBuf>,
+    ) -> Result<()> {
+        use crate::tasks::{DatabaseQueryEngine, ContentExtractor, HierarchicalTaskDivider, L1L8MarkdownGenerator};
+        use indicatif::{ProgressBar, ProgressStyle};
+        
+        println!("🏗️  Generating hierarchical tasks from table: {}", table_name.bright_cyan());
+        println!("📊 Configuration:");
+        println!("   Levels: {}", levels);
+        println!("   Groups per level: {}", groups);
+        println!("   Output file: {}", output.display().to_string().bright_yellow());
+        println!("   Prompt file: {}", prompt_file.display().to_string().bright_blue());
+        println!();
+        
+        // Validate prompt file exists
+        if !prompt_file.exists() {
+            anyhow::bail!("Prompt file not found: {}", prompt_file.display());
+        }
+        
+        // Get database connection
+        let database = if let Some(path) = db_path {
+            crate::database::Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            crate::database::Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        // Create progress bar
+        let progress = ProgressBar::new(100);
+        progress.set_style(
+            ProgressStyle::default_bar()
+                .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos:>7}/{len:7} {msg}")
+                .unwrap()
+                .progress_chars("#>-"),
+        );
+        
+        // Step 1: Count rows and validate table
+        progress.set_message("Validating table and counting rows...");
+        progress.set_position(10);
+        
+        let query_engine = DatabaseQueryEngine::new(database.pool().clone().into());
+        let row_count = query_engine.count_rows(&table_name).await?;
+        
+        if row_count == 0 {
+            anyhow::bail!("Table '{}' is empty. Cannot generate tasks from empty table.", table_name);
+        }
+        
+        // Step 2: Extract content to A/B/C files
+        progress.set_message("Extracting content to A/B/C files...");
+        progress.set_position(30);
+        
+        let output_dir = std::path::PathBuf::from(".raw_data_202509");
+        let extractor = ContentExtractor::new(database.pool().clone().into(), output_dir);
+        let content_triples = extractor.extract_all_rows(&table_name).await?;
+        
+        // Step 3: Create hierarchical task structure
+        progress.set_message("Creating hierarchical task structure...");
+        progress.set_position(60);
+        
+        let task_divider = HierarchicalTaskDivider::new(levels, groups)?;
+        let hierarchy = task_divider.create_hierarchy(content_triples.clone())?;
+        
+        // Step 4: Generate markdown
+        progress.set_message("Generating markdown file...");
+        progress.set_position(80);
+        
+        let output_dir_path = std::path::PathBuf::from("gringotts/WorkArea");
+        let markdown_generator = L1L8MarkdownGenerator::new(prompt_file, output_dir_path);
+        let markdown_content = markdown_generator.generate_hierarchical_markdown(&hierarchy, &table_name).await?;
+        
+        // Step 5: Write output file
+        progress.set_message("Writing output file...");
+        progress.set_position(90);
+        
+        // Ensure parent directory exists
+        if let Some(parent) = output.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        
+        tokio::fs::write(&output, markdown_content).await?;
+        
+        progress.set_message("Complete!");
+        progress.set_position(100);
+        progress.finish_with_message("✅ Hierarchical tasks generated!");
+        
+        // Display results
+        println!();
+        println!("📊 Generation Summary:");
+        println!("   Table: {}", table_name);
+        println!("   Total Tasks: {}", hierarchy.total_tasks);
+        println!("   Hierarchy Levels: {}", levels);
+        println!("   Groups per Level: {}", groups);
+        println!("   Content Files: {}", content_triples.len() * 3);
+        println!("   Output File: {}", output.display());
+        
+        println!();
+        println!("🎯 Next Steps:");
+        println!("   1. Open the tasks file: {}", output.display());
+        println!("   2. Review the hierarchical task structure");
+        println!("   3. Execute tasks systematically using Kiro");
+        println!("   4. Content files are available in: .raw_data_202509/");
+        println!("   5. Analysis outputs will be saved to: gringotts/WorkArea/");
+        
+        Ok(())
     }
 }
 #[cfg(test)]

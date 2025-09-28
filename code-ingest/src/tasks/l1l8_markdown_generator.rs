@@ -328,7 +328,7 @@ impl L1L8MarkdownGenerator {
     }
 
     /// Format an analysis stage for display
-    fn format_analysis_stage(&self, stage: &AnalysisStage) -> String {
+    pub fn format_analysis_stage(&self, stage: &AnalysisStage) -> String {
         match stage {
             AnalysisStage::AnalyzeA => "Analyze A alone: Extract insights from raw content".to_string(),
             AnalysisStage::AnalyzeAInContextB => "A in context of B: Understand content within immediate file context".to_string(),

@@ -249,26 +249,158 @@ pub enum ProcessingError {
     ContentAnalysisFailed { path: String, cause: String },
 }
 
-/// Errors related to task generation and markdown creation
+/// Comprehensive errors for task generation and markdown creation with actionable guidance
 #[derive(Error, Debug)]
 pub enum TaskError {
-    #[error("Task division failed: {total_tasks} tasks cannot be divided into {groups} groups")]
-    TaskDivisionFailed { total_tasks: usize, groups: usize },
+    #[error("Task division failed: {total_tasks} tasks cannot be divided into {groups} groups\n💡 Suggestion: {suggestion}")]
+    TaskDivisionFailed { 
+        total_tasks: usize, 
+        groups: usize,
+        suggestion: String,
+    },
 
-    #[error("Markdown generation failed: {cause}")]
-    MarkdownGenerationFailed { cause: String },
+    #[error("Markdown generation failed: {cause}\n💡 Suggestion: {suggestion}")]
+    MarkdownGenerationFailed { 
+        cause: String,
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
 
-    #[error("Task file creation failed: {path} - {cause}")]
-    TaskFileCreationFailed { path: String, cause: String },
+    #[error("Task file creation failed: {path} - {cause}\n💡 Suggestion: {suggestion}")]
+    TaskFileCreationFailed { 
+        path: String, 
+        cause: String,
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
 
-    #[error("Invalid task configuration: {cause}")]
-    InvalidTaskConfiguration { cause: String },
+    #[error("Invalid task configuration: {cause}\n💡 Suggestion: {suggestion}")]
+    InvalidTaskConfiguration { 
+        cause: String,
+        suggestion: String,
+    },
 
-    #[error("Query result processing failed: {cause}")]
-    QueryResultProcessingFailed { cause: String },
+    #[error("Query result processing failed: {cause}\n💡 Suggestion: {suggestion}")]
+    QueryResultProcessingFailed { 
+        cause: String,
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
 
-    #[error("Chunk analysis failed: {cause}")]
-    ChunkAnalysisFailed { cause: String },
+    #[error("Chunk analysis failed: {cause}\n💡 Suggestion: {suggestion}")]
+    ChunkAnalysisFailed { 
+        cause: String,
+        suggestion: String,
+    },
+
+    #[error("Content extraction failed for table '{table_name}' row {row}: {cause}\n💡 Suggestion: {suggestion}")]
+    ContentExtractionFailed { 
+        table_name: String,
+        row: usize, 
+        cause: String,
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("Hierarchical division failed: {cause}\n💡 Suggestion: {suggestion}")]
+    HierarchicalDivisionFailed { 
+        cause: String,
+        suggestion: String,
+    },
+
+    #[error("L1/L2 context generation failed for file '{filepath}': {cause}\n💡 Suggestion: {suggestion}")]
+    ContextGenerationFailed { 
+        filepath: String,
+        cause: String,
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("Database query engine operation failed: {operation} - {cause}\n💡 Suggestion: {suggestion}")]
+    DatabaseQueryEngineFailed {
+        operation: String,
+        cause: String,
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("Task hierarchy creation failed: levels={levels}, groups_per_level={groups_per_level} - {cause}\n💡 Suggestion: {suggestion}")]
+    TaskHierarchyFailed {
+        levels: usize,
+        groups_per_level: usize,
+        cause: String,
+        suggestion: String,
+    },
+
+    #[error("L1L8 markdown generation failed: {cause}\n💡 Suggestion: {suggestion}")]
+    L1L8MarkdownFailed {
+        cause: String,
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("Async operation timeout: {operation} exceeded {timeout_seconds}s\n💡 Suggestion: {suggestion}")]
+    AsyncTimeout {
+        operation: String,
+        timeout_seconds: u64,
+        suggestion: String,
+    },
+
+    #[error("Async operation cancelled: {operation}\n💡 Suggestion: {suggestion}")]
+    AsyncCancelled {
+        operation: String,
+        suggestion: String,
+    },
+
+    #[error("Memory limit exceeded during {operation}: used {used_mb}MB, limit {limit_mb}MB\n💡 Suggestion: {suggestion}")]
+    MemoryLimitExceeded {
+        operation: String,
+        used_mb: usize,
+        limit_mb: usize,
+        suggestion: String,
+    },
+
+    #[error("Batch processing failed: processed {processed}/{total} items - {cause}\n💡 Suggestion: {suggestion}")]
+    BatchProcessingFailed {
+        processed: usize,
+        total: usize,
+        cause: String,
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("Progress reporting failed: {cause}\n💡 Suggestion: {suggestion}")]
+    ProgressReportingFailed {
+        cause: String,
+        suggestion: String,
+    },
+
+    #[error("Large table processing failed: table '{table_name}' with {row_count} rows - {cause}\n💡 Suggestion: {suggestion}")]
+    LargeTableProcessingFailed {
+        table_name: String,
+        row_count: usize,
+        cause: String,
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("Streaming operation failed: {operation} - {cause}\n💡 Suggestion: {suggestion}")]
+    StreamingFailed {
+        operation: String,
+        cause: String,
+        suggestion: String,
+        #[source] 
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
 }
 
 /// Result type aliases for common operations
@@ -278,6 +410,257 @@ pub type IngestionResult<T> = Result<T, IngestionError>;
 pub type DatabaseResult<T> = Result<T, DatabaseError>;
 pub type ProcessingResult<T> = Result<T, ProcessingError>;
 pub type TaskResult<T> = Result<T, TaskError>;
+
+/// Enhanced task error creation helpers with actionable suggestions
+impl TaskError {
+    /// Create a task division error with actionable suggestions
+    pub fn task_division_failed(total_tasks: usize, groups: usize) -> Self {
+        let suggestion = if total_tasks < groups {
+            format!("Reduce group count to {} or fewer, or increase the number of tasks", total_tasks)
+        } else if groups == 0 {
+            "Group count must be greater than 0".to_string()
+        } else {
+            "Check task generation logic and ensure proper task distribution".to_string()
+        };
+
+        error!("Task division failed: {} tasks cannot be divided into {} groups", total_tasks, groups);
+        
+        Self::TaskDivisionFailed { 
+            total_tasks, 
+            groups, 
+            suggestion 
+        }
+    }
+
+    /// Create a content extraction error with actionable suggestions
+    pub fn content_extraction_failed(
+        table_name: impl Into<String>,
+        row: usize,
+        cause: impl Into<String>,
+        source: Option<Box<dyn std::error::Error + Send + Sync>>
+    ) -> Self {
+        let table_name = table_name.into();
+        let cause = cause.into();
+        
+        let suggestion = if cause.contains("connection") {
+            "Check database connection and retry the operation".to_string()
+        } else if cause.contains("timeout") {
+            "Increase timeout settings or process smaller batches".to_string()
+        } else if cause.contains("memory") {
+            "Reduce batch size or increase available memory".to_string()
+        } else if cause.contains("permission") {
+            format!("Check read permissions for table '{}'", table_name)
+        } else {
+            format!("Verify table '{}' exists and row {} is accessible", table_name, row)
+        };
+
+        error!("Content extraction failed for table '{}' row {}: {}", table_name, row, cause);
+        debug!("Content extraction error source: {:?}", source);
+        
+        Self::ContentExtractionFailed { 
+            table_name, 
+            row, 
+            cause, 
+            suggestion, 
+            source 
+        }
+    }
+
+    /// Create a context generation error with actionable suggestions
+    pub fn context_generation_failed(
+        filepath: impl Into<String>,
+        cause: impl Into<String>,
+        source: Option<Box<dyn std::error::Error + Send + Sync>>
+    ) -> Self {
+        let filepath = filepath.into();
+        let cause = cause.into();
+        
+        let suggestion = if cause.contains("encoding") {
+            "Check file encoding and ensure it's UTF-8 compatible".to_string()
+        } else if cause.contains("size") {
+            "File may be too large for context generation, consider chunking".to_string()
+        } else if cause.contains("parse") {
+            "File content may be corrupted or in an unexpected format".to_string()
+        } else {
+            "Verify file exists and is readable, check file format".to_string()
+        };
+
+        warn!("Context generation failed for file '{}': {}", filepath, cause);
+        debug!("Context generation error source: {:?}", source);
+        
+        Self::ContextGenerationFailed { 
+            filepath, 
+            cause, 
+            suggestion, 
+            source 
+        }
+    }
+
+    /// Create a database query engine error with actionable suggestions
+    pub fn database_query_engine_failed(
+        operation: impl Into<String>,
+        cause: impl Into<String>,
+        source: Option<Box<dyn std::error::Error + Send + Sync>>
+    ) -> Self {
+        let operation = operation.into();
+        let cause = cause.into();
+        
+        let suggestion = match operation.as_str() {
+            "count_rows" => "Check table name and database connection".to_string(),
+            "table_exists" => "Verify database connection and table permissions".to_string(),
+            "validate_table" => "Ensure table exists and you have read permissions".to_string(),
+            _ => "Check database connection and query syntax".to_string(),
+        };
+
+        error!("Database query engine operation '{}' failed: {}", operation, cause);
+        debug!("Database query engine error source: {:?}", source);
+        
+        Self::DatabaseQueryEngineFailed { 
+            operation, 
+            cause, 
+            suggestion, 
+            source 
+        }
+    }
+
+    /// Create a task hierarchy error with actionable suggestions
+    pub fn task_hierarchy_failed(
+        levels: usize,
+        groups_per_level: usize,
+        cause: impl Into<String>
+    ) -> Self {
+        let cause = cause.into();
+        
+        let suggestion = if levels == 0 {
+            "Levels must be greater than 0".to_string()
+        } else if groups_per_level == 0 {
+            "Groups per level must be greater than 0".to_string()
+        } else if levels > 10 {
+            "Consider reducing hierarchy levels for better usability (recommended: 2-4 levels)".to_string()
+        } else if groups_per_level > 20 {
+            "Consider reducing groups per level for better organization (recommended: 5-10 groups)".to_string()
+        } else {
+            "Check hierarchy parameters and ensure they match your task count".to_string()
+        };
+
+        error!("Task hierarchy creation failed: levels={}, groups_per_level={} - {}", levels, groups_per_level, cause);
+        
+        Self::TaskHierarchyFailed { 
+            levels, 
+            groups_per_level, 
+            cause, 
+            suggestion 
+        }
+    }
+
+    /// Create an async timeout error with actionable suggestions
+    pub fn async_timeout(operation: impl Into<String>, timeout_seconds: u64) -> Self {
+        let operation = operation.into();
+        
+        let suggestion = match operation.as_str() {
+            op if op.contains("database") => "Increase database timeout or optimize query performance".to_string(),
+            op if op.contains("file") => "Increase file I/O timeout or process smaller files".to_string(),
+            op if op.contains("network") => "Check network connection and increase network timeout".to_string(),
+            _ => format!("Increase timeout from {}s or optimize the operation", timeout_seconds),
+        };
+
+        warn!("Async operation '{}' timed out after {}s", operation, timeout_seconds);
+        
+        Self::AsyncTimeout { 
+            operation, 
+            timeout_seconds, 
+            suggestion 
+        }
+    }
+
+    /// Create a memory limit exceeded error with actionable suggestions
+    pub fn memory_limit_exceeded(
+        operation: impl Into<String>,
+        used_mb: usize,
+        limit_mb: usize
+    ) -> Self {
+        let operation = operation.into();
+        
+        let suggestion = if used_mb > limit_mb * 2 {
+            format!("Memory usage ({} MB) is very high. Consider processing in smaller batches or increasing memory limit to {} MB", used_mb, used_mb + 100)
+        } else {
+            format!("Increase memory limit from {} MB to {} MB or process in smaller batches", limit_mb, limit_mb * 2)
+        };
+
+        error!("Memory limit exceeded during '{}': used {} MB, limit {} MB", operation, used_mb, limit_mb);
+        
+        Self::MemoryLimitExceeded { 
+            operation, 
+            used_mb, 
+            limit_mb, 
+            suggestion 
+        }
+    }
+
+    /// Create a large table processing error with actionable suggestions
+    pub fn large_table_processing_failed(
+        table_name: impl Into<String>,
+        row_count: usize,
+        cause: impl Into<String>,
+        source: Option<Box<dyn std::error::Error + Send + Sync>>
+    ) -> Self {
+        let table_name = table_name.into();
+        let cause = cause.into();
+        
+        let suggestion = if row_count > 100_000 {
+            format!("Table has {} rows. Use streaming with batch size 1000-5000 for better performance", row_count)
+        } else if row_count > 10_000 {
+            format!("Table has {} rows. Consider using batch processing with size 500-1000", row_count)
+        } else {
+            "Enable progress reporting and consider parallel processing".to_string()
+        };
+
+        error!("Large table processing failed for '{}' with {} rows: {}", table_name, row_count, cause);
+        debug!("Large table processing error source: {:?}", source);
+        
+        Self::LargeTableProcessingFailed { 
+            table_name, 
+            row_count, 
+            cause, 
+            suggestion, 
+            source 
+        }
+    }
+
+    /// Check if this error is recoverable with retry
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::AsyncTimeout { .. } => true,
+            Self::DatabaseQueryEngineFailed { cause, .. } if cause.contains("connection") => true,
+            Self::ContentExtractionFailed { cause, .. } if cause.contains("timeout") || cause.contains("connection") => true,
+            Self::StreamingFailed { cause, .. } if cause.contains("network") || cause.contains("timeout") => true,
+            Self::BatchProcessingFailed { cause, .. } if cause.contains("timeout") => true,
+            _ => false,
+        }
+    }
+
+    /// Get suggested retry delay in seconds
+    pub fn retry_delay_seconds(&self) -> u64 {
+        match self {
+            Self::AsyncTimeout { .. } => 10,
+            Self::DatabaseQueryEngineFailed { .. } => 5,
+            Self::ContentExtractionFailed { .. } => 3,
+            Self::StreamingFailed { .. } => 5,
+            Self::BatchProcessingFailed { .. } => 2,
+            _ => 1,
+        }
+    }
+
+    /// Log error with appropriate level
+    pub fn log_error(&self) {
+        match self {
+            Self::ProgressReportingFailed { .. } => debug!("{}", self),
+            Self::ContextGenerationFailed { .. } => warn!("{}", self),
+            Self::AsyncCancelled { .. } => info!("{}", self),
+            _ => error!("{}", self),
+        }
+    }
+}
 
 /// Error recovery strategies and helper functions
 impl CodeIngestError {
@@ -779,6 +1162,216 @@ mod tests {
             }
             _ => panic!("Expected CodeIngestError::PermissionDenied"),
         }
+    }
+
+    #[test]
+    fn test_task_error_creation_helpers() {
+        // Test task division error
+        let division_error = TaskError::task_division_failed(5, 7);
+        match division_error {
+            TaskError::TaskDivisionFailed { total_tasks, groups, suggestion } => {
+                assert_eq!(total_tasks, 5);
+                assert_eq!(groups, 7);
+                assert!(suggestion.contains("Reduce group count"));
+            }
+            _ => panic!("Expected TaskDivisionFailed"),
+        }
+
+        // Test content extraction error
+        let extraction_error = TaskError::content_extraction_failed(
+            "test_table", 
+            42, 
+            "connection timeout", 
+            None
+        );
+        match extraction_error {
+            TaskError::ContentExtractionFailed { table_name, row, cause, suggestion, .. } => {
+                assert_eq!(table_name, "test_table");
+                assert_eq!(row, 42);
+                assert!(cause.contains("connection timeout"));
+                assert!(suggestion.contains("database connection"));
+            }
+            _ => panic!("Expected ContentExtractionFailed"),
+        }
+
+        // Test context generation error
+        let context_error = TaskError::context_generation_failed(
+            "/path/to/file.rs",
+            "encoding error",
+            None
+        );
+        match context_error {
+            TaskError::ContextGenerationFailed { filepath, cause, suggestion, .. } => {
+                assert_eq!(filepath, "/path/to/file.rs");
+                assert!(cause.contains("encoding error"));
+                assert!(suggestion.contains("UTF-8"));
+            }
+            _ => panic!("Expected ContextGenerationFailed"),
+        }
+
+        // Test database query engine error
+        let db_error = TaskError::database_query_engine_failed(
+            "count_rows",
+            "table not found",
+            None
+        );
+        match db_error {
+            TaskError::DatabaseQueryEngineFailed { operation, cause, suggestion, .. } => {
+                assert_eq!(operation, "count_rows");
+                assert!(cause.contains("table not found"));
+                assert!(suggestion.contains("table name"));
+            }
+            _ => panic!("Expected DatabaseQueryEngineFailed"),
+        }
+
+        // Test task hierarchy error
+        let hierarchy_error = TaskError::task_hierarchy_failed(0, 7, "invalid levels");
+        match hierarchy_error {
+            TaskError::TaskHierarchyFailed { levels, groups_per_level, cause, suggestion } => {
+                assert_eq!(levels, 0);
+                assert_eq!(groups_per_level, 7);
+                assert!(cause.contains("invalid levels"));
+                assert!(suggestion.contains("greater than 0"));
+            }
+            _ => panic!("Expected TaskHierarchyFailed"),
+        }
+
+        // Test async timeout error
+        let timeout_error = TaskError::async_timeout("database_query", 30);
+        match timeout_error {
+            TaskError::AsyncTimeout { operation, timeout_seconds, suggestion } => {
+                assert_eq!(operation, "database_query");
+                assert_eq!(timeout_seconds, 30);
+                assert!(suggestion.contains("database timeout"));
+            }
+            _ => panic!("Expected AsyncTimeout"),
+        }
+
+        // Test memory limit exceeded error
+        let memory_error = TaskError::memory_limit_exceeded("content_processing", 512, 256);
+        match memory_error {
+            TaskError::MemoryLimitExceeded { operation, used_mb, limit_mb, suggestion } => {
+                assert_eq!(operation, "content_processing");
+                assert_eq!(used_mb, 512);
+                assert_eq!(limit_mb, 256);
+                assert!(suggestion.contains("512 MB"));
+            }
+            _ => panic!("Expected MemoryLimitExceeded"),
+        }
+
+        // Test large table processing error
+        let large_table_error = TaskError::large_table_processing_failed(
+            "huge_table",
+            150_000,
+            "memory exhausted",
+            None
+        );
+        match large_table_error {
+            TaskError::LargeTableProcessingFailed { table_name, row_count, cause, suggestion, .. } => {
+                assert_eq!(table_name, "huge_table");
+                assert_eq!(row_count, 150_000);
+                assert!(cause.contains("memory exhausted"));
+                assert!(suggestion.contains("streaming"));
+            }
+            _ => panic!("Expected LargeTableProcessingFailed"),
+        }
+    }
+
+    #[test]
+    fn test_task_error_recovery_strategies() {
+        // Test recoverable errors
+        let timeout_error = TaskError::async_timeout("operation", 30);
+        assert!(timeout_error.is_recoverable());
+        assert_eq!(timeout_error.retry_delay_seconds(), 10);
+
+        let db_connection_error = TaskError::database_query_engine_failed(
+            "query", 
+            "connection failed", 
+            None
+        );
+        assert!(db_connection_error.is_recoverable());
+        assert_eq!(db_connection_error.retry_delay_seconds(), 5);
+
+        let extraction_timeout_error = TaskError::content_extraction_failed(
+            "table", 
+            1, 
+            "timeout occurred", 
+            None
+        );
+        assert!(extraction_timeout_error.is_recoverable());
+        assert_eq!(extraction_timeout_error.retry_delay_seconds(), 3);
+
+        // Test non-recoverable errors
+        let config_error = TaskError::task_hierarchy_failed(0, 7, "invalid config");
+        assert!(!config_error.is_recoverable());
+
+        let context_error = TaskError::context_generation_failed(
+            "file.rs", 
+            "parse error", 
+            None
+        );
+        assert!(!context_error.is_recoverable());
+    }
+
+    #[test]
+    fn test_task_error_suggestions_quality() {
+        // Test that suggestions are actionable and specific
+        
+        // Division error with too few tasks
+        let division_error = TaskError::task_division_failed(3, 7);
+        let error_string = division_error.to_string();
+        assert!(error_string.contains("Reduce group count to 3"));
+
+        // Division error with zero groups
+        let zero_groups_error = TaskError::task_division_failed(10, 0);
+        let error_string = zero_groups_error.to_string();
+        assert!(error_string.contains("Group count must be greater than 0"));
+
+        // Context generation with encoding issue
+        let encoding_error = TaskError::context_generation_failed(
+            "file.txt", 
+            "encoding detection failed", 
+            None
+        );
+        let error_string = encoding_error.to_string();
+        assert!(error_string.contains("UTF-8 compatible"));
+
+        // Memory error with high usage
+        let high_memory_error = TaskError::memory_limit_exceeded("processing", 1024, 256);
+        let error_string = high_memory_error.to_string();
+        assert!(error_string.contains("very high"));
+        assert!(error_string.contains("1124 MB")); // 1024 + 100
+
+        // Large table with very high row count
+        let huge_table_error = TaskError::large_table_processing_failed(
+            "massive_table",
+            500_000,
+            "processing failed",
+            None
+        );
+        let error_string = huge_table_error.to_string();
+        assert!(error_string.contains("streaming"));
+        assert!(error_string.contains("1000-5000"));
+    }
+
+    #[test]
+    fn test_task_error_display_format() {
+        let error = TaskError::content_extraction_failed(
+            "INGEST_20250928101039",
+            35,
+            "database connection timeout",
+            None
+        );
+        
+        let error_string = error.to_string();
+        
+        // Check that error contains all expected components
+        assert!(error_string.contains("Content extraction failed"));
+        assert!(error_string.contains("INGEST_20250928101039"));
+        assert!(error_string.contains("row 35"));
+        assert!(error_string.contains("database connection timeout"));
+        assert!(error_string.contains("💡 Suggestion:"));
+        assert!(error_string.contains("database connection"));
     }
 
     #[test]
