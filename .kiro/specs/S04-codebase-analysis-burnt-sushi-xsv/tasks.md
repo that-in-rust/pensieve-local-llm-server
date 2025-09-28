@@ -13,7 +13,7 @@ file_size_bytes    | bigint
 line_count         | integer   
 
 - the repo : https://github.com/BurntSushi/xsv
-- the prompt file : /Users/neetipatni/Desktop/Game20250927/pensieve/.kiro/steering/spec-S04-steering-doc-analysis.md
+- the prompt file : .kiro/steering/spec-S04-steering-doc-analysis.md
 
 
 
@@ -50,7 +50,7 @@ Running SQL Query
 - [ ] 4. Generate systematic analysis tasks using code-ingest
   - Run
   ``` bash
-  ./target/release/code-ingest generate-tasks --sql "SELECT * FROM INGEST_20250928062949" --prompt-file ./xsv-l1-l8-analysis-prompt.md --output-table QUERYRESULT_xsv_$%Y%M%D%H%S --tasks-file ./xsv-analysis-tasks.md --db-path /Users/neetipatni/desktop/PensieveDB01
+  ./target/release/code-ingest generate-tasks --sql 'SELECT * FROM "INGEST_20250928062949"' --prompt-file /Users/neetipatni/Desktop/Game20250927/pensieve/.kiro/steering/spec-S04-steering-doc-analysis.md --output-table QUERYRESULT_xsv_$%Y%M%D%H%S --tasks-file ./xsv-analysis-tasks.md --db-path /Users/neetipatni/desktop/PensieveDB01
   ``
   - Verify generated tasks.md file contains systematic analysis prompts for all 59 files
   - Confirm tasks are structured for chunked processing with 300-500 line segments and 10-20 line overlap

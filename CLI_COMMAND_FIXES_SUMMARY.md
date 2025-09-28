@@ -123,9 +123,22 @@ filepath              | filename
 
 ## Impact
 
-- **Fixed 3 critical bugs** that were preventing CLI commands from working
-- **Updated all documentation** with correct command syntax
+- **Fixed 4 critical bugs** that were preventing CLI commands from working
+- **Updated all documentation** with correct command syntax  
+- **Replaced cargo run with release binary** for production usage
 - **Verified all commands work** with the XSV repository ingestion
 - **Improved user experience** by providing accurate next steps after ingestion
+
+### **Additional Fix Applied:**
+- **🐛 DatabaseOperations Type Bug** - Found and fixed duplicate `extract_column_value` method in `operations.rs` that was causing the `generate-tasks` command to fail with the same type extraction error
+
+### **✅ All Commands Now Verified Working:**
+```bash
+# All commands tested and working with release binary:
+./target/release/code-ingest list-tables --db-path /Users/neetipatni/desktop/PensieveDB01 ✅
+./target/release/code-ingest sample --table INGEST_20250928101039 --db-path /Users/neetipatni/desktop/PensieveDB01 ✅
+./target/release/code-ingest sql 'SELECT * FROM "INGEST_20250928101039" LIMIT 3' --db-path /Users/neetipatni/desktop/PensieveDB01 ✅
+./target/release/code-ingest generate-tasks --sql 'SELECT * FROM "INGEST_20250928101039"' --prompt-file [PROMPT] --output-table QUERYRESULT_xsv_analysis --tasks-file ./xsv-analysis-tasks.md --db-path /Users/neetipatni/desktop/PensieveDB01 ✅
+```
 
 The CLI is now fully functional and ready for the L1-L8 knowledge arbitrage analysis of the XSV codebase.
