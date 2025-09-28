@@ -397,6 +397,7 @@ dependencies = [
  "predicates",
  "proptest",
  "rayon",
+ "regex",
  "serde",
  "serde_json",
  "serial_test",

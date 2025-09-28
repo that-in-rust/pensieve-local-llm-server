@@ -1202,6 +1202,8 @@ impl ContentExtractor {
             TaskError::TaskFileCreationFailed {
                 path: file_path.display().to_string(),
                 cause: format!("Failed to write content file: {}", e),
+                suggestion: "Check file permissions and available disk space".to_string(),
+                source: Some(Box::new(e)),
             }
         })?;
 
@@ -1231,6 +1233,7 @@ impl ContentExtractor {
         if table_name.is_empty() {
             return Err(TaskError::InvalidTaskConfiguration {
                 cause: "Table name cannot be empty".to_string(),
+                suggestion: "Provide a valid table name".to_string(),
             });
         }
 
@@ -1241,6 +1244,7 @@ impl ContentExtractor {
            invalid_strings.iter().any(|s| table_name.contains(s)) {
             return Err(TaskError::InvalidTaskConfiguration {
                 cause: format!("Table name '{}' contains invalid characters", table_name),
+                suggestion: "Use only letters, digits, and underscores in table names".to_string(),
             });
         }
 
@@ -1248,6 +1252,7 @@ impl ContentExtractor {
         if table_name.len() > 63 {
             return Err(TaskError::InvalidTaskConfiguration {
                 cause: format!("Table name '{}' exceeds maximum length of 63 characters", table_name),
+                suggestion: "Use a table name with 63 characters or fewer".to_string(),
             });
         }
 
@@ -1255,6 +1260,7 @@ impl ContentExtractor {
         if !table_name.chars().next().unwrap().is_ascii_alphabetic() && !table_name.starts_with('_') {
             return Err(TaskError::InvalidTaskConfiguration {
                 cause: format!("Table name '{}' must start with a letter or underscore", table_name),
+                suggestion: "Ensure table name starts with a letter or underscore".to_string(),
             });
         }
 
@@ -1262,6 +1268,7 @@ impl ContentExtractor {
         if !table_name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
             return Err(TaskError::InvalidTaskConfiguration {
                 cause: format!("Table name '{}' can only contain letters, digits, and underscores", table_name),
+                suggestion: "Use only letters, digits, and underscores in table names".to_string(),
             });
         }
 

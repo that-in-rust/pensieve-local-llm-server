@@ -1473,6 +1473,7 @@ mod tests {
         let task_error = TaskError::TaskDivisionFailed {
             total_tasks: 5,
             groups: 7,
+            suggestion: "Reduce group count or increase tasks".to_string(),
         };
         let system_error: SystemError = task_error.into();
 
@@ -1480,6 +1481,7 @@ mod tests {
             SystemError::TaskGeneration(TaskError::TaskDivisionFailed {
                 total_tasks,
                 groups,
+                suggestion: _,
             }) => {
                 assert_eq!(total_tasks, 5);
                 assert_eq!(groups, 7);
@@ -1532,6 +1534,8 @@ mod tests {
 
         let task_error = TaskError::MarkdownGenerationFailed {
             cause: "Invalid template".to_string(),
+            suggestion: "Check template format and try again".to_string(),
+            source: None,
         };
         assert_eq!(
             task_error.to_string(),

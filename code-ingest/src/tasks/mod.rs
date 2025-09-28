@@ -133,6 +133,7 @@ impl TaskDivider {
         if group_count == 0 {
             return Err(TaskError::InvalidTaskConfiguration {
                 cause: "Group count must be greater than 0".to_string(),
+                suggestion: "Provide a group count of 1 or more".to_string(),
             });
         }
         
@@ -155,6 +156,7 @@ impl TaskDivider {
             return Err(TaskError::TaskDivisionFailed {
                 total_tasks,
                 groups: self.group_count,
+                suggestion: format!("Reduce group count to {} or fewer, or increase the number of tasks", total_tasks),
             });
         }
 
@@ -265,12 +267,14 @@ impl TaskDivider {
         if chunk_size <= 0 {
             return Err(TaskError::ChunkAnalysisFailed {
                 cause: "Chunk size must be positive".to_string(),
+                suggestion: "Use a chunk size greater than 0".to_string(),
             });
         }
 
         if overlap >= chunk_size {
             return Err(TaskError::ChunkAnalysisFailed {
                 cause: "Overlap must be less than chunk size".to_string(),
+                suggestion: "Reduce overlap to be less than chunk size".to_string(),
             });
         }
 
@@ -424,6 +428,8 @@ impl MarkdownGenerator {
                 TaskError::TaskFileCreationFailed {
                     path: file_path.to_string(),
                     cause: format!("Failed to create parent directory: {}", e),
+                    suggestion: "Check directory permissions and available disk space".to_string(),
+                    source: Some(Box::new(e)),
                 }
             })?;
         }
@@ -432,6 +438,8 @@ impl MarkdownGenerator {
             TaskError::TaskFileCreationFailed {
                 path: file_path.to_string(),
                 cause: e.to_string(),
+                suggestion: "Check file permissions and available disk space".to_string(),
+                source: Some(Box::new(e)),
             }
         })?;
         
@@ -644,7 +652,7 @@ mod tests {
         let result = TaskDivider::new(0);
         assert!(result.is_err());
         match result.unwrap_err() {
-            TaskError::InvalidTaskConfiguration { cause } => {
+            TaskError::InvalidTaskConfiguration { cause, suggestion: _ } => {
                 assert!(cause.contains("Group count must be greater than 0"));
             }
             _ => panic!("Expected InvalidTaskConfiguration error"),
@@ -701,7 +709,7 @@ mod tests {
         assert!(result.is_err());
         
         match result.unwrap_err() {
-            TaskError::TaskDivisionFailed { total_tasks, groups } => {
+            TaskError::TaskDivisionFailed { total_tasks, groups, suggestion: _ } => {
                 assert_eq!(total_tasks, 5);
                 assert_eq!(groups, 7);
             }

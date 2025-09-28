@@ -117,7 +117,7 @@
   - Write performance tests for large dataset scenarios
   - _Requirements: All requirements_
 
-- [-] 7. Integration testing and validation
+- [x] 7. Integration testing and validation
 - [x] 7.1 Create end-to-end workflow tests
   - Test complete pipeline: count → extract → generate tasks
   - Validate output file structure and content accuracy
@@ -125,7 +125,7 @@
   - Verify L1-L8 analysis methodology integration
   - _Requirements: All requirements_
 
-- [-] 7.2 Validate generated task execution
+- [x] 7.2 Validate generated task execution
   - Test generated markdown files in Kiro task system
   - Verify task numbering and hierarchy navigation
   - Validate content file references and accessibility

@@ -43,12 +43,8 @@ code-ingest generate-hierarchical-tasks INGEST_20250928101039 --levels 4 --group
 
 # Advanced Scope - Advanced Task Generator
 
-## Moving one step ahead
 
-### Current generate-hierarchical-tasks has following format
-
-
-### Advanced commands
+## Advanced commands
 
 1. Feature Request 1:
 
@@ -67,5 +63,13 @@ When User sends the above command, following things happen
       - filepath remains same
       - parent_filepath remains same
       - filename remains same
-      - new column called <ChunkNumber>
+      - new column called Chunk_Number based on <UserOptionChunkSizeInLOC>
+      - content is according to what is there in the given chunk
+      - content L1 is concatenation of previous row content and next row content
+      - content L2 is concatenation of previous 2 rows of content and next 2 rows of content
 
+
+- [ ] 5. Analyze <TableName> row <row_iterator> 
+  - **Content**: `.raw_data_202509/<TableName_UserOptionChunkSizeInLOC>_<row_iterator>_Content.txt` as A + `.raw_data_202509/<TableName>_<row_iterator>_Content_L1.txt` as B + `.raw_data_<TableName>_<row_iterator>_Content_L2.txt` as C
+  - **Prompt**: `.kiro/steering/spec-S04-steering-doc-analysis.md` where you try to find insights of A alone ; A in context of B ; B in cotext of C ; A in context B & C
+  - **Output**: `gringotts/WorkArea/<TableName_UserOptionChunkSizeInLOC>_<row_iterator>.md`

@@ -179,6 +179,8 @@ impl L1L8MarkdownGenerator {
                 TaskError::TaskFileCreationFailed {
                     path: parent.display().to_string(),
                     cause: format!("Failed to create parent directory: {}", e),
+                    suggestion: "Check directory permissions and available disk space".to_string(),
+                    source: Some(Box::new(e)),
                 }
             })?;
         }
@@ -188,6 +190,8 @@ impl L1L8MarkdownGenerator {
             TaskError::TaskFileCreationFailed {
                 path: output_file.display().to_string(),
                 cause: e.to_string(),
+                suggestion: "Check file permissions and available disk space".to_string(),
+                source: Some(Box::new(e)),
             }
         })?;
 
