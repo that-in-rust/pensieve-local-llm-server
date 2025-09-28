@@ -1,4 +1,3 @@
-# Implementation Plan
 
 # Table Structure
 
@@ -16,6 +15,8 @@ line_count         | integer
 - the prompt file : .kiro/steering/spec-S04-steering-doc-analysis.md
 - Ingested TableName
 
+
+# Tasks Examples
 
 Ingestion
 ``` bash
@@ -53,7 +54,7 @@ Running SQL Query
   ./target/release/code-ingest task-generator --table "INGEST_20250928101039" --db-path /Users/neetipatni/desktop/PensieveDB01 --output-file .kiro/specs/S04-codebase-analysis-burnt-sushi-xsv/xsv-analysis-tasks.md
   ```
 
-- [ ] 5. Analyze INGEST_20250928101039 row 35 
+- [x] 5. Analyze INGEST_20250928101039 row 35 
   - **Content**: `.raw_data_202509/INGEST_20250928101039_35_Content.txt` as A + `.raw_data_202509/INGEST_20250928101039_35_Content_L1.txt` as B + `.raw_data_202509/INGEST_20250928101039_35_Content_L2.txt` as C
   - **Prompt**: `.kiro/steering/spec-S04-steering-doc-analysis.md` where you try to find insights of A alone ; A in context of B ; B in cotext of C ; A in context B & C
   - **Output**: `gringotts/WorkArea/INGEST_20250928101039_35.md`
