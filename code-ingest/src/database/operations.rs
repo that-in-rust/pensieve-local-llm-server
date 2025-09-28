@@ -481,7 +481,7 @@ impl DatabaseOperations {
                 .push_bind(&file.conversion_command)
                 .push_bind(&file.relative_path)
                 .push_bind(&file.absolute_path)
-                .push_bind(&parent_filepath);
+                .push_bind(parent_filepath);
         });
 
         let query = query_builder.build();

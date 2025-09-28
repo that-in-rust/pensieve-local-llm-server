@@ -6,6 +6,7 @@
 use crate::error::{DatabaseError, DatabaseResult};
 use chrono::{DateTime, Utc};
 use sqlx::{PgPool, Row};
+use std::time::Duration;
 use tracing::{debug, info, warn};
 
 /// Schema manager for database table operations

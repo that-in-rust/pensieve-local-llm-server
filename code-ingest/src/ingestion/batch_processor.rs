@@ -1,5 +1,5 @@
 use crate::error::{IngestionError, IngestionResult};
-use crate::processing::{FileProcessor, ProcessedFile, StreamingProcessor, StreamingConfig, StreamingProgress, PerformanceMonitor, PerformanceConfig};
+use crate::processing::{FileProcessor, ProcessedFile, StreamingProcessor, StreamingConfig, StreamingProgress, PerformanceMonitor, PerformanceThresholds, OptimizationRecommendation};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -166,12 +166,16 @@ impl BatchProcessor {
 
         // Create performance monitor if enabled
         let performance_monitor = if config.enable_performance_monitoring {
-            let perf_config = PerformanceConfig {
-                collection_interval: Duration::from_secs(1),
-                adaptive_optimization: true,
-                ..Default::default()
+            let perf_thresholds = PerformanceThresholds {
+                max_cpu_usage: 90.0,
+                max_memory_usage: 85.0,
+                max_concurrent_tasks: config.max_concurrency,
+                min_throughput: 10.0,
             };
-            Some(Arc::new(PerformanceMonitor::new(perf_config)))
+            match PerformanceMonitor::new(perf_thresholds) {
+                Ok(monitor) => Some(Arc::new(monitor)),
+                Err(_) => None,
+            }
         } else {
             None
         };

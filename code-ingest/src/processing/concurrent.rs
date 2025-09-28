@@ -393,7 +393,8 @@ impl ConcurrentProcessor {
 
         // Process work items in batches
         let batch_size = self.config.batch_size;
-        for batch in work_items.chunks(batch_size) {
+        let work_items_owned = work_items; // Take ownership
+        for batch in work_items_owned.chunks(batch_size) {
             for work_item in batch {
                 let permit = semaphore.clone().acquire_owned().await.unwrap();
                 let file_processor = Arc::clone(&self.file_processor);
@@ -414,20 +415,20 @@ impl ConcurrentProcessor {
                     // Check memory limit
                     if work_item.estimated_size > memory_limit {
                         let error_msg = format!("File too large: {} bytes", work_item.estimated_size);
-                        let _ = tx_clone.send(Err((work_item.file_path, error_msg))).await;
+                        let _ = tx_clone.send(Err((file_path, error_msg))).await;
                         return;
                     }
 
                     // Process with timeout
                     let result = tokio::time::timeout(
                         timeout,
-                        file_processor.process(&work_item.file_path),
+                        file_processor.process(&file_path),
                     ).await;
 
                     let processing_result = match result {
                         Ok(Ok(processed_file)) => Ok(processed_file),
-                        Ok(Err(e)) => Err((work_item.file_path, e.to_string())),
-                        Err(_) => Err((work_item.file_path, "Processing timeout".to_string())),
+                        Ok(Err(e)) => Err((file_path.clone(), e.to_string())),
+                        Err(_) => Err((file_path, "Processing timeout".to_string())),
                     };
 
                     // Record performance metrics
@@ -499,6 +500,7 @@ impl ConcurrentProcessor {
             let tx_clone = tx.clone();
             let timeout = self.config.processing_timeout;
             let memory_limit = self.config.memory_limit_per_task;
+            let file_path = work_item.file_path.clone();
 
             join_set.spawn(async move {
                 let _permit = permit; // Keep permit alive
@@ -506,20 +508,20 @@ impl ConcurrentProcessor {
                 // Check memory limit
                 if work_item.estimated_size > memory_limit {
                     let error_msg = format!("File too large: {} bytes", work_item.estimated_size);
-                    let _ = tx_clone.send(Err((work_item.file_path, error_msg))).await;
+                    let _ = tx_clone.send(Err((file_path, error_msg))).await;
                     return;
                 }
 
                 // Process with timeout
                 let result = tokio::time::timeout(
                     timeout,
-                    file_processor.process(&work_item.file_path),
+                    file_processor.process(&file_path),
                 ).await;
 
                 let processing_result = match result {
                     Ok(Ok(processed_file)) => Ok(processed_file),
-                    Ok(Err(e)) => Err((work_item.file_path, e.to_string())),
-                    Err(_) => Err((work_item.file_path, "Processing timeout".to_string())),
+                    Ok(Err(e)) => Err((file_path.clone(), e.to_string())),
+                    Err(_) => Err((file_path, "Processing timeout".to_string())),
                 };
 
                 let _ = tx_clone.send(processing_result).await;
@@ -573,20 +575,21 @@ impl ConcurrentProcessor {
                 let file_processor = Arc::clone(&processor.file_processor);
                 let tx_clone = tx.clone();
                 let timeout = processor.config.processing_timeout;
+                let file_path = work_item.file_path.clone();
 
                 join_set.spawn(async move {
                     let _permit = permit;
 
                     let result = tokio::time::timeout(
                         timeout,
-                        file_processor.process(&work_item.file_path),
+                        file_processor.process(&file_path),
                     ).await;
 
                     let final_result = match result {
                         Ok(Ok(processed_file)) => Ok(processed_file),
                         Ok(Err(e)) => Err(e),
                         Err(_) => Err(ProcessingError::ContentAnalysisFailed {
-                            path: work_item.file_path.display().to_string(),
+                            path: file_path.display().to_string(),
                             cause: "Processing timeout".to_string(),
                         }),
                     };
@@ -648,7 +651,7 @@ impl ParallelBatchProcessor {
         processor: F,
     ) -> ProcessingResult<Vec<R>>
     where
-        T: Send + 'static,
+        T: Send + 'static + Clone,
         F: Fn(Vec<T>) -> std::pin::Pin<Box<dyn std::future::Future<Output = ProcessingResult<Vec<R>>> + Send>> + Send + Sync + Clone + 'static,
         R: Send + 'static,
     {

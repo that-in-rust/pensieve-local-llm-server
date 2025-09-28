@@ -26,6 +26,8 @@ pub struct CloneConfig {
     pub show_progress: bool,
     /// Maximum repository size in MB (0 = no limit)
     pub max_size_mb: u64,
+    /// Clone depth for shallow cloning (1 = shallow, 0 = full history)
+    pub depth: u32,
 }
 
 impl Default for CloneConfig {
@@ -37,7 +39,7 @@ impl Default for CloneConfig {
             timeout: Duration::from_secs(300), // 5 minutes
             show_progress: true,
             max_size_mb: 5000, // 1GB default limit
-            depth: 1
+            depth: 1,
         }
     }
 }

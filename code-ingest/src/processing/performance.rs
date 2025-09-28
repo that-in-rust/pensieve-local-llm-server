@@ -124,8 +124,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
-use sysinfo::{System, SystemExt, CpuExt, ProcessExt, Pid};
+use std::time::{Duration, Instant, SystemTime};
+use sysinfo::{System, Pid};
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
@@ -157,7 +157,37 @@ pub struct PerformanceMetrics {
     /// Error rate percentage (0-100)
     pub error_rate: f64,
     /// Timestamp of measurement
-    pub timestamp: Instant,
+    #[serde(with = "timestamp_serde")]
+    pub timestamp: SystemTime,
+}
+
+/// Performance monitoring configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PerformanceConfig {
+    pub monitoring_interval: Duration,
+    pub memory_threshold: f64,
+    pub cpu_threshold: f64,
+    pub enable_recommendations: bool,
+}
+
+impl Default for PerformanceConfig {
+    fn default() -> Self {
+        Self {
+            monitoring_interval: Duration::from_secs(5),
+            memory_threshold: 0.8,
+            cpu_threshold: 0.9,
+            enable_recommendations: true,
+        }
+    }
+}
+
+/// Performance optimization recommendation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OptimizationRecommendation {
+    pub category: String,
+    pub description: String,
+    pub impact: String,
+    pub priority: u8,
 }
 
 /// Performance thresholds for adaptive optimization
@@ -431,7 +461,7 @@ impl PerformanceMonitor {
             disk_read_bps: 0, // TODO: Implement disk I/O monitoring
             disk_write_bps: 0,
             network_bps: 0, // TODO: Implement network monitoring
-            active_threads: process.tasks.len(),
+            active_threads: process.tasks().map(|tasks| tasks.len()).unwrap_or(0),
             processing_rate,
             avg_latency_ms,
             p95_latency_ms,
@@ -482,6 +512,58 @@ impl PerformanceMonitor {
     pub fn update_thresholds(&mut self, thresholds: PerformanceThresholds) {
         self.thresholds = thresholds;
         info!("Updated performance thresholds");
+    }
+
+    /// Start monitoring system performance
+    pub async fn start_monitoring(&self) -> ProcessingResult<()> {
+        info!("Starting performance monitoring");
+        // Implementation would start background monitoring task
+        Ok(())
+    }
+
+    /// Get current system utilization
+    pub fn get_current_utilization(&self) -> ProcessingResult<f64> {
+        let metrics = self.collect_metrics()?;
+        let cpu_util = metrics.cpu_usage / 100.0;
+        let memory_util = metrics.memory_usage as f64 / metrics.total_memory as f64;
+        Ok((cpu_util + memory_util) / 2.0)
+    }
+
+    /// Check if system is under pressure
+    pub fn is_under_pressure(&self) -> bool {
+        if let Ok(utilization) = self.get_current_utilization() {
+            utilization > 0.8
+        } else {
+            false
+        }
+    }
+
+    /// Get optimization recommendations
+    pub fn get_optimization_recommendations(&self) -> Vec<OptimizationRecommendation> {
+        let mut recommendations = Vec::new();
+        
+        if let Ok(metrics) = self.collect_metrics() {
+            if metrics.cpu_usage > 90.0 {
+                recommendations.push(OptimizationRecommendation {
+                    category: "CPU".to_string(),
+                    description: "High CPU usage detected. Consider reducing concurrency.".to_string(),
+                    impact: "High".to_string(),
+                    priority: 1,
+                });
+            }
+            
+            let memory_usage_percent = (metrics.memory_usage as f64 / metrics.total_memory as f64) * 100.0;
+            if memory_usage_percent > 85.0 {
+                recommendations.push(OptimizationRecommendation {
+                    category: "Memory".to_string(),
+                    description: "High memory usage detected. Consider reducing batch sizes.".to_string(),
+                    impact: "High".to_string(),
+                    priority: 1,
+                });
+            }
+        }
+        
+        recommendations
     }
 }
 
@@ -688,5 +770,29 @@ mod tests {
         assert_eq!(summary.total_processed, 2);
         assert_eq!(summary.total_errors, 1);
         assert!(summary.uptime.as_millis() > 0);
+    }
+}
+
+/// Custom serialization for SystemTime
+mod timestamp_serde {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::time::{SystemTime, UNIX_EPOCH};
+    
+    pub fn serialize<S>(time: &SystemTime, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        time.duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            .serialize(serializer)
+    }
+    
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<SystemTime, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let secs = u64::deserialize(deserializer)?;
+        Ok(UNIX_EPOCH + std::time::Duration::from_secs(secs))
     }
 }

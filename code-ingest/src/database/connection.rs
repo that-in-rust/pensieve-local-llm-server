@@ -293,16 +293,16 @@ impl Database {
             .idle_timeout(Duration::from_secs(300)) // Reduced idle timeout for better resource usage
             .max_lifetime(Duration::from_secs(3600)) // Increased lifetime for better connection reuse
             .test_before_acquire(false) // Skip health checks for performance
-            .after_connect(|conn, _meta| {
+            .after_connect(|mut conn, _meta| {
                 Box::pin(async move {
                     // Optimize PostgreSQL connection settings for bulk operations
-                    sqlx::query("SET synchronous_commit = off").execute(conn).await?;
-                    sqlx::query("SET wal_buffers = '16MB'").execute(conn).await?;
-                    sqlx::query("SET checkpoint_completion_target = 0.9").execute(conn).await?;
-                    sqlx::query("SET shared_buffers = '256MB'").execute(conn).await?;
-                    sqlx::query("SET effective_cache_size = '1GB'").execute(conn).await?;
-                    sqlx::query("SET work_mem = '64MB'").execute(conn).await?;
-                    sqlx::query("SET maintenance_work_mem = '256MB'").execute(conn).await?;
+                    sqlx::query("SET synchronous_commit = off").execute(&mut *conn).await?;
+                    sqlx::query("SET wal_buffers = '16MB'").execute(&mut *conn).await?;
+                    sqlx::query("SET checkpoint_completion_target = 0.9").execute(&mut *conn).await?;
+                    sqlx::query("SET shared_buffers = '256MB'").execute(&mut *conn).await?;
+                    sqlx::query("SET effective_cache_size = '1GB'").execute(&mut *conn).await?;
+                    sqlx::query("SET work_mem = '64MB'").execute(&mut *conn).await?;
+                    sqlx::query("SET maintenance_work_mem = '256MB'").execute(&mut *conn).await?;
                     Ok(())
                 })
             });
