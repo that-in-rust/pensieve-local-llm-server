@@ -56,7 +56,7 @@ The analysis serves the strategic objective of becoming one of the top 5 Rust pr
 1. WHEN enhancing the database schema THEN the system SHALL add parent_filepath column using simple rule: go back by 1 backslash/slash, if no slash then parent_filepath equals filepath
 2. WHEN populating hierarchical content THEN the system SHALL add l1_window_content column containing concatenated content of all files within the same parent_filepath, ordered alphabetically by filepath
 3. WHEN creating system-level context THEN the system SHALL add l2_window_content column containing concatenated content of all files within the same grandfather_filepath (parent of parent_filepath), ordered by parent_filepath then filepath
-4. WHEN storing analytical data THEN the system SHALL accept redundancy in favor of analytics-ready single-query access, enabling immediate multi-scale context without JOINs
+4. WHEN storing analytical data THEN the system SHALL accept redundancy in favor of analytics-ready single-query access, enabling immediate multi-scale context without JOINs, following the existing code-ingest task-based workflow pattern
 
 ### Requirement 5: Triple-Comparison Analysis Framework
 
@@ -67,7 +67,7 @@ The analysis serves the strategic objective of becoming one of the top 5 Rust pr
 1. WHEN analyzing individual files THEN the system SHALL compare content_text against l1_window_content to identify how individual patterns compose within modules
 2. WHEN examining system relationships THEN the system SHALL compare content_text against l2_window_content to understand how individual files relate to overall architecture
 3. WHEN identifying scaling patterns THEN the system SHALL compare l1_window_content against l2_window_content to reveal how module patterns scale to system-wide architectural principles
-4. WHEN processing any single file THEN the system SHALL have immediate access to all three context levels (individual, module, system) within a single database row for efficient analysis
+4. WHEN processing any single file THEN the system SHALL have immediate access to all three context levels (individual, module, system) within a single database row for efficient analysis, with results stored in QUERYRESULT_xsv_knowledge_arbitrage table following code-ingest conventions
 
 ### Requirement 6: Systematic Chunked Processing with Multi-Perspective Analysis
 
@@ -80,24 +80,24 @@ The analysis serves the strategic objective of becoming one of the top 5 Rust pr
 3. WHEN conducting expert council process THEN the system SHALL require Skeptical Engineer challenges to primary assertions, expert responses to challenges, and synthesis of refined insights into cohesive conclusions
 4. WHEN generating verification questions THEN the system SHALL produce 5-10 fact-checkable questions per major insight and validate claims against available evidence from the multi-scale context
 
-### Requirement 7: Knowledge Arbitrage Output Generation
+### Requirement 7: Task-Based Knowledge Arbitrage Output Generation
 
-**User Story:** As a Rust mastery strategist, I want to generate structured knowledge arbitrage outputs from xsv analysis, so that I can build specialized repositories and contribute to The Horcrux Codex LLM training dataset.
-
-#### Acceptance Criteria
-
-1. WHEN generating optimization arbitrage THEN the system SHALL produce categorized micro-optimizations, performance patterns, and mechanical sympathy techniques with benchmarking data and applicability analysis
-2. WHEN creating cross-paradigm translations THEN the system SHALL identify patterns from other ecosystems (C, C++, Haskell, Erlang) that xsv implements or could benefit from with specific translation strategies
-3. WHEN building the unsafe compendium THEN the system SHALL document all unsafe usage patterns, safety invariants, and alternative safe approaches with risk-benefit analysis
-4. WHEN contributing to Horcrux Codex THEN the system SHALL format insights as structured training data with context, rationale, and verification metadata for LLM fine-tuning
-
-### Requirement 8: Mermaid Visualization and Export Capabilities
-
-**User Story:** As a knowledge synthesizer, I want to generate comprehensive mermaid diagrams and export capabilities for xsv analysis, so that I can visualize architectural insights and share knowledge effectively.
+**User Story:** As a Rust mastery strategist, I want to execute systematic tasks that generate structured knowledge arbitrage outputs and store them in QUERYRESULT tables, so that I can build specialized repositories and contribute to The Horcrux Codex LLM training dataset.
 
 #### Acceptance Criteria
 
-1. WHEN generating architectural diagrams THEN the system SHALL produce mermaid flowcharts showing module dependencies, data flow pipelines, and component relationships with clear hierarchical organization
-2. WHEN creating performance visualizations THEN the system SHALL generate mermaid graphs showing optimization opportunities, bottleneck analysis, and performance improvement paths
-3. WHEN exporting analysis results THEN the system SHALL support JSON format for programmatic access, markdown for documentation, and structured formats for The Horcrux Codex dataset
-4. WHEN saving results THEN the system SHALL include complete metadata about analysis methodology, xsv version, commit hash, analysis timestamp, L1-L8 extraction completeness metrics, and reference the source database at /Users/neetipatni/desktop/PensieveDB01 with table INGEST_20250928062949
+1. WHEN executing optimization arbitrage tasks THEN the system SHALL generate tasks.md with specific steps to extract micro-optimizations, performance patterns, and mechanical sympathy techniques, storing results in QUERYRESULT_xsv_knowledge_arbitrage table
+2. WHEN executing cross-paradigm translation tasks THEN the system SHALL create systematic tasks to identify patterns from other ecosystems (C, C++, Haskell, Erlang) and store translation strategies in structured database format
+3. WHEN executing unsafe compendium tasks THEN the system SHALL generate tasks to document all unsafe usage patterns, safety invariants, and alternative approaches, with results stored in queryable format
+4. WHEN executing Horcrux Codex preparation tasks THEN the system SHALL create tasks that format insights as structured training data with context, rationale, and verification metadata, stored in JSONB columns for LLM fine-tuning
+
+### Requirement 8: Task-Based Visualization and Export System
+
+**User Story:** As a knowledge synthesizer, I want to execute systematic tasks that generate comprehensive mermaid diagrams and export capabilities, so that I can visualize architectural insights and share knowledge effectively through the code-ingest export system.
+
+#### Acceptance Criteria
+
+1. WHEN executing visualization generation tasks THEN the system SHALL create tasks.md with steps to query QUERYRESULT_xsv_knowledge_arbitrage table and generate mermaid flowcharts showing module dependencies, data flow pipelines, and component relationships
+2. WHEN executing performance visualization tasks THEN the system SHALL generate tasks that create mermaid graphs from stored analysis results showing optimization opportunities, bottleneck analysis, and performance improvement paths
+3. WHEN executing export tasks THEN the system SHALL use code-ingest print-to-md functionality to export analysis results in markdown format, with JSON exports for programmatic access and structured formats for The Horcrux Codex dataset
+4. WHEN executing metadata tasks THEN the system SHALL store complete metadata in analysis_meta table including analysis methodology, xsv version, commit hash, analysis timestamp, L1-L8 extraction completeness metrics, and references to source database /Users/neetipatni/desktop/PensieveDB01 with table INGEST_20250928062949

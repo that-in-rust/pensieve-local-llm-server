@@ -1,28 +1,36 @@
-# Code Ingest
+# Pensieve - Knowledge Arbitrage System
 
-A high-performance Rust-based code ingestion system that transforms GitHub repositories into queryable PostgreSQL databases for lightning-fast semantic code analysis.
+A revolutionary Rust-based knowledge extraction system that transforms stellar codebases into systematic wisdom through L1-L8 analysis methodology. Built on high-performance PostgreSQL ingestion with multi-scale context windows and semantic search capabilities.
 
 [![CI](https://github.com/your-org/code-ingest/workflows/CI/badge.svg)](https://github.com/your-org/code-ingest/actions)
 [![Coverage](https://codecov.io/gh/your-org/code-ingest/branch/main/graph/badge.svg)](https://codecov.io/gh/your-org/code-ingest)
 [![Crates.io](https://img.shields.io/crates/v/code-ingest.svg)](https://crates.io/crates/code-ingest)
 
-## 🚀 Quick Start
+## 🚀 Quick Start - Knowledge Arbitrage
 
 ```bash
-# Install code-ingest
-cargo install code-ingest
+# Build the system
+cargo build --release
 
-# Set up PostgreSQL (if not already installed)
-code-ingest pg-start
+# Set up PostgreSQL database
+./target/release/code-ingest pg-start
 
-# Ingest a GitHub repository
-code-ingest ingest https://github.com/rust-lang/mdBook --db-path ./analysis
+# Ingest a stellar codebase (XSV example)
+./target/release/code-ingest ingest https://github.com/BurntSushi/xsv --db-path /Users/neetipatni/desktop/PensieveDB01
 
-# Query the ingested code
-code-ingest sql "SELECT filepath, content_text FROM INGEST_20240928143022 WHERE content_text LIKE '%authenticate%'" --db-path ./analysis
+# Enhance database with multi-scale context windows
+./target/release/code-ingest sql "ALTER TABLE INGEST_20250928062949 ADD COLUMN parent_filepath VARCHAR" --db-path /Users/neetipatni/desktop/PensieveDB01
 
-# List all ingestion tables
-code-ingest list-tables --db-path ./analysis
+# Extract L1-L8 knowledge arbitrage insights
+./target/release/code-ingest generate-tasks \
+  --sql "SELECT * FROM INGEST_20250928062949" \
+  --prompt-file .kiro/specs/S04-codebase-analysis-burnt-sushi-xsv/requirements.md \
+  --output-table QUERYRESULT_xsv_knowledge_arbitrage \
+  --tasks-file ./xsv-analysis-tasks.md \
+  --db-path /Users/neetipatni/desktop/PensieveDB01
+
+# Execute systematic analysis in Kiro IDE
+# Open xsv-analysis-tasks.md and execute tasks for L1-L8 extraction
 ```
 
 ## 📋 Table of Contents
@@ -38,15 +46,22 @@ code-ingest list-tables --db-path ./analysis
 - [Troubleshooting](#-troubleshooting)
 - [Contributing](#-contributing)
 
-## ✨ Features
+## ✨ Features - Knowledge Arbitrage System
 
-### Core Capabilities
-- **🔄 Dual Input Sources**: Ingest from GitHub repositories or local folders
-- **🎯 Intelligent File Processing**: Three-type classification (DirectText, Convertible, Binary)
-- **⚡ High Performance**: >100 files/second processing with streaming architecture
-- **🗄️ PostgreSQL Storage**: Timestamped tables with full-text search indexing
-- **🔍 SQL Query Interface**: Direct SQL access with terminal-friendly output
-- **🔧 IDE Integration**: Structured task generation for systematic code analysis
+### Revolutionary Capabilities
+- **🧠 L1-L8 Knowledge Extraction**: Systematic wisdom extraction from micro-optimizations to intent archaeology
+- **🔄 Multi-Scale Context Windows**: Hierarchical analysis (Individual → Module → System)
+- **🎯 Semantic Code Search**: AST-aware pattern matching with ast-grep integration
+- **⚡ Triple-Comparison Analysis**: Individual↔Module↔System pattern recognition
+- **🗄️ Analytics-First Database**: Enhanced PostgreSQL with hierarchical context storage
+- **🔍 Task-Based Workflow**: Systematic analysis with results stored in QUERYRESULT tables
+- **🔧 Kiro IDE Integration**: Structured task generation for systematic knowledge arbitrage
+
+### Strategic Mission
+- **🎯 Top-5 Rust Programmer Goal**: Systematic analysis of stellar codebases for mastery
+- **📚 The Horcrux Codex**: Proprietary LLM training dataset from extracted wisdom
+- **🔄 Cross-Paradigm Translation**: Identify patterns from mature ecosystems (C, C++, Haskell, Erlang)
+- **⚡ 10x Improvements**: Focus on paradigm-market fit, not incremental gains
 
 ### File Type Support
 
