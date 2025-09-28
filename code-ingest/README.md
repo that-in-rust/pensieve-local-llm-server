@@ -33,6 +33,8 @@ code-ingest list-tables --db-path ./analysis
 - [Performance](#-performance)
 - [Architecture](#-architecture)
 - [Development](#-development)
+- [Examples](#-examples)
+- [Documentation](#-documentation)
 - [Troubleshooting](#-troubleshooting)
 - [Contributing](#-contributing)
 
@@ -445,6 +447,39 @@ perf report
 
 # Memory profiling with valgrind
 valgrind --tool=massif cargo run --release -- ingest repo --db-path ./analysis
+```
+
+## 📚 Examples
+
+Comprehensive examples for various use cases:
+
+- **[Basic Usage](examples/basic_usage.md)** - Getting started with repository ingestion and basic queries
+- **[Security Analysis](examples/security_analysis.md)** - Finding security vulnerabilities and sensitive information
+- **[Architecture Analysis](examples/architecture_analysis.md)** - Understanding codebase structure and design patterns
+- **[IDE Integration](examples/ide_integration.md)** - Systematic analysis workflows with IDE support
+- **[Custom Queries](examples/custom_queries.md)** - Advanced SQL patterns for specialized analysis
+
+See the [examples directory](examples/) for complete tutorials and use case scenarios.
+
+## 📖 Documentation
+
+### User Documentation
+- **[CLI Reference](docs/CLI_REFERENCE.md)** - Complete command reference and options
+- **[Performance Guide](docs/PERFORMANCE.md)** - Benchmarks, optimization, and system requirements
+- **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+
+### Developer Documentation
+- **[Developer Guide](docs/DEVELOPER_GUIDE.md)** - Architecture, contributing, and extending the system
+- **[Contributing Guidelines](CONTRIBUTING.md)** - How to contribute to the project
+- **[Changelog](CHANGELOG.md)** - Version history and release notes
+
+### Quick Installation
+```bash
+# Automated installation (recommended)
+curl -sSL https://raw.githubusercontent.com/your-org/code-ingest/main/install.sh | bash
+
+# Or install manually
+cargo install code-ingest
 ```
 
 ## 🤝 Contributing
