@@ -2870,7 +2870,7 @@ mod tests {
         let cli = Cli::try_parse_from(args).unwrap();
 
         match &cli.command {
-            Some(Commands::Ingest { source, db_path }) => {
+            Some(Commands::Ingest { source, folder_flag: _, db_path }) => {
                 assert_eq!(source, "https://github.com/test/repo");
                 assert_eq!(db_path.as_ref().unwrap().to_str().unwrap(), "/tmp/test");
             }

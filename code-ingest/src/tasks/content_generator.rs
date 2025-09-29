@@ -1213,8 +1213,8 @@ mod tests {
         )
     }
 
-    #[test]
-    fn test_extract_rust_imports() {
+    #[tokio::test]
+    async fn test_extract_rust_imports() {
         let content = r#"
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
@@ -1249,8 +1249,8 @@ fn main() {
         assert!(imports.contains(&"extern crate tokio;".to_string()));
     }
 
-    #[test]
-    fn test_detect_architectural_patterns() {
+    #[tokio::test]
+    async fn test_detect_architectural_patterns() {
         let content = r#"
 struct MyStruct {
     field: String,
@@ -1296,8 +1296,8 @@ trait MyTrait {
         assert!(patterns.iter().any(|p| p.contains("Source code organization")));
     }
 
-    #[test]
-    fn test_validate_table_name() {
+    #[tokio::test]
+    async fn test_validate_table_name() {
         let temp_dir = TempDir::new().unwrap();
         let config = create_test_config();
         

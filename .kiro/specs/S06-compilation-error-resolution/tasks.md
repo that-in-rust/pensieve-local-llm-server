@@ -12,7 +12,7 @@
   - Add connection pool management for concurrent operations
   - _Requirements: 1.1, 3.1, 3.2, 3.3_
 
-- [-] 3. Implement missing PerformanceMonitor methods and types
+- [x] 3. Implement missing PerformanceMonitor methods and types
   - Create PerformanceConfig struct with serialization support
   - Implement start_monitoring() async method
   - Add get_current_utilization() method
@@ -49,7 +49,7 @@
   - Correct all type-related compilation errors
   - _Requirements: 1.1, 4.2, 4.3_
 
-- [ ] 8. Fix remaining test compilation errors
+- [x] 8. Fix remaining test compilation errors
   - Fix async/await usage in non-async test functions in content_generator.rs
   - Fix CLI pattern matching to include missing folder_flag field
   - Update test functions to be async where needed or remove await calls
