@@ -590,10 +590,10 @@ Provide insights for each analysis stage focusing on:
     
     // Generate markdown
     let task_divider = HierarchicalTaskDivider::new(2, 3); // 2 levels, 3 groups for testing
-    let hierarchy = task_divider.create_hierarchy(content_triples.clone())?;
+    let hierarchy = task_divider?.create_hierarchy(content_triples.clone())?;
     
     let markdown_generator = L1L8MarkdownGenerator::new(prompt_file, temp_dir.path().to_path_buf());
-    let markdown = markdown_generator.generate_hierarchical_markdown(&hierarchy, "TEST_TABLE")?;
+    let markdown = markdown_generator.generate_hierarchical_markdown(&hierarchy, "TEST_TABLE").await?;
     
     Ok((markdown, content_triples))
 }

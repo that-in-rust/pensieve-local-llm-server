@@ -574,12 +574,14 @@ mod stress_tests {
         let chunking_engine = ChunkingEngine::with_chunk_size(50);
         let task_divider = HierarchicalTaskDivider::new(3, 5).unwrap();
         
+        let very_long_line = "x".repeat(10000);
+        let many_empty_lines = "\n".repeat(100);
         let edge_cases = vec![
             ("empty", ""),
             ("single_line", "single line"),
             ("whitespace_only", "   \n\t\t\n   "),
-            ("very_long_lines", &"x".repeat(10000)),
-            ("many_empty_lines", &"\n".repeat(100)),
+            ("very_long_lines", &very_long_line),
+            ("many_empty_lines", &many_empty_lines),
             ("mixed_content", "line1\n\n\nline4\n   \nline6"),
         ];
         
@@ -771,7 +773,7 @@ mod boundary_condition_tests {
             "Hello 世界\nこんにちは\n🚀 Rust",
             "Line with\ttabs\nand\r\nwindows\nline endings",
             "Émojis: 🎉🔥💯\nSpecial chars: àáâãäå\nSymbols: ∑∆∇∈∉",
-            "Very long line: ".to_string() + &"x".repeat(10000) + "\nShort line",
+            &("Very long line: ".to_string() + &"x".repeat(10000) + "\nShort line"),
         ];
         
         let chunking_engine = ChunkingEngine::with_chunk_size(2);
