@@ -76,4 +76,7 @@
   - Run integration tests to validate end-to-end behavior
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
+- [ ] Fix and make this spic and span by testing it for 1 particular small repo with file level + chunk size 50 + a folder path
+    - 
+
   
