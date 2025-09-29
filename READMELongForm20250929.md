@@ -1,14 +1,14 @@
-# Code Ingest: High-Performance Rust Code Analysis Engine
+# Code Ingest: High-Performance Rust Ingestion Engine
 
-**Transform any codebase into queryable intelligence in seconds.**
+**Transform any codebase into queryable PostgreSQL intelligence in seconds.**
 
-Code Ingest is a production-ready Rust tool that ingests GitHub repositories and local folders into PostgreSQL databases, enabling systematic code analysis through hierarchical task generation and multi-scale context windows.
+Code Ingest is a production-ready Rust tool that ingests GitHub repositories, local folders, and documents into PostgreSQL databases, enabling systematic code analysis through SQL queries, full-text search, and structured data exploration.
 
 ## Core Value Proposition
 
 **Problem**: Analyzing large codebases manually is time-consuming and inconsistent.  
-**Solution**: Automated ingestion + structured analysis = systematic code intelligence.  
-**Result**: 100+ files/second processing with hierarchical task generation for methodical analysis.
+**Solution**: Automated ingestion + PostgreSQL storage = queryable code intelligence.  
+**Result**: 100+ files/second processing with full-text search and metadata analysis.
 
 ## Architecture Overview
 
@@ -51,10 +51,10 @@ flowchart TD
         I[Multi-Scale Windows]
     end
     
-    subgraph "Analysis Layer"
-        J[Hierarchical Tasks]
-        K[Chunked Analysis]
-        L[Content Extraction]
+    subgraph "Query Layer"
+        J[SQL Interface]
+        K[Full-Text Search]
+        L[Metadata Queries]
     end
     
     A --> C
@@ -82,10 +82,10 @@ flowchart TD
 - **Memory Usage**: 8.04 MB peak
 - **Table Created**: `INGEST_20250929040158`
 
-**Task Generation**:
-- **File-Level Tasks**: 59 tasks generated
-- **Chunked Tasks (50 LOC)**: 194 tasks from 48 chunked files
-- **Content Files**: 582 A/B/C content files created
+**Database Results**:
+- **Files Ingested**: 59 files with full content and metadata
+- **Searchable Content**: All file content indexed for full-text search
+- **Query Ready**: Immediate SQL access to all code and metadata
 
 ### Test Case 2: Local Folder Analysis
 **Command**: `./target/release/code-ingest ingest /Users/neetipatni/Desktop/Game20250927/number-12-grimmauld-place/LibraryOfOrderOfThePhoenix --folder-flag --db-path /Users/neetipatni/desktop/PensieveDB01`
@@ -97,10 +97,10 @@ flowchart TD
 - **Memory Usage**: 10.84 MB peak
 - **Table Created**: `INGEST_20250929042515`
 
-**Task Generation**:
-- **File-Level Tasks**: 9 tasks generated
-- **Chunked Tasks (50 LOC)**: 1,551 tasks from 9 files
-- **Content Files**: 4,653 A/B/C content files created
+**Database Results**:
+- **Files Ingested**: 9 large files (4.3MB) with full content and metadata
+- **Searchable Content**: All file content indexed for full-text search
+- **Query Ready**: Immediate SQL access to all code and metadata
 
 ## Quick Start
 
@@ -126,15 +126,16 @@ cargo build --release
   --folder-flag --db-path /path/to/database
 ```
 
-#### 3. Generate Analysis Tasks
+#### 3. Query Your Data
 ```bash
-# File-level analysis
-./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME \
-  --levels 4 --groups 7 --output tasks.md --db-path /path/to/database
+# Search for specific patterns
+./target/release/code-ingest sql \
+  "SELECT filepath FROM TABLE_NAME WHERE content_text LIKE '%async fn%'" \
+  --db-path /path/to/database
 
-# Chunked analysis (50 lines per chunk)
-./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME \
-  --levels 4 --groups 7 --chunks 50 --output chunked-tasks.md \
+# Analyze file types and sizes
+./target/release/code-ingest sql \
+  "SELECT extension, COUNT(*), AVG(line_count) FROM TABLE_NAME GROUP BY extension" \
   --db-path /path/to/database
 ```
 
@@ -146,11 +147,11 @@ Every ingested file automatically generates three context levels:
 - **L1**: Directory-level context (related files)
 - **L2**: System-level context (architectural patterns)
 
-### Hierarchical Task Generation
-Systematic analysis through structured task hierarchies:
-- **4 Levels**: Configurable depth for analysis granularity
-- **7 Groups**: Balanced distribution across hierarchy levels
-- **Chunked Mode**: Split large files into manageable 50-line segments
+### SQL Query Interface
+Powerful querying capabilities for code analysis:
+- **Full-Text Search**: Find patterns across all ingested content
+- **Metadata Queries**: Filter by file types, sizes, complexity
+- **Relationship Analysis**: Understand code structure and dependencies
 
 ### Database Schema
 ```sql
@@ -198,16 +199,16 @@ flowchart TD
         D[Database Storage]
     end
     
-    subgraph "Phase 2: Task Generation"
-        E[Hierarchical Structure]
-        F[Content Extraction]
-        G[A/B/C Files]
+    subgraph "Phase 2: Database Storage"
+        E[PostgreSQL Tables]
+        F[Full-Text Indexing]
+        G[Metadata Structure]
     end
     
-    subgraph "Phase 3: Analysis"
-        H[Systematic Review]
-        I[Pattern Detection]
-        J[Knowledge Extraction]
+    subgraph "Phase 3: Query & Analysis"
+        H[SQL Queries]
+        I[Pattern Search]
+        J[Data Exploration]
     end
     
     A --> B
@@ -223,12 +224,12 @@ flowchart TD
 
 ## Advanced Features
 
-### Chunked Analysis
-For large files, the system automatically:
-1. **Splits** files into 50-line chunks
-2. **Maintains** context across chunks
-3. **Generates** individual tasks per chunk
-4. **Preserves** file relationships
+### Advanced Processing
+For comprehensive analysis, the system:
+1. **Extracts** full file content with metadata
+2. **Maintains** directory and system context
+3. **Indexes** content for fast full-text search
+4. **Preserves** file relationships and structure
 
 ### SQL Query Interface
 ```bash
@@ -279,23 +280,45 @@ For large files, the system automatically:
 | **Convertible** | `.pdf`, `.docx`, `.xlsx`, `.pptx` | External tool conversion |
 | **Binary** | `.jpg`, `.png`, `.gif`, `.mp4`, `.exe`, `.bin`, `.zip` | Metadata-only storage |
 
-## Generated Task Files
+## Database Schema
 
-The system creates structured markdown files in `.kiro/specs/S07-OperationalSpec-20250929/`:
+The system creates timestamped PostgreSQL tables with comprehensive metadata:
 
-### XSV Repository Analysis
-- `xsv-file-level-tasks.md` - 59 file-level analysis tasks
-- `xsv-chunked-50-tasks.md` - 194 chunk-level analysis tasks
+### Table Structure (Example: `INGEST_20250929040158`)
+```sql
+CREATE TABLE INGEST_20250929040158 (
+    file_id BIGSERIAL PRIMARY KEY,
+    filepath VARCHAR NOT NULL,
+    filename VARCHAR NOT NULL,
+    extension VARCHAR,
+    file_size_bytes BIGINT,
+    line_count INTEGER,
+    word_count INTEGER,
+    content_text TEXT,                -- Full file content (searchable)
+    parent_filepath VARCHAR,          -- Directory context
+    l1_window_content TEXT,           -- Directory-level context
+    l2_window_content TEXT,           -- System-level context
+    ast_patterns JSONB,               -- Semantic patterns
+    file_type VARCHAR,                -- Processing type
+    ingestion_timestamp TIMESTAMP DEFAULT NOW()
+);
+```
 
-### Local Folder Analysis  
-- `local-folder-file-level-tasks.md` - 9 file-level analysis tasks
-- `local-folder-chunked-50-tasks.md` - 1,551 chunk-level analysis tasks
+### Query Examples
+```sql
+-- Find all async functions
+SELECT filepath, filename FROM INGEST_20250929040158 
+WHERE content_text LIKE '%async fn%';
 
-### Content Files
-All analysis tasks reference A/B/C content files in `.raw_data_202509/`:
-- **A Files**: Raw content
-- **B Files**: L1 context (directory-level)
-- **C Files**: L2 context (system-level)
+-- Analyze file complexity
+SELECT extension, AVG(line_count), COUNT(*) 
+FROM INGEST_20250929040158 
+GROUP BY extension ORDER BY AVG(line_count) DESC;
+
+-- Full-text search
+SELECT filepath FROM INGEST_20250929040158 
+WHERE content_text @@ to_tsquery('error & handling');
+```
 
 ## System Requirements
 
@@ -359,8 +382,8 @@ export CODE_INGEST_MAX_CONCURRENCY=4
 - ✅ GitHub repository ingestion
 - ✅ Local folder ingestion  
 - ✅ Multi-scale context windows
-- ✅ Hierarchical task generation
-- ✅ Chunked analysis (50 LOC)
+- ✅ SQL query interface
+- ✅ Full-text search capabilities
 - ✅ PostgreSQL optimization
 - ✅ SQL query interface
 - ✅ Performance monitoring
@@ -368,8 +391,8 @@ export CODE_INGEST_MAX_CONCURRENCY=4
 ### Validated Test Cases
 - ✅ XSV repository (59 files, 1.79s)
 - ✅ Local folder (9 files, 1.46s)
-- ✅ Task generation (file + chunked)
-- ✅ Content extraction (A/B/C files)
+- ✅ Database schema creation
+- ✅ Content indexing and search
 - ✅ Database operations (CRUD)
 
 ## Contributing
@@ -387,7 +410,7 @@ cargo test
 - **Core**: Ingestion engine with async processing
 - **Database**: PostgreSQL with sqlx
 - **Processing**: Multi-threaded file processing
-- **Tasks**: Hierarchical markdown generation
+- **Queries**: SQL interface with full-text search
 
 ## License
 

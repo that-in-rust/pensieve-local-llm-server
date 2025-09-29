@@ -1,71 +1,74 @@
 # Code Ingest Documentation
 
-This directory contains comprehensive documentation for the Code Ingest project, including analysis documents, testing files, and implementation guides.
+This directory contains comprehensive documentation for the Code Ingest project, focusing on the core ingestion engine that transforms codebases into queryable PostgreSQL databases.
 
 ## 📁 Directory Structure
 
 ### `/analysis/` - Technical Analysis & Design Documents
-- **`task_volume_analysis.md`** - Root cause analysis of Kiro task volume limits
-- **`task_pagination_strategy.md`** - Initial pagination approach (superseded by windowed system)
-- **`windowed_task_system_design.md`** - Complete windowed task system architecture
-- **`generic_task_generator_analysis.md`** - Analysis of task generator genericity improvements
+- **`task_volume_analysis.md`** - Analysis of specialized task generation features (Kiro-specific)
+- **`windowed_task_system_design.md`** - Advanced task management system (experimental)
+- **`generic_task_generator_analysis.md`** - Task generator improvements (specialized use case)
 - **`fix_demonstration.md`** - Problem analysis and solution demonstration
 - **`COMMIT_SUMMARY.md`** - Summary of major commits and changes
 - **`FINAL_VALIDATION_SUMMARY.md`** - Complete validation results and success metrics
 
 ### `/testing/` - Test Files & Validation Scripts
-- **`test_windowed_system.rs`** - Demonstration of windowed task system concept
-- **`test_generic_task_generator.rs`** - Validation of generic task generator capabilities
-- **`test_final_format_validation.rs`** - Final format compatibility validation
+- **`test_windowed_system.rs`** - Demonstration of advanced task features
+- **`test_generic_task_generator.rs`** - Validation of specialized generators
+- **`test_final_format_validation.rs`** - Format compatibility validation
 - **`test_reference_format_match.rs`** - Reference format matching tests
 - **`test_simple_generator.rs`** - Basic format validation tests
 
-## 🎯 Key Achievements
+## 🎯 Core Focus: Database Ingestion
 
-### Problem Solved: Task Generator Fix
-- **Issue**: Task generator produced complex markdown (19,497 lines) that Kiro couldn't parse
-- **Root Cause**: Two-fold problem - format incompatibility AND task volume limits
-- **Solution**: Windowed task system with simple checkbox format
+### Primary Value: PostgreSQL Integration
+- **Issue**: Manual codebase analysis is time-consuming and inconsistent
+- **Solution**: Automated ingestion into queryable PostgreSQL databases
+- **Result**: 100+ files/second processing with full-text search and metadata analysis
 
 ### Technical Implementation
-1. **SimpleTaskGenerator** - Clean checkbox markdown generation
-2. **WindowedTaskManager** - Handles large task volumes in manageable windows
-3. **CLI Integration** - Seamless workflow commands
-4. **Progress Tracking** - Automatic state management and resumability
+1. **Ingestion Engine** - High-performance file processing and database storage
+2. **Multi-Scale Context** - Directory and system-level relationship mapping
+3. **SQL Interface** - Full-text search and metadata queries
+4. **Performance Optimization** - Efficient batch processing and indexing
 
 ### Results
-- ✅ **Format Fixed**: Simple `- [ ] Task Name` format (Kiro-compatible)
-- ✅ **Volume Managed**: 1,551 tasks → 32 windows of 50 tasks each
-- ✅ **Complete Coverage**: All tasks processed systematically
-- ✅ **User Experience**: Single file focus with automatic progress tracking
+- ✅ **High Performance**: 100+ files/second ingestion speed
+- ✅ **Full-Text Search**: Indexed content for pattern matching
+- ✅ **Metadata Queries**: File types, sizes, complexity analysis
+- ✅ **Relationship Mapping**: Directory and system context preservation
 
-## 🚀 Usage Examples
+## 🚀 Primary Usage Examples
 
-### Generate Windowed System
+### Ingest GitHub Repository
 ```bash
-code-ingest generate-hierarchical-tasks INGEST_20250929042515 \
-  --levels 4 --groups 7 --chunks 50 --windowed \
-  --output .kiro/tasks/INGEST_20250929042515/
+code-ingest ingest https://github.com/user/repo --db-path ./analysis
 ```
 
-### Daily Workflow
+### Ingest Local Codebase
 ```bash
-# Work on current 50 tasks
-kiro .kiro/tasks/INGEST_20250929042515/current-window.md
-
-# Advance to next window when done
-code-ingest advance-window .kiro/tasks/INGEST_20250929042515/
-
-# Check progress anytime
-code-ingest task-progress .kiro/tasks/INGEST_20250929042515/
+code-ingest ingest /path/to/code --folder-flag --db-path ./analysis
 ```
 
-## 📊 Impact Metrics
+### Query Your Data
+```bash
+# Find async functions
+code-ingest sql "SELECT filepath FROM TABLE_NAME WHERE content_text LIKE '%async fn%'" --db-path ./analysis
 
-- **File Size Reduction**: 19,497 lines → ~100 lines per window (99.5% reduction)
-- **Task Management**: 1,551 tasks organized into 32 manageable windows
-- **Kiro Compatibility**: 100% compatible with Kiro task parser
-- **Developer Experience**: Streamlined workflow with automatic progress tracking
+# Analyze file complexity
+code-ingest sql "SELECT extension, AVG(line_count) FROM TABLE_NAME GROUP BY extension" --db-path ./analysis
+```
+
+## 📊 Performance Metrics
+
+- **Ingestion Speed**: 100+ files/second processing
+- **Database Efficiency**: Optimized PostgreSQL schema with full-text indexing
+- **Memory Usage**: Constant ~10-25MB regardless of repository size
+- **Query Performance**: Sub-second response times for most queries
+
+## 📝 Note on Task Generation
+
+The task generation features documented in this directory are **specialized tools** designed for specific IDE integration (Kiro). The core value of Code Ingest is the **database ingestion engine** that works universally with any PostgreSQL-compatible analysis workflow.
 
 ## 🔗 Related Files
 

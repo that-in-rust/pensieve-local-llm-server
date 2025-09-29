@@ -1,19 +1,16 @@
 # Code Ingest
 
-**Turn any codebase into structured analysis tasks in seconds**
+**Transform any codebase into queryable PostgreSQL intelligence in seconds.**
 
-Point it at a GitHub repo or local folder. Get back organized tasks for systematic code review. That's it.
+Point it at a GitHub repo or local folder. Get back a structured database with full-text search, metadata queries, and multi-scale context windows. That's it.
 
-
-**Transform any codebase or folder into queryable intelligence in seconds.**
-
-Code Ingest is a production-ready Rust tool that ingests GitHub repositories and local folders into PostgreSQL databases, enabling systematic code analysis through hierarchical task generation and multi-scale context windows.
+Code Ingest is a production-ready Rust tool that ingests GitHub repositories, local folders, and documents into PostgreSQL databases, enabling systematic code analysis through SQL queries and structured data exploration.
 
 ## Core Value Proposition
 
 **Problem**: Analyzing large codebases manually is time-consuming and inconsistent.  
-**Solution**: Automated ingestion + structured analysis = systematic code intelligence.  
-**Result**: 100+ files/second processing with hierarchical task generation for methodical analysis.
+**Solution**: Automated ingestion + PostgreSQL storage = queryable code intelligence.  
+**Result**: 100+ files/second processing with full-text search and metadata analysis.
 
 ## Architecture Overview
 
@@ -56,10 +53,10 @@ flowchart TD
         I[Multi-Scale Windows]
     end
     
-    subgraph "Analysis Layer"
-        J[Hierarchical Tasks]
-        K[Chunked Analysis]
-        L[Content Extraction]
+    subgraph "Query Interface"
+        J[SQL Queries]
+        K[Full-Text Search]
+        L[Metadata Analysis]
     end
     
     A --> C
@@ -78,18 +75,14 @@ flowchart TD
 
 ## What you get
 
-Two commands give you everything:
+One command gives you everything:
 
 ```bash
-# 1. Ingest code
+# Ingest any codebase into PostgreSQL
 ./target/release/code-ingest ingest https://github.com/user/repo --db-path ./db
-
-# 2. Get analysis tasks  
-./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME \
-  --levels 4 --groups 7 --output tasks.md --db-path ./db
 ```
 
-Result: Structured markdown files with systematic analysis tasks. No more staring at random files wondering where to start.
+Result: A queryable PostgreSQL database with full-text search, metadata, and multi-scale context. No more manual file hunting.
 
 ## How it works
 
@@ -126,9 +119,9 @@ flowchart TD
     end
     
     subgraph "Your Output"
-        F[Analysis Tasks]
-        G[Searchable Database]
-        H[Context Files]
+        F[PostgreSQL Database]
+        G[Full-Text Search]
+        H[Metadata Queries]
     end
     
     A --> C
@@ -149,39 +142,45 @@ Tested on actual repos:
 
 ## Common workflows
 
-### Analyze any GitHub repo
+### Ingest any GitHub repo
 ```bash
 ./target/release/code-ingest ingest https://github.com/user/repo --db-path ./analysis
-./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME \
-  --output tasks.md --db-path ./analysis
 ```
 
-### Analyze local code
+### Ingest local code or documents
 ```bash
-./target/release/code-ingest ingest /absolute/path/to/code \
+./target/release/code-ingest ingest /absolute/path/to/folder \
   --folder-flag --db-path ./analysis
-./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME \
-  --output tasks.md --db-path ./analysis
 ```
 
-### Break down large files
-```bash
-# Split files into 50-line chunks for detailed review
-./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME \
-  --chunks 50 --output detailed-tasks.md --db-path ./analysis
-```
-
-### Search your code
+### Query your ingested code
 ```bash
 # Find all async functions
 ./target/release/code-ingest sql \
   "SELECT filepath FROM TABLE_NAME WHERE content_text LIKE '%async fn%'" \
   --db-path ./analysis
 
-# List all Rust files
+# List all Rust files with line counts
 ./target/release/code-ingest sql \
   "SELECT filepath, line_count FROM TABLE_NAME WHERE extension = 'rs'" \
   --db-path ./analysis
+
+# Full-text search across all files
+./target/release/code-ingest sql \
+  "SELECT filepath, filename FROM TABLE_NAME WHERE content_text ILIKE '%error handling%'" \
+  --db-path ./analysis
+```
+
+### Explore your database
+```bash
+# List all ingested tables
+./target/release/code-ingest list-tables --db-path ./analysis
+
+# Sample data from a table
+./target/release/code-ingest sample --table TABLE_NAME --db-path ./analysis
+
+# Get table schema
+./target/release/code-ingest describe --table TABLE_NAME --db-path ./analysis
 ```
 
 ## What you need
@@ -192,7 +191,7 @@ Tested on actual repos:
 
 That's it. The tool handles the rest.
 
-## What gets generated
+## What gets stored
 
 ```mermaid
 %%{init: {
@@ -216,37 +215,36 @@ That's it. The tool handles the rest.
 
 flowchart TD
     subgraph "For each file"
-        A[Analysis Task]
-        B[Raw Content]
+        A[File Content]
+        B[Metadata]
         C[Directory Context]
         D[System Context]
     end
     
-    subgraph "Database"
-        E[Searchable Content]
-        F[File Metadata]
-        G[Relationships]
+    subgraph "PostgreSQL Database"
+        E[Full-Text Search]
+        F[Structured Queries]
+        G[Relationship Mapping]
     end
     
     A --> E
-    B --> E
+    B --> F
     C --> F
     D --> G
 ```
 
-### Task files
-- **File-level**: One task per file
-- **Chunked**: One task per 50-line chunk (for large files)
+### Database schema
+- **File content**: Full text with search indexing
+- **Metadata**: File paths, sizes, types, line counts
+- **Context windows**: Directory and system-level relationships
+- **Timestamps**: When files were ingested and processed
 
-### Content files
-- **Raw**: Original file content
-- **Context**: How it fits with other files
-- **Architecture**: System-level patterns
-
-### Database
+### Query capabilities
 - Full-text search across all content
-- Metadata queries (file types, sizes, etc.)
-- Relationship mapping between files
+- Metadata filtering (file types, sizes, etc.)
+- Pattern matching and regex searches
+- Relationship queries between files
+- Performance analytics (largest files, most complex, etc.)
 
 ## Build it
 
@@ -262,6 +260,6 @@ Works with most text files (`.rs`, `.py`, `.js`, `.md`, `.json`, etc.). Converts
 
 ---
 
-**Stop wandering through codebases. Start with a plan.**
+**Stop wandering through codebases. Start with structured data.**
 
-See [READMELongForm20250929.md](READMELongForm20250929.md) for technical details.
+See [READMELongForm20250929.md](READMELongForm20250929.md) for comprehensive documentation and examples.
