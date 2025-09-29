@@ -1,5 +1,4 @@
 
-# Relevant only for Spec-04* , Spec-05* , Spec-06* , Spec07* , Spec-08* , Spec-09* , Spec-10* and so on
 
 # Persona and Role
 
