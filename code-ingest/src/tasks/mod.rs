@@ -12,6 +12,7 @@ pub mod l1l8_markdown_generator;
 pub mod markdown_writer;
 pub mod models;
 pub mod output_directory_manager;
+pub mod simple_task_generator;
 pub mod task_structure_builder;
 
 pub use database_query_engine::{DatabaseQueryEngine, TableValidation, DatabaseConnectionStats};
@@ -29,6 +30,7 @@ pub use hierarchical_generator::{
     HierarchicalTaskGenerator, TaskDistribution, TaskNumbering, DatabaseRow
 };
 pub use l1l8_markdown_generator::L1L8MarkdownGenerator;
+pub use simple_task_generator::SimpleTaskGenerator;
 pub use task_structure_builder::{
     TaskStructureBuilder, EnhancedTask, PromptReference, TaskRelationship, 
     RelationshipType, TaskStructure as EnhancedTaskStructure, TaskStructureMetadata, TaskStructureStatistics

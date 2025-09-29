@@ -2543,7 +2543,7 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         
         // Validate parameters using merged configuration
         self.validate_hierarchical_task_parameters(&table_name, merged_config.levels, merged_config.groups, &output, &merged_config.prompt_file, merged_config.chunks)?;
-        use crate::tasks::{DatabaseQueryEngine, ContentExtractor, HierarchicalTaskDivider, L1L8MarkdownGenerator};
+        use crate::tasks::{DatabaseQueryEngine, ContentExtractor, HierarchicalTaskDivider, SimpleTaskGenerator};
         use indicatif::{ProgressBar, ProgressStyle};
         
         println!("🏗️  Generating hierarchical tasks from table: {}", table_name.bright_cyan());
@@ -2636,9 +2636,8 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         progress.set_message("Generating markdown file...");
         progress.set_position(80);
         
-        let output_dir_path = std::path::PathBuf::from("gringotts/WorkArea");
-        let markdown_generator = L1L8MarkdownGenerator::new(merged_config.prompt_file, output_dir_path);
-        let markdown_content = markdown_generator.generate_hierarchical_markdown(&hierarchy, &working_table_name).await?;
+        let markdown_generator = SimpleTaskGenerator::new();
+        let markdown_content = markdown_generator.generate_simple_markdown(&hierarchy, &working_table_name).await?;
         
         // Step 5: Write output file
         progress.set_message("Writing output file...");
