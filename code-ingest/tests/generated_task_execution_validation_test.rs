@@ -7,7 +7,8 @@
 
 use anyhow::Result;
 use code_ingest::{
-    database::{Database, DatabaseConfig},
+    database::Database,
+    config::DatabaseConfig,
     tasks::{
         DatabaseQueryEngine, ContentExtractor, HierarchicalTaskDivider, 
         L1L8MarkdownGenerator, ContentTriple, TaskHierarchy
@@ -617,7 +618,7 @@ fn traverse_task_hierarchy(tasks: &[KiroTask], start_id: &str, visited: &mut std
     Ok(path)
 }
 
-fn get_sibling_tasks(tasks: &[KiroTask], task_id: &str) -> Vec<&KiroTask> {
+fn get_sibling_tasks<'a>(tasks: &'a [KiroTask], task_id: &str) -> Vec<&'a KiroTask> {
     if let Some(task) = tasks.iter().find(|t| t.id == task_id) {
         if let Some(parent_id) = &task.parent_id {
             return tasks.iter()

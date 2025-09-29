@@ -2,7 +2,8 @@
 //! 
 //! Tests Requirements 2.1, 2.2, 2.3 - Three-type file classification system
 
-use code_ingest::processing::classifier::{FileClassifier, FileType};
+use code_ingest::processing::classifier::FileClassifier;
+use code_ingest::processing::FileType;
 use std::path::Path;
 use proptest::prelude::*;
 
