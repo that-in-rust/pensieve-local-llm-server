@@ -5,6 +5,8 @@
 
 Analyze 60,000+ tweets to understand authentic voice patterns and extract insights for potential book creation. Use code-ingest to load data into PostgreSQL, then apply voice analysis prompts to 1000-line chunks.
 
+
+
 ## Requirements
 
 ### Requirement 1: Data Ingestion

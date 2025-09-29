@@ -5,7 +5,7 @@
   - Check that the data loaded properly
   - _Requirements: 1.1, 1.2_
 
-- [ ] 2. Create 1000-line chunks for voice analysis using code-ingest chunking engine
+- [x] 2. Create 1000-line chunks for voice analysis using code-ingest chunking engine
   - Use generate-hierarchical-tasks command with --chunks 1000 to create line-based chunks
   - Run: `./target/release/code-ingest generate-hierarchical-tasks INGEST_20250929133512 --chunks 1000 --output voice_analysis_tasks.md --db-path /Users/neetipatni/desktop/PensieveDB01`
   - This creates a new database table with 1000-line chunks optimized for voice analysis
