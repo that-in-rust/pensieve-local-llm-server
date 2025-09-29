@@ -8,9 +8,9 @@ use crate::error::{TaskError, TaskResult};
 use crate::tasks::content_extractor::{ContentTriple, ProcessingConfig, ProcessingProgress, CancellationToken};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
-use tracing::{debug, info, warn};
-use tokio::sync::Semaphore;
-use std::sync::Arc;
+use tracing::{debug, info};
+
+
 
 /// Hierarchical task divider that creates multi-level task structures
 #[derive(Debug, Clone)]
@@ -490,6 +490,7 @@ impl HierarchicalTaskDivider {
     }
 
     /// Legacy method for backward compatibility
+    #[allow(dead_code)]
     fn distribute_across_levels(
         &self,
         items: Vec<ContentTriple>,
@@ -557,6 +558,7 @@ impl HierarchicalTaskDivider {
     }
 
     /// Legacy method for backward compatibility
+    #[allow(dead_code)]
     fn create_leaf_groups(
         &self,
         items: Vec<ContentTriple>,
@@ -597,6 +599,7 @@ impl HierarchicalTaskDivider {
     }
 
     /// Legacy method for backward compatibility
+    #[allow(dead_code)]
     fn create_analysis_tasks_from_items(
         &self,
         items: Vec<ContentTriple>,
@@ -682,6 +685,7 @@ impl Default for HierarchicalTaskDivider {
 mod tests {
     use super::*;
     use std::path::PathBuf;
+    use std::sync::Arc;
 
     fn create_test_content_triples(count: usize) -> Vec<ContentTriple> {
         (1..=count)

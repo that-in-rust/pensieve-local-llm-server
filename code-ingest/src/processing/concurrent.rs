@@ -179,7 +179,7 @@
 
 use crate::error::{ProcessingError, ProcessingResult};
 use crate::processing::{FileProcessor, ProcessedFile, PerformanceMonitor};
-use futures::stream::{Stream, StreamExt};
+use futures::stream::Stream;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -490,7 +490,7 @@ impl ConcurrentProcessor {
         let mut processed_files = Vec::new();
         let mut failed_files = Vec::new();
         let peak_concurrency = self.config.max_concurrency;
-        let mut memory_peak = 0u64;
+        let memory_peak = 0u64;
 
         // Spawn all tasks
         for work_item in work_items {

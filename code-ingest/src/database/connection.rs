@@ -16,6 +16,7 @@ use tracing::{debug, info, warn, error};
 #[derive(Clone, Debug)]
 pub struct Database {
     pool: PgPool,
+    #[allow(dead_code)]
     database_url: String,
 }
 
@@ -188,7 +189,7 @@ impl Database {
     }
 
     /// Create an ingestion table with the given name
-    pub async fn create_ingestion_table(&self, table_name: &str) -> DatabaseResult<()> {
+    pub async fn create_ingestion_table(&self, _table_name: &str) -> DatabaseResult<()> {
         let schema_manager = crate::database::schema::SchemaManager::new(self.pool.clone());
         let _table_name = schema_manager.create_ingestion_table(Some(chrono::Utc::now())).await?;
         Ok(())
@@ -293,7 +294,7 @@ impl Database {
             .idle_timeout(Duration::from_secs(300)) // Reduced idle timeout for better resource usage
             .max_lifetime(Duration::from_secs(3600)) // Increased lifetime for better connection reuse
             .test_before_acquire(false) // Skip health checks for performance
-            .after_connect(|mut conn, _meta| {
+            .after_connect(|conn, _meta| {
                 Box::pin(async move {
                     // Optimize PostgreSQL connection settings for bulk operations
                     sqlx::query("SET synchronous_commit = off").execute(&mut *conn).await?;

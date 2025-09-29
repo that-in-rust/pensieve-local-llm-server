@@ -6,7 +6,7 @@
 
 use crate::error::{TaskError, TaskResult};
 use crate::tasks::models::{
-    ChunkMetadata, ContentFileReference, ContentFileType, GenerationConfig,
+    ContentFileReference, ContentFileType, GenerationConfig,
 };
 use crate::tasks::output_directory_manager::{OutputDirectoryManager, ConflictResolution};
 use sqlx::{PgPool, Row};

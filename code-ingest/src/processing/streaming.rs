@@ -6,8 +6,8 @@
 
 use crate::error::{ProcessingError, ProcessingResult};
 use crate::processing::{FileProcessor, ProcessedFile};
-use futures::stream::{Stream, StreamExt};
-use std::path::{Path, PathBuf};
+use futures::stream::Stream;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -250,6 +250,7 @@ impl MemoryTracker {
 /// CPU utilization monitor
 #[derive(Debug)]
 struct CpuMonitor {
+    #[allow(dead_code)]
     last_measurement: std::sync::Mutex<Option<(Instant, f64)>>,
 }
 
@@ -571,11 +572,12 @@ impl Clone for StreamingProcessor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::processing::{FileType, ProcessedFile};
-    use crate::error::ProcessingResult;
+    use crate::processing::{FileType, ProcessedFile, FileProcessor};
+    use crate::error::{ProcessingError, ProcessingResult};
+    use std::path::{Path, PathBuf};
     use std::sync::Mutex;
     use tempfile::TempDir;
-    use tokio_test;
+    use tokio_stream::StreamExt;
 
     // Mock file processor for testing
     struct MockStreamingProcessor {
@@ -742,7 +744,7 @@ mod tests {
             .await
             .unwrap();
 
-        let mut results = Vec::new();
+        let mut results: Vec<ProcessingResult<ProcessedFile>> = Vec::new();
         while let Some(result) = stream.next().await {
             results.push(result);
         }
@@ -779,7 +781,7 @@ mod tests {
             .await
             .unwrap();
 
-        let mut results = Vec::new();
+        let mut results: Vec<ProcessingResult<ProcessedFile>> = Vec::new();
         while let Some(result) = stream.next().await {
             results.push(result);
         }
@@ -809,7 +811,7 @@ mod tests {
             .await
             .unwrap();
 
-        let mut results = Vec::new();
+        let mut results: Vec<ProcessingResult<ProcessedFile>> = Vec::new();
         while let Some(result) = stream.next().await {
             results.push(result);
         }

@@ -562,9 +562,9 @@ impl IngestionEngine {
 
         // Return result with updated statistics
         match result {
-            Ok((processed_files, mut stats)) => {
+            Ok((_processed_files, mut stats)) => {
                 stats.files_processed += resume_state.completed_files.len();
-                let mut operation_result = IngestionOperationResult {
+                let operation_result = IngestionOperationResult {
                     source: resume_state.source,
                     source_type: SourceType::GitRepository,
                     table_name: resume_state.table_name,
@@ -661,7 +661,7 @@ impl IngestionEngine {
 
         // Return result with updated statistics
         match result {
-            Ok((processed_files, mut stats)) => {
+            Ok((_processed_files, mut stats)) => {
                 stats.files_processed += resume_state.completed_files.len();
                 Ok(IngestionOperationResult {
                     source: resume_state.source,
@@ -711,7 +711,7 @@ impl IngestionEngine {
         };
 
         // Process files
-        let (mut processed_files, stats) = batch_processor
+        let (processed_files, stats) = batch_processor
             .process_files(file_paths.clone(), resume_progress_callback)
             .await?;
 
@@ -769,7 +769,7 @@ impl IngestionEngine {
 
     /// List all resumable ingestions
     pub async fn list_resumable_ingestions(&self) -> crate::error::IngestionResult<Vec<(i64, ProgressStats)>> {
-        let resume_manager = self.resume_manager.as_ref().ok_or_else(|| {
+        let _resume_manager = self.resume_manager.as_ref().ok_or_else(|| {
             IngestionError::ConfigurationError {
                 message: "Resume capability is not enabled".to_string(),
             }

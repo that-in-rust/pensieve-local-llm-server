@@ -107,7 +107,7 @@ impl GitCloner {
 
     /// Validate that the repository URL is well-formed and supported
     fn validate_repository_url(&self, repo_url: &str) -> IngestionResult<Url> {
-        let parsed_url = Url::parse(repo_url).map_err(|e| IngestionError::InvalidRepositoryUrl {
+        let parsed_url = Url::parse(repo_url).map_err(|_e| IngestionError::InvalidRepositoryUrl {
             url: repo_url.to_string(),
         })?;
 
@@ -143,7 +143,7 @@ impl GitCloner {
 
         // Remove existing directory if it exists
         if target_path.exists() {
-            std::fs::remove_dir_all(&target_path).map_err(|e| {
+            std::fs::remove_dir_all(&target_path).map_err(|_e| {
                 IngestionError::PermissionDenied {
                     path: target_path.display().to_string(),
                 }
@@ -152,7 +152,7 @@ impl GitCloner {
 
         // Create parent directories
         if let Some(parent) = target_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| IngestionError::PermissionDenied {
+            std::fs::create_dir_all(parent).map_err(|_e| IngestionError::PermissionDenied {
                 path: parent.display().to_string(),
             })?;
         }
@@ -203,7 +203,7 @@ impl GitCloner {
         if let Some((username, password)) = &config.credentials {
             let username = username.clone();
             let password = password.clone();
-            callbacks.credentials(move |_url, username_from_url, _allowed_types| {
+            callbacks.credentials(move |_url, _username_from_url, _allowed_types| {
                 Cred::userpass_plaintext(&username, &password)
             });
         } else {

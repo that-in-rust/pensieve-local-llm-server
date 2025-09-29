@@ -212,7 +212,7 @@ impl FolderProcessor {
         }
 
         // Test read access
-        std::fs::read_dir(root_path).map_err(|e| IngestionError::PermissionDenied {
+        std::fs::read_dir(root_path).map_err(|_e| IngestionError::PermissionDenied {
             path: root_path.display().to_string(),
         })?;
 
@@ -252,7 +252,7 @@ impl FolderProcessor {
     /// Process a single file and extract its information
     fn process_file(&self, root_path: &Path, file_path: &Path) -> IngestionResult<FileInfo> {
         // Get file metadata
-        let metadata = std::fs::metadata(file_path).map_err(|e| {
+        let metadata = std::fs::metadata(file_path).map_err(|_e| {
             IngestionError::PermissionDenied {
                 path: file_path.display().to_string(),
             }

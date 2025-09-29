@@ -396,6 +396,7 @@ pub struct QueryResultRow {
 /// Markdown generator for creating Kiro-compatible task files
 pub struct MarkdownGenerator {
     /// Template for task descriptions
+    #[allow(dead_code)]
     task_template: Option<String>,
 }
 

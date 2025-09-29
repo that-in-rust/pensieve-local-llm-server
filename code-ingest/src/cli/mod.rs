@@ -2,11 +2,11 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use crate::help::HelpSystem;
-use crate::error::CodeIngestError;
+
 use crate::config::{Config, ConfigManager, merge_config_with_cli};
-use crate::logging::{LoggingConfig, init_logging, ProgressReporter, PerformanceMetrics, MonitoringContext};
+use crate::logging::MonitoringContext;
 use colored::*;
-use tracing::{info, warn, error, debug, instrument};
+use tracing::{info, error, instrument};
 
 #[derive(Parser)]
 #[command(name = "code-ingest")]
@@ -420,7 +420,7 @@ impl Cli {
         logging_config.progress_reporting = !self.no_progress;
         
         // Try to load additional logging config from file
-        if let Ok(config) = self.load_config() {
+        if let Ok(_config) = self.load_config() {
             // Merge with file-based logging configuration if available
             // This would require extending the Config struct to include logging settings
         }
@@ -1256,7 +1256,7 @@ impl Cli {
         
         // Read and validate result file
         let result_content = tokio::fs::read_to_string(&result_file).await?;
-        let result_size = result_content.len();
+        let _result_size = result_content.len();
         
         if result_content.trim().is_empty() {
             anyhow::bail!("Result file is empty: {}", result_file.display());
@@ -1344,42 +1344,7 @@ impl Cli {
     }
 
     // This method was moved to the end of the impl block to avoid conflicts
-    async fn execute_store_result_old(
-        &self,
-        db_path: Option<PathBuf>,
-        output_table: String,
-        result_file: PathBuf,
-        original_query: String,
-    ) -> Result<()> {
-        // Get storage statistics
-        use crate::database::{Database, ResultStorage};
-        
-        let database = if let Some(path) = db_path {
-            Database::from_path(&path).await?
-        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
-            Database::new(&database_url).await?
-        } else {
-            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
-        };
 
-        let storage = ResultStorage::new(database.pool().clone());
-        
-        match storage.get_storage_stats(&output_table).await {
-            Ok(stats) => {
-                println!("\n📊 Table statistics:");
-                println!("   Total results: {}", stats.total_results);
-                println!("   Average size: {} bytes", stats.avg_result_size_bytes);
-                if let Some(newest) = stats.newest_result {
-                    println!("   Latest result: {}", newest.format("%Y-%m-%d %H:%M:%S UTC"));
-                }
-            }
-            Err(e) => {
-                println!("Note: Could not retrieve table statistics: {}", e);
-            }
-        }
-        
-        Ok(())
-    }
 
     async fn execute_print_to_md(
         &self,
@@ -1705,46 +1670,7 @@ impl Cli {
         Ok(())
     }
 
-    /// Create a basic task structure for IDE integration
-    fn create_basic_task_structure(&self, query: &str, temp_path: &PathBuf, output_table: &str) -> String {
-        format!(
-            r#"# Analysis Tasks
 
-## Query Information
-- **Query**: `{}`
-- **Data Source**: {}
-- **Output Table**: {}
-- **Generated**: {}
-
-## Tasks
-
-- [ ] 1. Review query results
-  - Open and examine the temporary file: {}
-  - Understand the data structure and content
-  - Identify key patterns or areas of interest
-
-- [ ] 2. Perform analysis
-  - Apply your analysis methodology to the data
-  - Document findings and insights
-  - Prepare structured results
-
-- [ ] 3. Store results
-  - Save analysis results to a file
-  - Use: `code-ingest store-result --output-table {} --result-file <your_result_file> --original-query "{}"`
-
-## Notes
-
-This is a basic task structure. For more sophisticated task generation with automatic division and detailed prompts, use the `generate-tasks` command.
-"#,
-            query,
-            temp_path.display(),
-            output_table,
-            chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC"),
-            temp_path.display(),
-            output_table,
-            query
-        )
-    }
 
     async fn execute_cleanup_tables(&self, db_path: Option<PathBuf>, keep: usize, confirm: bool) -> Result<()> {
         use crate::database::{Database, DatabaseExplorer};
@@ -1959,63 +1885,7 @@ This is a basic task structure. For more sophisticated task generation with auto
         Ok(())
     }
 
-    /// Create a basic task structure for simple query-prepare operations (legacy method)
-    fn create_basic_task_structure_legacy(&self, query: &str, temp_path: &PathBuf, output_table: &str) -> String {
-        format!(
-            r#"# Analysis Tasks
 
-## Query Preparation Results
-
-**Query**: `{}`
-**Temporary File**: `{}`
-**Output Table**: `{}`
-**Generated**: {}
-
-## Tasks
-
-- [ ] 1. Review query results
-  - Open the temporary file and examine the data structure
-  - Understand the format and content organization
-  - Identify key patterns or areas of focus
-
-- [ ] 2. Perform analysis
-  - Apply your analysis methodology to the data
-  - Document findings and insights
-  - Prepare structured results
-
-- [ ] 3. Store results
-  - Format your analysis results appropriately
-  - Use the store-result command to persist findings
-  - Verify results are properly stored in the output table
-
-## Commands
-
-```bash
-# View the temporary file
-cat "{}"
-
-# Store analysis results (replace with your actual result file)
-code-ingest store-result \
-  --output-table {} \
-  --result-file /path/to/your/analysis_result.txt \
-  --original-query "{}"
-```
-
-## Notes
-
-- The temporary file contains query results in LLM-friendly format
-- Complete tasks in order for systematic analysis
-- Store results using the provided commands for traceability
-"#,
-            query,
-            temp_path.display(),
-            output_table,
-            chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC"),
-            temp_path.display(),
-            output_table,
-            query
-        )
-    }
 
     /// Create a comprehensive task structure for query-prepare operations
     fn create_comprehensive_task_structure(&self, query: &str, temp_path: &PathBuf, output_table: &str, row_count: usize) -> String {
@@ -2231,7 +2101,7 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
     /// Detect analysis type from result content and original query
     fn detect_analysis_type_from_content(&self, content: &str, query: &str) -> String {
         let content_lower = content.to_lowercase();
-        let query_lower = query.to_lowercase();
+        let _query_lower = query.to_lowercase();
         
         // Check content for analysis type indicators
         if content_lower.contains("security") || content_lower.contains("vulnerability") || content_lower.contains("exploit") {
@@ -2274,53 +2144,7 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         Ok(())
     }
 
-    /// Enhanced error handling with user-friendly messages
-    fn handle_error(&self, error: anyhow::Error) {
-        // Try to downcast to CodeIngestError for better error messages
-        if let Some(code_ingest_error) = error.downcast_ref::<CodeIngestError>() {
-            eprintln!("{}", format!("❌ {}", code_ingest_error).red());
-            println!();
-            
-            // Show contextual suggestions
-            let suggestions = HelpSystem::suggest_next_steps(code_ingest_error);
-            if !suggestions.is_empty() {
-                println!("{}", "💡 Suggestions:".bright_yellow().bold());
-                for suggestion in suggestions {
-                    println!("   • {}", suggestion.yellow());
-                }
-                println!();
-            }
-            
-            // Show relevant help commands
-            match code_ingest_error {
-                CodeIngestError::Database { .. } | CodeIngestError::DatabaseConnection { .. } => {
-                    println!("{}", "🔧 For PostgreSQL help:".bright_blue().bold());
-                    println!("   code-ingest pg-start");
-                }
-                CodeIngestError::Configuration { .. } => {
-                    println!("{}", "📚 For setup help:".bright_blue().bold());
-                    println!("   code-ingest setup");
-                    println!("   code-ingest examples");
-                }
-                CodeIngestError::Git { .. } => {
-                    println!("{}", "🔍 For troubleshooting:".bright_blue().bold());
-                    println!("   code-ingest troubleshoot");
-                }
-                _ => {
-                    println!("{}", "❓ For general help:".bright_blue().bold());
-                    println!("   code-ingest --help");
-                    println!("   code-ingest troubleshoot");
-                }
-            }
-        } else {
-            // Fallback for other error types
-            eprintln!("{}", format!("❌ Error: {}", error).red());
-            println!();
-            println!("{}", "💡 For help:".bright_yellow().bold());
-            println!("   code-ingest --help");
-            println!("   code-ingest troubleshoot");
-        }
-    }
+
 
     /// Execute count-rows command
     async fn execute_count_rows(&self, table_name: String, db_path: Option<PathBuf>) -> Result<()> {
@@ -2777,7 +2601,7 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
             progress.set_message("Creating chunked table...");
             progress.set_position(20);
             
-            use crate::processing::{ChunkDatabaseManager, ChunkDatabaseConfig};
+            use crate::processing::ChunkDatabaseManager;
             let chunk_manager = ChunkDatabaseManager::with_pool(database.pool().clone());
             let chunk_result = chunk_manager.process_table_with_chunking(&table_name, chunk_size).await?;
             

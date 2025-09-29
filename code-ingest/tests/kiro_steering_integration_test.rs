@@ -4,8 +4,9 @@
 //! and ensures the generated tasks work correctly with the analysis framework.
 
 use code_ingest::database::Database;
-use code_ingest::ingestion::{IngestionEngine, IngestionConfig, IngestionSource};
-use code_ingest::tasks::{TaskGenerator, TaskGeneratorConfig, HierarchicalTaskGenerator};
+use code_ingest::ingestion::{IngestionEngine, IngestionConfig};
+use code_ingest::ingestion::providers::IngestionSource;
+use code_ingest::tasks::{HierarchicalTaskGenerator, GenerationConfig};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::TempDir;

@@ -4,10 +4,10 @@
 //! chunked table population, batch insertion, and size threshold checking.
 
 use crate::database::schema::SchemaManager;
-use crate::error::{DatabaseResult, ProcessingError, ProcessingResult};
-use crate::processing::chunking::{ChunkData, ChunkContext, ChunkingEngine, ChunkingResult};
+use crate::error::{ProcessingError, ProcessingResult};
+use crate::processing::chunking::{ChunkData, ChunkContext, ChunkingEngine};
 use sqlx::{PgPool, Row};
-use std::collections::HashMap;
+
 use tracing::{debug, info, warn};
 
 /// Configuration for chunk database operations

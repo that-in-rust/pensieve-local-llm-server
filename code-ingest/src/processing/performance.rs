@@ -127,7 +127,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
 use sysinfo::{System, Pid};
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Performance metrics for monitoring system health
 #[derive(Debug, Clone, Serialize, Deserialize)]

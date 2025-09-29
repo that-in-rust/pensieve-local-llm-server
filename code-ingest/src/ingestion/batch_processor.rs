@@ -1,5 +1,5 @@
 use crate::error::{IngestionError, IngestionResult};
-use crate::processing::{FileProcessor, ProcessedFile, StreamingProcessor, StreamingConfig, StreamingProgress, PerformanceMonitor, PerformanceThresholds, OptimizationRecommendation};
+use crate::processing::{FileProcessor, ProcessedFile, StreamingProcessor, StreamingConfig, StreamingProgress, PerformanceMonitor, PerformanceThresholds};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -369,7 +369,7 @@ impl BatchProcessor {
         let (result_tx, mut result_rx) = mpsc::channel(self.config.batch_size * 2);
 
         // Statistics tracking
-        let stats = Arc::new(std::sync::Mutex::new(BatchStats::default()));
+        let _stats = Arc::new(std::sync::Mutex::new(BatchStats::default()));
         let processed_count = Arc::new(AtomicUsize::new(0));
 
         // Spawn file processing tasks
@@ -655,7 +655,7 @@ impl BatchProcessor {
     pub fn is_under_resource_pressure(&self) -> bool {
         self.performance_monitor
             .as_ref()
-            .map_or(false, |monitor| {
+            .map_or(false, |_monitor| {
                 // For now, return false since we can't await in this context
                 // In a real implementation, this would need to be async
                 false

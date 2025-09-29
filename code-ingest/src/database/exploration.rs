@@ -898,7 +898,7 @@ Status: ✅ Connected and operational"#,
         let column_name = column.name();
 
         // Handle different PostgreSQL types using the actual type info
-        use sqlx::postgres::PgTypeInfo;
+
         use sqlx::TypeInfo;
         
         let type_info = column.type_info();

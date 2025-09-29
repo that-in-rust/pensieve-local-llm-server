@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, info, warn};
 use tokio::sync::{mpsc, Semaphore};
-use tokio_stream::{Stream, StreamExt};
+use tokio_stream::Stream;
 use futures::stream;
 
 /// Configuration for large table processing optimizations
@@ -289,7 +289,7 @@ impl ContentExtractor {
         offset: usize,
         limit: usize,
         semaphore: &Arc<Semaphore>,
-        config: &ProcessingConfig,
+        _config: &ProcessingConfig,
     ) -> TaskResult<Vec<ContentTriple>> {
         // Query batch of rows
         let query = format!(

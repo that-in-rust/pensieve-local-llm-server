@@ -1154,7 +1154,7 @@ impl From<walkdir::Error> for ProcessingError {
 impl From<DatabaseError> for IngestionError {
     fn from(err: DatabaseError) -> Self {
         match err {
-            DatabaseError::ConnectionFailed { url, cause } => IngestionError::NetworkError { cause },
+            DatabaseError::ConnectionFailed { url: _, cause } => IngestionError::NetworkError { cause },
             DatabaseError::QueryFailed { query: _, cause } => IngestionError::NetworkError { cause },
             _ => IngestionError::NetworkError { 
                 cause: format!("Database error: {}", err) 

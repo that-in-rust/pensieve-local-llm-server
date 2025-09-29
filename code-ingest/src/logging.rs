@@ -649,6 +649,7 @@ macro_rules! log_operation_error {
 pub struct BatchLogger {
     operation_name: String,
     batch_size: usize,
+    #[allow(dead_code)]
     total_items: Option<usize>,
     processed_batches: Arc<RwLock<usize>>,
     failed_batches: Arc<RwLock<usize>>,

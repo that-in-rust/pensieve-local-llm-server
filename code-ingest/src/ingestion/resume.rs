@@ -91,6 +91,7 @@ impl Default for IngestionResumeConfig {
 /// Resume manager for handling ingestion interruptions and recovery
 pub struct ResumeManager {
     config: IngestionResumeConfig,
+    #[allow(dead_code)]
     database: Arc<Database>,
 }
 

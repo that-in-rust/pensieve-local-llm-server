@@ -5,7 +5,7 @@
 //! and file cleanup with error handling.
 
 use crate::database::query_executor::{QueryExecutor, QueryConfig};
-use crate::error::{DatabaseError, DatabaseResult};
+
 use anyhow::Result;
 use std::path::{Path, PathBuf};
 use tokio::fs;
