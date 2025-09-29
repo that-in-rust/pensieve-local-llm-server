@@ -115,15 +115,17 @@ impl SimpleTaskGenerator {
         Box::pin(async move {
             let indent = "  ".repeat(depth);
 
-            // Add group as a task if it has an ID
-            if let Some(task_id) = self.extract_task_id(&group.title) {
-                markdown.push_str(&format!("{}* [ ] {}\n", indent, task_id));
+            // Add group as a task using its actual title (cleaned up)
+            let clean_title = self.clean_group_title(&group.title);
+            if !clean_title.is_empty() {
+                markdown.push_str(&format!("{}- [ ] {}\n", indent, clean_title));
             }
 
-            // Add individual tasks
+            // Add individual tasks with their actual IDs and content
             for task in &group.tasks {
                 let task_indent = "  ".repeat(depth + 1);
-                markdown.push_str(&format!("{}* [ ] {}\n", task_indent, task.id));
+                let task_description = self.format_task_description(task);
+                markdown.push_str(&format!("{}- [ ] {}\n", task_indent, task_description));
             }
 
             // Add sub-groups recursively
@@ -140,33 +142,47 @@ impl SimpleTaskGenerator {
         })
     }
 
-    /// Extract task ID from group title
-    fn extract_task_id(&self, title: &str) -> Option<String> {
-        // Look for patterns like "Task Group 1.1.1 (Level 3)" and extract "1.1.1"
-        if title.contains("Task Group") || title.contains("Analysis Group") {
-            // Try to extract the number pattern
-            let parts: Vec<&str> = title.split_whitespace().collect();
-            for part in parts {
-                if part.contains('.') && part.chars().all(|c| c.is_numeric() || c == '.') {
-                    return Some(format!("{}. {}", part, self.generate_task_description(part)));
-                }
-                if part.chars().all(|c| c.is_numeric()) && part.len() <= 3 {
-                    return Some(format!("{}. {}", part, self.generate_task_description(part)));
+    /// Clean up group title to be more readable
+    fn clean_group_title(&self, title: &str) -> String {
+        // Remove common prefixes and suffixes, extract meaningful content
+        let cleaned = title
+            .replace("Task Group ", "")
+            .replace("Analysis Group ", "")
+            .replace(" (Level ", " - Level ")
+            .replace(")", "");
+        
+        // If it's just a number or number pattern, format it nicely
+        if cleaned.chars().all(|c| c.is_numeric() || c == '.' || c == ' ' || c == '-') {
+            let parts: Vec<&str> = cleaned.split(" - ").collect();
+            if let Some(number) = parts.first() {
+                if number.trim().chars().all(|c| c.is_numeric() || c == '.') {
+                    return format!("{}. Task Group {}", number.trim(), number.trim());
                 }
             }
         }
-        None
+        
+        // Return cleaned title or original if cleaning didn't help
+        if cleaned.trim().is_empty() {
+            title.to_string()
+        } else {
+            cleaned
+        }
     }
 
-    /// Generate a simple task description based on the task ID
-    fn generate_task_description(&self, task_id: &str) -> String {
-        let level = task_id.matches('.').count() + 1;
-        match level {
-            1 => format!("Task {}", task_id),
-            2 => format!("Task {}", task_id),
-            3 => format!("Task {}", task_id),
-            4 => format!("Task {}", task_id),
-            _ => format!("Task {}", task_id),
+    /// Format task description using actual task data
+    fn format_task_description(&self, task: &AnalysisTask) -> String {
+        // Use the actual task ID and any meaningful content
+        let base_description = if task.id.is_empty() {
+            format!("Task {}", task.row_number)
+        } else {
+            task.id.clone()
+        };
+        
+        // Add context if available (but keep it concise for Kiro)
+        if !task.table_name.is_empty() && task.row_number > 0 {
+            format!("{}. Analyze {} row {}", base_description, task.table_name, task.row_number)
+        } else {
+            base_description
         }
     }
 }
@@ -219,7 +235,7 @@ mod tests {
         let markdown = generator.generate_simple_markdown(&hierarchy, "TEST_TABLE").await.unwrap();
         
         // Verify simple checkbox format
-        assert!(markdown.contains("* [ ]"));
+        assert!(markdown.contains("- [ ]"));
         assert!(!markdown.contains("# L1-L8 Analysis Tasks")); // Should not contain complex headers
         assert!(!markdown.contains("## Task Generation Metadata")); // Should not contain metadata
         assert!(!markdown.contains("**Content**:")); // Should not contain detailed content info
@@ -229,34 +245,71 @@ mod tests {
         for line in lines {
             if !line.trim().is_empty() {
                 // Each non-empty line should be a checkbox or indented checkbox
-                assert!(line.contains("* [ ]") || line.starts_with("  "));
+                assert!(line.contains("- [ ]") || line.starts_with("  "));
             }
         }
     }
 
     #[test]
-    fn test_extract_task_id() {
+    fn test_clean_group_title() {
         let generator = SimpleTaskGenerator::new();
         
         // Test various title formats
-        assert_eq!(generator.extract_task_id("Task Group 1 (Level 1)"), Some("1. Task 1".to_string()));
-        assert_eq!(generator.extract_task_id("Analysis Group 1.1.1 (Level 3)"), Some("1.1.1. Task 1.1.1".to_string()));
-        assert_eq!(generator.extract_task_id("Task Group 2.3 (Level 2)"), Some("2.3. Task 2.3".to_string()));
+        assert_eq!(generator.clean_group_title("Task Group 1 (Level 1)"), "1. Task Group 1");
+        assert_eq!(generator.clean_group_title("Analysis Group 1.1.1 (Level 3)"), "1.1.1. Task Group 1.1.1");
+        assert_eq!(generator.clean_group_title("Custom Analysis Phase"), "Custom Analysis Phase");
         
-        // Test titles without extractable IDs
-        assert_eq!(generator.extract_task_id("Random Title"), None);
-        assert_eq!(generator.extract_task_id(""), None);
+        // Test edge cases
+        assert_eq!(generator.clean_group_title(""), "");
+        assert_eq!(generator.clean_group_title("Random Title"), "Random Title");
     }
 
     #[test]
-    fn test_generate_task_description() {
+    fn test_format_task_description() {
+        use crate::tasks::hierarchical_task_divider::AnalysisStage;
+        use std::path::PathBuf;
+        
         let generator = SimpleTaskGenerator::new();
         
-        // Test different task ID formats
-        assert_eq!(generator.generate_task_description("1"), "Task 1");
-        assert_eq!(generator.generate_task_description("1.1"), "Task 1.1");
-        assert_eq!(generator.generate_task_description("1.1.1"), "Task 1.1.1");
-        assert_eq!(generator.generate_task_description("1.1.1.1"), "Task 1.1.1.1");
+        // Create a test task
+        let task = AnalysisTask {
+            id: "1.2.3.4".to_string(),
+            table_name: "INGEST_TEST".to_string(),
+            row_number: 42,
+            content_files: crate::tasks::content_extractor::ContentTriple {
+                content_a: PathBuf::from("test_a.txt"),
+                content_b: PathBuf::from("test_b.txt"),
+                content_c: PathBuf::from("test_c.txt"),
+                row_number: 42,
+                table_name: "INGEST_TEST".to_string(),
+            },
+            prompt_file: PathBuf::from("prompt.md"),
+            output_file: PathBuf::from("output.md"),
+            analysis_stages: vec![AnalysisStage::AnalyzeA],
+        };
+        
+        let description = generator.format_task_description(&task);
+        assert_eq!(description, "1.2.3.4. Analyze INGEST_TEST row 42");
+        
+        // Test with empty ID
+        let task_no_id = AnalysisTask {
+            id: "".to_string(),
+            table_name: "TEST_TABLE".to_string(),
+            row_number: 5,
+            content_files: crate::tasks::content_extractor::ContentTriple {
+                content_a: PathBuf::from("test_a.txt"),
+                content_b: PathBuf::from("test_b.txt"),
+                content_c: PathBuf::from("test_c.txt"),
+                row_number: 5,
+                table_name: "TEST_TABLE".to_string(),
+            },
+            prompt_file: PathBuf::from("prompt.md"),
+            output_file: PathBuf::from("output.md"),
+            analysis_stages: vec![AnalysisStage::AnalyzeA],
+        };
+        
+        let description_no_id = generator.format_task_description(&task_no_id);
+        assert_eq!(description_no_id, "Task 5. Analyze TEST_TABLE row 5");
     }
 
     #[tokio::test]
@@ -276,14 +329,14 @@ mod tests {
         let content = tokio::fs::read_to_string(&output_file).await.unwrap();
         
         // Should contain simple checkbox format
-        assert!(content.contains("* [ ]"));
+        assert!(content.contains("- [ ]"));
         assert!(!content.contains("# L1-L8")); // Should not contain complex headers
         
         // Should be parseable by simple markdown parsers
         let lines: Vec<&str> = content.lines().collect();
         for line in lines {
             if !line.trim().is_empty() {
-                assert!(line.contains("* [ ]") || line.starts_with("  "));
+                assert!(line.contains("- [ ]") || line.starts_with("  "));
             }
         }
     }
@@ -305,7 +358,7 @@ mod tests {
         for line in lines {
             // Each line should be a checkbox with proper indentation
             let trimmed = line.trim_start();
-            assert!(trimmed.starts_with("* [ ]"), "Line should start with checkbox: {}", line);
+            assert!(trimmed.starts_with("- [ ]"), "Line should start with checkbox: {}", line);
             
             // Indentation should be multiples of 2 spaces
             let indent_count = line.len() - line.trim_start().len();
