@@ -106,12 +106,15 @@ pub fn init_logging(config: &LoggingConfig) -> Result<(), Box<dyn std::error::Er
                 registry
                     .with(stdout_layer)
                     .with(file_layer)
-                    .init();
+                    .try_init()
+                    .map_err(|e| format!("Failed to initialize logging: {}", e))?;
             } else {
-                registry.with(json_layer).init();
+                registry.with(json_layer).try_init()
+                    .map_err(|e| format!("Failed to initialize logging: {}", e))?;
             }
         } else {
-            registry.with(json_layer).init();
+            registry.with(json_layer).try_init()
+                .map_err(|e| format!("Failed to initialize logging: {}", e))?;
         }
     } else {
         // Human-readable logging
@@ -155,12 +158,15 @@ pub fn init_logging(config: &LoggingConfig) -> Result<(), Box<dyn std::error::Er
                 registry
                     .with(stdout_layer)
                     .with(file_layer)
-                    .init();
+                    .try_init()
+                    .map_err(|e| format!("Failed to initialize logging: {}", e))?;
             } else {
-                registry.with(fmt_layer).init();
+                registry.with(fmt_layer).try_init()
+                    .map_err(|e| format!("Failed to initialize logging: {}", e))?;
             }
         } else {
-            registry.with(fmt_layer).init();
+            registry.with(fmt_layer).try_init()
+                .map_err(|e| format!("Failed to initialize logging: {}", e))?;
         }
     }
 

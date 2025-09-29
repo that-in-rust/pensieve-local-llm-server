@@ -76,7 +76,7 @@
   - Run integration tests to validate end-to-end behavior
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] Fix and make this spic and span by testing it for 1 particular small repo with file level + chunk size 50 + a folder path
+- [-] Fix and make this spic and span by testing it for 1 particular small repo with file level + chunk size 50 + a folder path
     - run tree to find which documents might not be relevant or outdated and move them to zzArchive
     - Create new final documentation - minimalist basis the following actual tests
     - Run the ingestion for https://github.com/BurntSushi/xsv - update READMELongForm20250929.md with exact results and command line reference - - Ingest PG Database to be stored at - /Users/neetipatni/desktop/PensieveDB01 - Result PG database to be stored at -  /Users/neetipatni/desktop/PensieveDB01
@@ -91,7 +91,10 @@
             - run for 3 rows eye ball results - and confirm + update in READMELongForm20250929.md
     - Using Minto Pyramid Principle (essence first and details layer by layer) and twitter.com/amuldotexe 's low drama style, Create a fresh README.md file in root folder
         - Add Mermaid diagrams to make it more readable - use .kiro/MermaidRef20250929.md as a reference on creating the mermaid diagrams
-    - make a commit for v0.2 and label it and push it to origin
+    - Update whatever relevant stuff needs to be updated - be it Makefile or other imp docs
+    - Summarize your whole task and your key learnings using minto pyramdid principle (essence first details layer by layer) in a Journal20250929.md in ./journal 
+    - make a commit for v0.2 and label it and push it to origin thanking the developers of Kiro for such a lovely product
+
 
 
     

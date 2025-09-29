@@ -432,8 +432,7 @@ impl Cli {
     }
 
     pub async fn run(&self) -> Result<()> {
-        // Initialize logging based on CLI arguments
-        self.init_logging()?;
+        // Logging is initialized in main.rs
         
         match &self.command {
             Some(command) => self.execute_command(command).await,

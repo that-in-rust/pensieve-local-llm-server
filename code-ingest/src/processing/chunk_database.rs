@@ -173,7 +173,7 @@ impl ChunkDatabaseManager {
         let query = format!(
             r#"
             SELECT 
-                COALESCE(file_id::text, id::text) as file_id,
+                file_id::text as file_id,
                 filepath,
                 filename,
                 extension,

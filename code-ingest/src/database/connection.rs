@@ -297,13 +297,12 @@ impl Database {
             .after_connect(|conn, _meta| {
                 Box::pin(async move {
                     // Optimize PostgreSQL connection settings for bulk operations
+                    // Only set session-level parameters that don't require server restart
                     sqlx::query("SET synchronous_commit = off").execute(&mut *conn).await?;
-                    sqlx::query("SET wal_buffers = '16MB'").execute(&mut *conn).await?;
-                    sqlx::query("SET checkpoint_completion_target = 0.9").execute(&mut *conn).await?;
-                    sqlx::query("SET shared_buffers = '256MB'").execute(&mut *conn).await?;
-                    sqlx::query("SET effective_cache_size = '1GB'").execute(&mut *conn).await?;
                     sqlx::query("SET work_mem = '64MB'").execute(&mut *conn).await?;
                     sqlx::query("SET maintenance_work_mem = '256MB'").execute(&mut *conn).await?;
+                    sqlx::query("SET temp_buffers = '32MB'").execute(&mut *conn).await?;
+                    sqlx::query("SET random_page_cost = 1.1").execute(&mut *conn).await?;
                     Ok(())
                 })
             });

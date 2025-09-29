@@ -475,15 +475,28 @@ impl ContentExtractor {
         // Validate table name
         self.validate_table_name(table_name)?;
 
-        // Query all rows from the table
-        let query = format!(
-            "SELECT file_id, filepath, filename, extension, file_size_bytes, 
-                    line_count, word_count, content_text, file_type, 
-                    relative_path, absolute_path 
-             FROM \"{}\" 
-             ORDER BY file_id",
-            table_name
-        );
+        // Query all rows from the table - handle both regular and chunked tables
+        let query = if table_name.contains("_") && table_name.split('_').last().unwrap_or("").parse::<u32>().is_ok() {
+            // This appears to be a chunked table (ends with _<number>)
+            format!(
+                "SELECT file_id, filepath, filename, extension, 
+                        line_count, 0 as word_count, content as content_text, 'direct_text' as file_type, 
+                        filepath as relative_path, filepath as absolute_path 
+                 FROM \"{}\" 
+                 ORDER BY file_id, chunk_number",
+                table_name
+            )
+        } else {
+            // Regular ingestion table
+            format!(
+                "SELECT file_id, filepath, filename, extension, file_size_bytes, 
+                        line_count, word_count, content_text, file_type, 
+                        relative_path, absolute_path 
+                 FROM \"{}\" 
+                 ORDER BY file_id",
+                table_name
+            )
+        };
 
         debug!("Executing query: {}", query);
 
@@ -1218,9 +1231,9 @@ impl ContentExtractor {
             filepath: row.try_get("filepath").ok(),
             filename: row.try_get("filename").ok(),
             extension: row.try_get("extension").ok(),
-            file_size_bytes: row.try_get("file_size_bytes").ok(),
+            file_size_bytes: row.try_get("file_size_bytes").ok().or_else(|| Some(0)), // Default to 0 for chunked tables
             line_count: row.try_get("line_count").ok(),
-            word_count: row.try_get("word_count").ok(),
+            word_count: row.try_get("word_count").ok().or_else(|| Some(0)), // Default to 0 for chunked tables
             content_text: row.try_get("content_text").ok(),
             file_type: row.try_get("file_type").ok(),
             relative_path: row.try_get("relative_path").ok(),
