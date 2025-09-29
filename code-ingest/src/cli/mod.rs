@@ -305,16 +305,16 @@ pub enum Commands {
     /// 
     /// Creates structured markdown files with hierarchical task numbering for systematic
     /// codebase analysis. Supports both basic file-level analysis and advanced chunked
-    /// processing for large files.
+    /// processing for large files. Automatically limits task count to prevent Kiro IDE overload.
     /// 
     /// Examples:
-    ///   # Basic hierarchical task generation
+    ///   # Basic hierarchical task generation (limited to 50 tasks)
     ///   code-ingest generate-hierarchical-tasks INGEST_20250928101039 \
     ///     --levels 4 --groups 7 --output tasks.md --db-path /path/to/db
     ///   
-    ///   # Chunked analysis for large files
+    ///   # Chunked analysis with custom task limit
     ///   code-ingest generate-hierarchical-tasks INGEST_20250928101039 \
-    ///     --chunks 500 --levels 4 --groups 7 --output tasks.md \
+    ///     --chunks 500 --levels 4 --groups 7 --max-tasks 20 --output tasks.md \
     ///     --prompt-file custom_prompt.md --db-path /path/to/db
     GenerateHierarchicalTasks {
         /// Database table name containing ingested code data
@@ -342,9 +342,59 @@ pub enum Commands {
         #[arg(long, help = "Split large files into chunks of specified LOC (50-10000)")]
         chunks: Option<usize>,
         
+        /// Maximum number of tasks to generate (prevents Kiro overload)
+        #[arg(long, default_value = "50", help = "Maximum number of tasks to generate (default: 50, prevents Kiro overload)")]
+        max_tasks: usize,
+        
+        /// Enable windowed task system for large task sets
+        #[arg(long, help = "Create windowed task system with master list and current window")]
+        windowed: bool,
+        
         /// Database path (can also be set globally)
         #[arg(long, help = "Path to PostgreSQL database directory")]
         db_path: Option<PathBuf>,
+    },
+
+    /// Advance to the next window in a windowed task system
+    /// 
+    /// Moves the current window to the next set of tasks, archiving the completed window
+    /// and updating progress tracking. Use this after completing all tasks in the current window.
+    /// 
+    /// Example:
+    ///   code-ingest advance-window .kiro/tasks/INGEST_20250929042515/
+    AdvanceWindow {
+        /// Path to the windowed task directory
+        #[arg(help = "Directory containing the windowed task system")]
+        task_dir: PathBuf,
+    },
+
+    /// Show progress for a windowed task system
+    /// 
+    /// Displays current progress, completion percentage, and window information
+    /// for a windowed task system.
+    /// 
+    /// Example:
+    ///   code-ingest task-progress .kiro/tasks/INGEST_20250929042515/
+    TaskProgress {
+        /// Path to the windowed task directory
+        #[arg(help = "Directory containing the windowed task system")]
+        task_dir: PathBuf,
+    },
+
+    /// Reset windowed task system to a specific position
+    /// 
+    /// Resets the current window to start at a specific task number. Useful for
+    /// resuming work from a different position or correcting progress tracking.
+    /// 
+    /// Example:
+    ///   code-ingest reset-window .kiro/tasks/INGEST_20250929042515/ --to 101
+    ResetWindow {
+        /// Path to the windowed task directory
+        #[arg(help = "Directory containing the windowed task system")]
+        task_dir: PathBuf,
+        /// Task number to reset to (1-based)
+        #[arg(long, help = "Task number to reset the current window to")]
+        to: usize,
     },
 }
 
@@ -588,6 +638,8 @@ impl Cli {
                 output, 
                 prompt_file, 
                 chunks,
+                max_tasks,
+                windowed,
                 db_path 
             } => {
                 let db_path = db_path.clone().or_else(|| self.db_path.clone());
@@ -598,8 +650,19 @@ impl Cli {
                     output.clone(),
                     prompt_file.clone(),
                     *chunks,
+                    *max_tasks,
+                    *windowed,
                     db_path,
                 ).await
+            }
+            Commands::AdvanceWindow { task_dir } => {
+                self.execute_advance_window(task_dir.clone()).await
+            }
+            Commands::TaskProgress { task_dir } => {
+                self.execute_task_progress(task_dir.clone()).await
+            }
+            Commands::ResetWindow { task_dir, to } => {
+                self.execute_reset_window(task_dir.clone(), *to).await
             }
         }
     }
@@ -2528,6 +2591,8 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         output: PathBuf,
         prompt_file: PathBuf,
         chunks: Option<usize>,
+        max_tasks: usize,
+        windowed: bool,
         db_path: Option<PathBuf>,
     ) -> Result<()> {
         // Load configuration and merge with CLI arguments
@@ -2632,23 +2697,79 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         let task_divider = HierarchicalTaskDivider::new(merged_config.levels, merged_config.groups)?;
         let hierarchy = task_divider.create_hierarchy(content_triples.clone())?;
         
-        // Step 4: Generate markdown
-        progress.set_message("Generating markdown file...");
+        // Step 4: Generate markdown or windowed system
+        progress.set_message("Generating task system...");
         progress.set_position(80);
         
-        let markdown_generator = SimpleTaskGenerator::new();
-        let markdown_content = markdown_generator.generate_simple_markdown(&hierarchy, &working_table_name).await?;
-        
-        // Step 5: Write output file
-        progress.set_message("Writing output file...");
-        progress.set_position(90);
-        
-        // Ensure parent directory exists
-        if let Some(parent) = output.parent() {
-            tokio::fs::create_dir_all(parent).await?;
+        if windowed && hierarchy.total_tasks > max_tasks {
+            // Create windowed task system
+            use crate::tasks::{WindowedTaskManager, WindowedTaskConfig};
+            
+            let task_dir = if output.is_dir() {
+                output.clone()
+            } else {
+                output.parent().unwrap_or_else(|| std::path::Path::new(".")).join(format!("{}_windowed", working_table_name))
+            };
+            
+            let config = WindowedTaskConfig {
+                task_dir: task_dir.clone(),
+                window_size: max_tasks,
+                table_name: working_table_name.clone(),
+            };
+            
+            let mut windowed_manager = WindowedTaskManager::new(config, hierarchy.total_tasks).await?;
+            windowed_manager.generate_from_hierarchy(&hierarchy).await?;
+            
+            progress.set_message("Windowed system created!");
+            progress.set_position(100);
+            progress.finish_with_message("✅ Windowed task system generated!");
+            
+            // Display windowed results
+            println!();
+            println!("📊 Windowed System Summary:");
+            println!("   Table: {}", table_name);
+            println!("   Total Tasks: {}", hierarchy.total_tasks);
+            println!("   Window Size: {}", max_tasks);
+            println!("   Total Windows: {}", (hierarchy.total_tasks + max_tasks - 1) / max_tasks);
+            println!("   Task Directory: {}", task_dir.display());
+            println!();
+            println!("🎯 Next Steps:");
+            println!("   1. Work on current window: kiro {}/current-window.md", task_dir.display());
+            println!("   2. When done, advance window: code-ingest advance-window {}", task_dir.display());
+            println!("   3. Check progress: code-ingest task-progress {}", task_dir.display());
+            
+        } else {
+            // Create regular single-file system
+            let markdown_generator = SimpleTaskGenerator::with_max_tasks(max_tasks);
+            let markdown_content = markdown_generator.generate_simple_markdown(&hierarchy, &working_table_name).await?;
+            
+            // Step 5: Write output file
+            progress.set_message("Writing output file...");
+            progress.set_position(90);
+            
+            // Ensure parent directory exists
+            if let Some(parent) = output.parent() {
+                tokio::fs::create_dir_all(parent).await?;
+            }
+            
+            tokio::fs::write(&output, markdown_content).await?;
+            
+            progress.set_message("Complete!");
+            progress.set_position(100);
+            progress.finish_with_message("✅ Hierarchical tasks generated!");
+            
+            // Display regular results
+            println!();
+            println!("📊 Generation Summary:");
+            println!("   Table: {}", table_name);
+            println!("   Total Tasks: {}", hierarchy.total_tasks);
+            println!("   Tasks Generated: {}", std::cmp::min(hierarchy.total_tasks, max_tasks));
+            println!("   Output File: {}", output.display());
+            
+            if hierarchy.total_tasks > max_tasks {
+                println!("   ⚠️  Note: Limited to {} tasks (use --windowed for complete coverage)", max_tasks);
+            }
         }
-        
-        tokio::fs::write(&output, markdown_content).await?;
         
         progress.set_message("Complete!");
         progress.set_position(100);

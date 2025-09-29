@@ -14,6 +14,7 @@ pub mod models;
 pub mod output_directory_manager;
 pub mod simple_task_generator;
 pub mod task_structure_builder;
+pub mod windowed_task_manager;
 
 pub use database_query_engine::{DatabaseQueryEngine, TableValidation, DatabaseConnectionStats};
 pub use content_extractor::{ContentExtractor, ContentTriple, RowMetadata};
@@ -36,6 +37,10 @@ pub use task_structure_builder::{
     RelationshipType, TaskStructure as EnhancedTaskStructure, TaskStructureMetadata, TaskStructureStatistics
 };
 pub use markdown_writer::{MarkdownWriter, MarkdownConfig, MarkdownUtils};
+pub use windowed_task_manager::{
+    WindowedTaskManager, WindowedTaskConfig, TaskProgress, WindowInfo, WindowStatus,
+    MasterTaskEntry, TaskStatus
+};
 
 // Re-export the new core data models
 pub use models::{

@@ -11,12 +11,44 @@ use tracing::{debug, info};
 
 /// Simple task generator for creating Kiro-compatible task files
 #[derive(Clone, Debug)]
-pub struct SimpleTaskGenerator;
+pub struct SimpleTaskGenerator {
+    /// Maximum number of tasks to generate (prevents Kiro overload)
+    max_tasks: Option<usize>,
+    /// Number of tasks to skip (for pagination)
+    offset: usize,
+}
 
 impl SimpleTaskGenerator {
-    /// Create a new SimpleTaskGenerator
+    /// Create a new SimpleTaskGenerator with default settings
     pub fn new() -> Self {
-        Self
+        Self {
+            max_tasks: Some(50), // Default limit to prevent Kiro overload
+            offset: 0,
+        }
+    }
+
+    /// Create a SimpleTaskGenerator with no task limit
+    pub fn unlimited() -> Self {
+        Self {
+            max_tasks: None,
+            offset: 0,
+        }
+    }
+
+    /// Create a SimpleTaskGenerator with a specific task limit
+    pub fn with_max_tasks(max_tasks: usize) -> Self {
+        Self {
+            max_tasks: Some(max_tasks),
+            offset: 0,
+        }
+    }
+
+    /// Create a SimpleTaskGenerator with offset and limit for pagination
+    pub fn with_offset_and_limit(offset: usize, max_tasks: usize) -> Self {
+        Self {
+            max_tasks: Some(max_tasks),
+            offset,
+        }
     }
 
     /// Generate simple checkbox markdown for a complete task structure
@@ -96,41 +128,114 @@ impl SimpleTaskGenerator {
         hierarchy: &TaskHierarchy,
         _depth: usize,
     ) -> TaskResult<()> {
-        // Process each level
-        for level in &hierarchy.levels {
+        let mut task_count = 0;
+        let mut tasks_processed = 0;
+        
+        // Add pagination info if using offset
+        if self.offset > 0 {
+            let end_task = self.offset + self.max_tasks.unwrap_or(50);
+            markdown.push_str(&format!("<!-- Batch: Tasks {}-{} of {} total -->\n\n", 
+                self.offset + 1, 
+                std::cmp::min(end_task, hierarchy.total_tasks),
+                hierarchy.total_tasks
+            ));
+        }
+        
+        // Process each level, respecting offset and limits
+        'outer: for level in &hierarchy.levels {
             for group in &level.groups {
-                self.add_group_tasks(markdown, group, 0).await?;
+                // Check if we've processed enough tasks to reach our offset
+                if tasks_processed < self.offset {
+                    let group_task_count = self.count_tasks_in_group(group);
+                    if tasks_processed + group_task_count <= self.offset {
+                        tasks_processed += group_task_count;
+                        continue; // Skip this entire group
+                    }
+                }
+                
+                // Check if we've hit the max limit
+                if let Some(max) = self.max_tasks {
+                    if task_count >= max {
+                        // Add a note about pagination
+                        let next_offset = self.offset + max;
+                        if next_offset < hierarchy.total_tasks {
+                            markdown.push_str(&format!("\n<!-- Next batch starts at task {} -->\n", next_offset + 1));
+                        }
+                        break 'outer;
+                    }
+                }
+                
+                let tasks_added = self.add_group_tasks_with_offset_and_limit(
+                    markdown, group, 0, &mut task_count, &mut tasks_processed
+                ).await?;
+                
+                if tasks_added == 0 && self.max_tasks.is_some() {
+                    break 'outer; // Hit the limit
+                }
             }
         }
         Ok(())
     }
 
-    /// Add a hierarchical group to markdown recursively
-    fn add_group_tasks<'a>(
+    /// Add a hierarchical group to markdown recursively with task counting
+    fn add_group_tasks_with_limit<'a>(
         &'a self,
         markdown: &'a mut String,
         group: &'a HierarchicalTaskGroup,
         depth: usize,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = TaskResult<()>> + 'a>> {
+        task_count: &'a mut usize,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = TaskResult<usize>> + 'a>> {
         Box::pin(async move {
             let indent = "  ".repeat(depth);
+            let mut tasks_added = 0;
+
+            // Check if we've hit the limit
+            if let Some(max) = self.max_tasks {
+                if *task_count >= max {
+                    return Ok(0);
+                }
+            }
 
             // Add group as a task using its actual title (cleaned up)
             let clean_title = self.clean_group_title(&group.title);
             if !clean_title.is_empty() {
                 markdown.push_str(&format!("{}- [ ] {}\n", indent, clean_title));
+                *task_count += 1;
+                tasks_added += 1;
+                
+                // Check limit after adding group task
+                if let Some(max) = self.max_tasks {
+                    if *task_count >= max {
+                        return Ok(tasks_added);
+                    }
+                }
             }
 
             // Add individual tasks with their actual IDs and content
             for task in &group.tasks {
+                if let Some(max) = self.max_tasks {
+                    if *task_count >= max {
+                        break;
+                    }
+                }
+                
                 let task_indent = "  ".repeat(depth + 1);
                 let task_description = self.format_task_description(task);
                 markdown.push_str(&format!("{}- [ ] {}\n", task_indent, task_description));
+                *task_count += 1;
+                tasks_added += 1;
             }
 
             // Add sub-groups recursively
             for sub_group in &group.sub_groups {
-                self.add_group_tasks(markdown, sub_group, depth + 1).await?;
+                if let Some(max) = self.max_tasks {
+                    if *task_count >= max {
+                        break;
+                    }
+                }
+                
+                let sub_tasks_added = self.add_group_tasks_with_limit(markdown, sub_group, depth + 1, task_count).await?;
+                tasks_added += sub_tasks_added;
             }
 
             // Add spacing after root-level groups
@@ -138,7 +243,7 @@ impl SimpleTaskGenerator {
                 markdown.push('\n');
             }
 
-            Ok(())
+            Ok(tasks_added)
         })
     }
 
