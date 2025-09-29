@@ -1,5 +1,7 @@
 # Special case
 .raw_data_202509
+rawDataWillBeDeleted
+
 
 # Compiled files
 /target/
