@@ -117,6 +117,7 @@ impl BinaryProcessor {
             absolute_path,
             skipped: true, // Mark as skipped since we don't extract content
             skip_reason,
+            metadata: std::collections::HashMap::new(),
         })
     }
 }

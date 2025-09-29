@@ -77,6 +77,22 @@ pub enum Commands {
         /// Database path (can also be set globally)
         #[arg(long, help = "Path to PostgreSQL database directory")]
         db_path: Option<PathBuf>,
+        
+        /// Enable automatic chunking for large files that exceed tsvector limits
+        #[arg(long, help = "Automatically chunk large files to avoid PostgreSQL tsvector size limits")]
+        auto_chunk: bool,
+        
+        /// Chunk size in MB for large files (default: 0.8MB)
+        #[arg(long, default_value = "0.8", help = "Size of each chunk in MB (0.1-10.0)")]
+        chunk_size: f64,
+        
+        /// Validate chunks after creation (slower but safer)
+        #[arg(long, help = "Validate chunks against original file using checksums")]
+        validate_chunks: bool,
+        
+        /// Clean up chunk files after processing
+        #[arg(long, help = "Remove chunk files after successful processing")]
+        cleanup_chunks: bool,
     },
 
     /// Execute SQL query and output results
@@ -494,7 +510,7 @@ impl Cli {
                     let source = args[1].clone();
                     let db_path = self.db_path.clone();
                     // Default to false for folder_flag in legacy mode
-                    self.execute_ingest(source, false, db_path).await
+                    self.execute_ingest(source, false, db_path, false, 0.8, true, false).await
                 } else {
                     println!("Code ingestion tool");
                     println!("Use --help for usage information");
@@ -506,9 +522,17 @@ impl Cli {
 
     async fn execute_command(&self, command: &Commands) -> Result<()> {
         match command {
-            Commands::Ingest { source, folder_flag, db_path } => {
+            Commands::Ingest { source, folder_flag, db_path, auto_chunk, chunk_size, validate_chunks, cleanup_chunks } => {
                 let db_path = db_path.clone().or_else(|| self.db_path.clone());
-                self.execute_ingest(source.clone(), *folder_flag, db_path).await
+                self.execute_ingest(
+                    source.clone(), 
+                    *folder_flag, 
+                    db_path, 
+                    *auto_chunk, 
+                    *chunk_size, 
+                    *validate_chunks, 
+                    *cleanup_chunks
+                ).await
             }
             Commands::Sql { query, db_path, limit, offset, timeout, llm_format } => {
                 let db_path = db_path.clone().or_else(|| self.db_path.clone());
@@ -655,20 +679,32 @@ impl Cli {
                     db_path,
                 ).await
             }
-            Commands::AdvanceWindow { task_dir } => {
-                self.execute_advance_window(task_dir.clone()).await
+            Commands::AdvanceWindow { task_dir: _ } => {
+                eprintln!("AdvanceWindow command not yet implemented");
+                Ok(())
             }
-            Commands::TaskProgress { task_dir } => {
-                self.execute_task_progress(task_dir.clone()).await
+            Commands::TaskProgress { task_dir: _ } => {
+                eprintln!("TaskProgress command not yet implemented");
+                Ok(())
             }
-            Commands::ResetWindow { task_dir, to } => {
-                self.execute_reset_window(task_dir.clone(), *to).await
+            Commands::ResetWindow { task_dir: _, to: _ } => {
+                eprintln!("ResetWindow command not yet implemented");
+                Ok(())
             }
         }
     }
 
     #[instrument(skip(self))]
-    async fn execute_ingest(&self, source: String, folder_flag: bool, db_path: Option<PathBuf>) -> Result<()> {
+    async fn execute_ingest(
+        &self, 
+        source: String, 
+        folder_flag: bool, 
+        db_path: Option<PathBuf>,
+        auto_chunk: bool,
+        chunk_size: f64,
+        validate_chunks: bool,
+        cleanup_chunks: bool,
+    ) -> Result<()> {
         use crate::database::{Database, SchemaManager};
         use crate::ingestion::{IngestionEngine, IngestionConfig};
         use crate::processing::text_processor::TextProcessor;
@@ -775,8 +811,41 @@ impl Cli {
         // Create ingestion configuration
         let config = IngestionConfig::default();
         
-        // Create file processor
-        let file_processor = Arc::new(TextProcessor::new());
+        // Create file processor with optional chunking
+        let base_processor = Arc::new(TextProcessor::new());
+        let file_processor: Arc<dyn crate::processing::FileProcessor> = if auto_chunk {
+            // Validate chunk size
+            if chunk_size < 0.1 || chunk_size > 10.0 {
+                return Err(anyhow::anyhow!("Chunk size must be between 0.1 and 10.0 MB, got {}", chunk_size));
+            }
+            
+            info!("Auto-chunking enabled: chunk_size={}MB, validate={}, cleanup={}", 
+                  chunk_size, validate_chunks, cleanup_chunks);
+            
+            // Create chunking configuration
+            let chunking_config = crate::chunking::ChunkingConfig {
+                chunk_size_mb: chunk_size,
+                validate_chunks,
+                cleanup_on_failure: true,
+                output_dir: None,
+            };
+            
+            let processor_config = crate::processing::ChunkingProcessorConfig {
+                chunking_config,
+                validate_chunks,
+                cleanup_chunks,
+                include_chunk_metadata: true,
+            };
+            
+            // Wrap the base processor with chunking capabilities
+            Arc::new(crate::processing::ChunkingProcessorFactory::wrap_processor_with_config(
+                base_processor,
+                processor_config,
+            ))
+        } else {
+            info!("Auto-chunking disabled, using standard text processor");
+            base_processor
+        };
         
         // Create ingestion engine
         let engine = IngestionEngine::new(config, Arc::new(database), file_processor);

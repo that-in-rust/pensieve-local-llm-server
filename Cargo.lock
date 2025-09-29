@@ -414,6 +414,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "txt-sectumsempra",
  "url",
  "uuid",
  "walkdir",
@@ -2891,6 +2892,15 @@ dependencies = [
  "tracing-core",
  "tracing-log",
  "tracing-serde",
+]
+
+[[package]]
+name = "txt-sectumsempra"
+version = "0.1.0"
+source = "git+https://github.com/that-in-rust/txt-sectumsempra.git#8e872f0bf8de5ed18c69846a5db6262d48b70df9"
+dependencies = [
+ "clap",
+ "sha2",
 ]
 
 [[package]]

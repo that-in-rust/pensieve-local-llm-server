@@ -2,6 +2,7 @@ pub mod classifier;
 pub mod text_processor;
 pub mod converter;
 pub mod binary_processor;
+pub mod chunking_processor;
 pub mod pipeline;
 pub mod streaming;
 pub mod performance;
@@ -14,6 +15,7 @@ pub use classifier::{FileClassifier};
 pub use text_processor::{TextProcessor, TextProcessorConfig};
 pub use converter::{Converter, ConverterConfig};
 pub use binary_processor::{BinaryProcessor, BinaryProcessorConfig};
+pub use chunking_processor::{ChunkingProcessor, ChunkingProcessorConfig, ChunkingProcessorFactory};
 pub use pipeline::{ContentExtractionPipeline, PipelineConfig, ProcessingStats};
 pub use streaming::{StreamingProcessor, StreamingConfig, StreamingProgress, StreamingStats};
 pub use performance::{PerformanceMonitor, PerformanceMetrics, PerformanceThresholds, PerformanceSummary, ConcurrencyController, LatencyTracker, MemoryPool, BatchSizeController, PerformanceConfig, OptimizationRecommendation};
@@ -22,6 +24,7 @@ pub use chunking::{ChunkingEngine, ChunkingConfig, ChunkData, ChunkMetadata, Chu
 pub use chunk_database::{ChunkDatabaseManager, ChunkDatabaseConfig, ChunkDatabaseResult, ChunkedTableStats, ValidationResult};
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::Path;
 
 /// File type classification based on processing requirements
@@ -73,6 +76,8 @@ pub struct ProcessedFile {
     pub absolute_path: String,
     pub skipped: bool,
     pub skip_reason: Option<String>,
+    /// Additional metadata for the processed file
+    pub metadata: std::collections::HashMap<String, String>,
 }
 
 /// Trait for processing different file types
@@ -129,6 +134,7 @@ mod tests {
             absolute_path: "/home/user/project/src/main.rs".to_string(),
             skipped: false,
             skip_reason: None,
+            metadata: HashMap::new(),
         };
 
         assert_eq!(processed_file.file_type, FileType::DirectText);

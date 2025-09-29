@@ -301,6 +301,7 @@ impl TextProcessor {
             absolute_path,
             skipped: false,
             skip_reason: None,
+            metadata: std::collections::HashMap::new(),
         })
     }
 }

@@ -177,6 +177,106 @@ impl SimpleTaskGenerator {
         Ok(())
     }
 
+    /// Count total tasks in a group (including sub-groups)
+    fn count_tasks_in_group(&self, group: &HierarchicalTaskGroup) -> usize {
+        let mut count = 0;
+        
+        // Count the group itself as a task if it has a meaningful title
+        let clean_title = self.clean_group_title(&group.title);
+        if !clean_title.is_empty() {
+            count += 1;
+        }
+        
+        // Count individual tasks
+        count += group.tasks.len();
+        
+        // Count tasks in sub-groups recursively
+        for sub_group in &group.sub_groups {
+            count += self.count_tasks_in_group(sub_group);
+        }
+        
+        count
+    }
+
+    /// Add group tasks with offset and limit support
+    fn add_group_tasks_with_offset_and_limit<'a>(
+        &'a self,
+        markdown: &'a mut String,
+        group: &'a HierarchicalTaskGroup,
+        depth: usize,
+        task_count: &'a mut usize,
+        tasks_processed: &'a mut usize,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = TaskResult<usize>> + 'a>> {
+        Box::pin(async move {
+        let indent = "  ".repeat(depth);
+        let mut tasks_added = 0;
+
+        // Check if we've hit the limit
+        if let Some(max) = self.max_tasks {
+            if *task_count >= max {
+                return Ok(0);
+            }
+        }
+
+        // Handle group as a task
+        let clean_title = self.clean_group_title(&group.title);
+        if !clean_title.is_empty() {
+            if *tasks_processed >= self.offset {
+                markdown.push_str(&format!("{}- [ ] {}\n", indent, clean_title));
+                *task_count += 1;
+                tasks_added += 1;
+                
+                // Check limit after adding group task
+                if let Some(max) = self.max_tasks {
+                    if *task_count >= max {
+                        return Ok(tasks_added);
+                    }
+                }
+            }
+            *tasks_processed += 1;
+        }
+
+        // Handle individual tasks
+        for task in &group.tasks {
+            if let Some(max) = self.max_tasks {
+                if *task_count >= max {
+                    break;
+                }
+            }
+            
+            if *tasks_processed >= self.offset {
+                let task_indent = "  ".repeat(depth + 1);
+                let task_description = self.format_task_description(task);
+                markdown.push_str(&format!("{}- [ ] {}\n", task_indent, task_description));
+                *task_count += 1;
+                tasks_added += 1;
+            }
+            *tasks_processed += 1;
+        }
+
+        // Handle sub-groups recursively
+        for sub_group in &group.sub_groups {
+            if let Some(max) = self.max_tasks {
+                if *task_count >= max {
+                    break;
+                }
+            }
+            
+            let sub_tasks_added = self.add_group_tasks_with_offset_and_limit(
+                markdown, sub_group, depth + 1, task_count, tasks_processed
+            ).await?;
+            tasks_added += sub_tasks_added;
+        }
+
+        // Add spacing after root-level groups
+        if depth == 0 && tasks_added > 0 {
+            markdown.push('\n');
+        }
+
+        Ok(tasks_added)
+        })
+    }
+
     /// Add a hierarchical group to markdown recursively with task counting
     fn add_group_tasks_with_limit<'a>(
         &'a self,

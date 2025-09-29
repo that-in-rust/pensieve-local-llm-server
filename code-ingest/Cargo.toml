@@ -83,6 +83,9 @@ async-trait = "0.1"
 # Cryptographic hashing
 sha2 = "0.10"
 
+# File chunking for large files
+txt-sectumsempra = { git = "https://github.com/that-in-rust/txt-sectumsempra.git" }
+
 # Streaming support
 futures = "0.3"
 tokio-stream = "0.1"

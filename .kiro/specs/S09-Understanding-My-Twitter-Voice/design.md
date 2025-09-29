@@ -170,3 +170,4 @@ CREATE TABLE VOICE_ANALYSIS_OBSERVATIONS_YYYYMMDDHHMMSS (
 - **Content Preservation**: Verify original tweet content is maintained
 - **Metadata Accuracy**: Check file paths and timestamps are correct
 - **Analysis Completeness**: Ensure all chunks are processed and stored
+- **Markdown Export**: Verify consolidated results are properly formatted and complete
