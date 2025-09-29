@@ -48,6 +48,17 @@ Thumbs.db
 
 # Test artifacts
 standalone_test/target/
+test_*
+!docs/testing/test_*.rs
 
 # Archive folder (for development cleanup)
 zzzzArchive/
+zzArchive/
+
+# Temporary analysis files (keep organized versions in docs/)
+*_analysis.md
+*_strategy.md
+*_design.md
+*_demonstration.md
+*_summary.md
+!docs/analysis/
