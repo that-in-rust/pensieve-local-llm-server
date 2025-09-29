@@ -92,10 +92,10 @@
     - Using Minto Pyramid Principle (essence first and details layer by layer) and twitter.com/amuldotexe 's low drama style, Create a fresh README.md file in root folder
         - Add Mermaid diagrams to make it more readable - use .kiro/MermaidRef20250929.md as a reference on creating the mermaid diagrams
     - Update whatever relevant stuff needs to be updated - be it Makefile or other imp docs
-    - Summarize your whole task and your key learnings using minto pyramdid principle (essence first details layer by layer) in a Journal20250929.md in ./journal 
-    - make a commit for v0.2 and label it and push it to origin thanking the developers of Kiro for such a lovely product
-    - Update README.md Using Minto Pyramid Principle (essence first and details layer by layer) and twitter.com/amuldotexe 's low drama style learning exclusively from READMELongForm20250929.md - make it focused on the user - put Mermaid diagrams using guidance of .kiro/MermaidRef20250929.md
-    - Choose the right label given best practices - update it and push to origin
+    - ✅ Summarize your whole task and your key learnings using minto pyramdid principle (essence first details layer by layer) in a Journal20250929.md in .journal/ 
+    - ✅ make a commit for v0.2 and label it and push it to origin thanking the developers of Kiro for such a lovely product
+    - ✅ Update README.md Using Minto Pyramid Principle (essence first and details layer by layer) and twitter.com/amuldotexe 's low drama style learning exclusively from READMELongForm20250929.md - make it focused on the user - put Mermaid diagrams using guidance of .kiro/MermaidRef20250929.md
+    - ✅ Choose the right label given best practices - update it and push to origin (v0.2.1 - patch release for stability improvements)
 
 
 
