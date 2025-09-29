@@ -223,7 +223,7 @@ impl Default for ConcurrentConfig {
 }
 
 /// Work item for concurrent processing
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct WorkItem {
     file_path: PathBuf,
     priority: u8, // 0 = highest priority
@@ -364,7 +364,7 @@ impl ConcurrentProcessor {
 
         // Spawn monitoring task if enabled
         let monitoring_task = if let Some(monitor) = &self.performance_monitor {
-            let monitor_clone = Arc::clone(monitor);
+            let monitor_clone: Arc<RwLock<PerformanceMonitor>> = Arc::clone(monitor);
             let semaphore_clone = Arc::clone(&semaphore);
             
             Some(tokio::spawn(async move {
@@ -393,9 +393,8 @@ impl ConcurrentProcessor {
 
         // Process work items in batches
         let batch_size = self.config.batch_size;
-        let work_items_owned = work_items; // Take ownership
-        for batch in work_items_owned.chunks(batch_size) {
-            for work_item in batch {
+        for batch in work_items.chunks(batch_size) {
+            for work_item in batch.iter().cloned() {
                 let permit = semaphore.clone().acquire_owned().await.unwrap();
                 let file_processor = Arc::clone(&self.file_processor);
                 let tx_clone = tx.clone();

@@ -157,7 +157,7 @@ pub struct PerformanceMetrics {
     /// Error rate percentage (0-100)
     pub error_rate: f64,
     /// Timestamp of measurement
-    #[serde(with = "timestamp_serde")]
+    #[serde(with = "crate::utils::timestamp::system_time_serde")]
     pub timestamp: SystemTime,
 }
 
@@ -466,7 +466,7 @@ impl PerformanceMonitor {
             avg_latency_ms,
             p95_latency_ms,
             error_rate,
-            timestamp: Instant::now(),
+            timestamp: SystemTime::now(),
         })
     }
 
@@ -522,16 +522,16 @@ impl PerformanceMonitor {
     }
 
     /// Get current system utilization
-    pub fn get_current_utilization(&self) -> ProcessingResult<f64> {
-        let metrics = self.collect_metrics()?;
+    pub async fn get_current_utilization(&self) -> ProcessingResult<f64> {
+        let metrics = self.get_metrics().await?;
         let cpu_util = metrics.cpu_usage / 100.0;
-        let memory_util = metrics.memory_usage as f64 / metrics.total_memory as f64;
+        let memory_util = metrics.memory_percentage / 100.0;
         Ok((cpu_util + memory_util) / 2.0)
     }
 
     /// Check if system is under pressure
-    pub fn is_under_pressure(&self) -> bool {
-        if let Ok(utilization) = self.get_current_utilization() {
+    pub async fn is_under_pressure(&self) -> bool {
+        if let Ok(utilization) = self.get_current_utilization().await {
             utilization > 0.8
         } else {
             false
@@ -539,10 +539,10 @@ impl PerformanceMonitor {
     }
 
     /// Get optimization recommendations
-    pub fn get_optimization_recommendations(&self) -> Vec<OptimizationRecommendation> {
+    pub async fn get_optimization_recommendations(&self) -> Vec<OptimizationRecommendation> {
         let mut recommendations = Vec::new();
         
-        if let Ok(metrics) = self.collect_metrics() {
+        if let Ok(metrics) = self.get_metrics().await {
             if metrics.cpu_usage > 90.0 {
                 recommendations.push(OptimizationRecommendation {
                     category: "CPU".to_string(),
@@ -552,7 +552,7 @@ impl PerformanceMonitor {
                 });
             }
             
-            let memory_usage_percent = (metrics.memory_usage as f64 / metrics.total_memory as f64) * 100.0;
+            let memory_usage_percent = metrics.memory_percentage;
             if memory_usage_percent > 85.0 {
                 recommendations.push(OptimizationRecommendation {
                     category: "Memory".to_string(),
@@ -690,7 +690,7 @@ mod tests {
             disk_write_bps: 0,
             network_bps: 0,
             active_threads: 8,
-            timestamp: Instant::now(),
+            timestamp: SystemTime::now(),
         };
 
         let thresholds = PerformanceThresholds::default();
@@ -773,26 +773,3 @@ mod tests {
     }
 }
 
-/// Custom serialization for SystemTime
-mod timestamp_serde {
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    use std::time::{SystemTime, UNIX_EPOCH};
-    
-    pub fn serialize<S>(time: &SystemTime, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        time.duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-            .serialize(serializer)
-    }
-    
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<SystemTime, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let secs = u64::deserialize(deserializer)?;
-        Ok(UNIX_EPOCH + std::time::Duration::from_secs(secs))
-    }
-}
