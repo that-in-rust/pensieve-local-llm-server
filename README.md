@@ -5,9 +5,7 @@
 Point it at a GitHub repo or local folder. Get back organized tasks for systematic code review. That's it.
 
 
-# Code Ingest: High-Performance Rust Code Analysis Engine
-
-**Transform any codebase into queryable intelligence in seconds.**
+**Transform any codebase or folder into queryable intelligence in seconds.**
 
 Code Ingest is a production-ready Rust tool that ingests GitHub repositories and local folders into PostgreSQL databases, enabling systematic code analysis through hierarchical task generation and multi-scale context windows.
 
