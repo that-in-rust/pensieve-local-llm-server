@@ -1,8 +1,13 @@
-//! Hierarchical task division for creating 4-level task hierarchies
+//! [DEPRECATED] Hierarchical task division for creating 4-level task hierarchies
+//! 
+//! ⚠️  DEPRECATION WARNING: This module is deprecated and will be removed in a future version.
+//! Please use `chunk_level_task_generator` instead for simpler, more maintainable task generation.
 //! 
 //! This module implements the hierarchical task division algorithm that creates
 //! structured task hierarchies with configurable levels and groups per level.
 //! The default configuration creates 4 levels with 7 groups per level.
+//! 
+//! Migration path: Use `ChunkLevelTaskGenerator` for file-level or chunk-level task generation.
 
 use crate::error::{TaskError, TaskResult};
 use crate::tasks::content_extractor::{ContentTriple, ProcessingConfig, ProcessingProgress, CancellationToken};

@@ -1,7 +1,12 @@
-//! Hierarchical task generation and distribution algorithms
+//! [DEPRECATED] Hierarchical task generation and distribution algorithms
+//! 
+//! ⚠️  DEPRECATION WARNING: This module is deprecated and will be removed in a future version.
+//! Please use `chunk_level_task_generator` instead for simpler, more maintainable task generation.
 //! 
 //! This module implements the core algorithms for distributing database rows
 //! across hierarchical task structures with proper numbering and balancing.
+//! 
+//! Migration path: Use `ChunkLevelTaskGenerator` for file-level or chunk-level task generation.
 
 use crate::error::{TaskError, TaskResult};
 use crate::tasks::models::{

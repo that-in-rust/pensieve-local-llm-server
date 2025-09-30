@@ -1,8 +1,13 @@
-//! Windowed Task Manager for handling large task sets in manageable chunks
+//! [DEPRECATED] Windowed Task Manager for handling large task sets in manageable chunks
+//!
+//! ⚠️  DEPRECATION WARNING: This module is deprecated and will be removed in a future version.
+//! Please use `chunk_level_task_generator` instead for simpler, more maintainable task generation.
 //!
 //! This module provides a windowed approach to task management, where large task sets
 //! are stored in a master list and presented to users in manageable windows (e.g., 50 tasks).
 //! Users can advance through windows as they complete work, with automatic progress tracking.
+//! 
+//! Migration path: Use `ChunkLevelTaskGenerator` for file-level or chunk-level task generation.
 
 use crate::error::{TaskError, TaskResult};
 use crate::tasks::hierarchical_task_divider::{TaskHierarchy, AnalysisTask};

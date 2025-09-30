@@ -152,6 +152,20 @@ impl HelpSystem {
         println!("# - Optional chunked table for large file processing");
         println!();
         
+        println!("{}", "⚠️  Migration from Deprecated Commands".bright_yellow().bold());
+        println!("# OLD (deprecated): generate-hierarchical-tasks");
+        println!("code-ingest generate-hierarchical-tasks TABLE --output tasks.md --db-path ./analysis");
+        println!();
+        println!("# NEW (recommended): chunk-level-task-generator");
+        println!("code-ingest chunk-level-task-generator TABLE --db-path ./analysis");
+        println!();
+        println!("# The new command provides:");
+        println!("# - Simpler workflow with two modes (file-level/chunk-level)");
+        println!("# - Better performance and maintainability");
+        println!("# - Separate content files for easier processing");
+        println!("# - See docs/MIGRATION_GUIDE.md for detailed migration steps");
+        println!();
+        
         println!("{}", "📊 Database Management".bright_green().bold());
         println!("# View database status");
         println!("code-ingest db-info --db-path ./analysis");
