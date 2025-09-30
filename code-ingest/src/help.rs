@@ -153,8 +153,8 @@ impl HelpSystem {
         println!();
         
         println!("{}", "⚠️  Migration from Deprecated Commands".bright_yellow().bold());
-        println!("# OLD (deprecated): generate-hierarchical-tasks");
-        println!("code-ingest generate-hierarchical-tasks TABLE --output tasks.md --db-path ./analysis");
+        println!("# OLD (deprecated): generate-hierarchical-tasks - REMOVED");
+        println!("# This command has been removed. Use chunk-level-task-generator instead.");
         println!();
         println!("# NEW (recommended): chunk-level-task-generator");
         println!("code-ingest chunk-level-task-generator TABLE --db-path ./analysis");

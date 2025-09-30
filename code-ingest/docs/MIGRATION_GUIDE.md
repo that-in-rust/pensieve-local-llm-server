@@ -1,8 +1,8 @@
-# Migration Guide: From GenerateHierarchicalTasks to ChunkLevelTaskGenerator
+# Migration Guide: GenerateHierarchicalTasks Command Removed
 
 ## Overview
 
-The `generate-hierarchical-tasks` command has been deprecated in favor of the simpler and more efficient `chunk-level-task-generator` command. This guide will help you migrate your workflows.
+The `generate-hierarchical-tasks` command has been **completely removed** from code-ingest. All functionality has been replaced by the simpler and more efficient `chunk-level-task-generator` command.
 
 ## Why the Change?
 
@@ -17,8 +17,9 @@ The old hierarchical task generation system was complex and difficult to maintai
 
 ### Basic Task Generation
 
-**OLD (Deprecated):**
+**OLD (REMOVED):**
 ```bash
+# This command no longer exists and will result in an error
 code-ingest generate-hierarchical-tasks INGEST_20250928101039 \
   --output tasks.md --db-path /path/to/db
 ```
@@ -31,8 +32,9 @@ code-ingest chunk-level-task-generator INGEST_20250928101039 \
 
 ### Task Generation with Chunking
 
-**OLD (Deprecated):**
+**OLD (REMOVED):**
 ```bash
+# This command no longer exists and will result in an error
 code-ingest generate-hierarchical-tasks INGEST_20250928101039 \
   --chunks 500 --max-tasks 20 --output tasks.md \
   --prompt-file .kiro/steering/analysis.md --db-path /path/to/db

@@ -8,15 +8,13 @@ pub mod content_extractor;
 pub mod content_generator;
 pub mod content_file_writer;
 pub mod content_file_writer_test;
-pub mod hierarchical_task_divider;
-pub mod hierarchical_generator;
-pub mod l1l8_markdown_generator;
+
+
 pub mod markdown_writer;
 pub mod models;
 pub mod output_directory_manager;
-pub mod simple_task_generator;
-pub mod task_structure_builder;
-pub mod windowed_task_manager;
+
+
 pub mod chunk_level_task_generator;
 pub mod database_service;
 pub mod chunking_service;
@@ -32,24 +30,9 @@ pub use output_directory_manager::{
     OutputDirectoryManager, OutputDirectoryConfig, DirectoryStatistics, FileConflict, 
     ConflictResolution, CleanupResult, OrganizationResult, ClearResult, BackupResult
 };
-pub use hierarchical_task_divider::{
-    HierarchicalTaskDivider, TaskHierarchy, TaskLevel, HierarchicalTaskGroup, 
-    AnalysisTask, AnalysisStage
-};
-pub use hierarchical_generator::{
-    HierarchicalTaskGenerator, TaskDistribution, TaskNumbering, DatabaseRow
-};
-pub use l1l8_markdown_generator::L1L8MarkdownGenerator;
-pub use simple_task_generator::SimpleTaskGenerator;
-pub use task_structure_builder::{
-    TaskStructureBuilder, EnhancedTask, PromptReference, TaskRelationship, 
-    RelationshipType, TaskStructure as EnhancedTaskStructure, TaskStructureMetadata, TaskStructureStatistics
-};
+
+
 pub use markdown_writer::{MarkdownWriter, MarkdownConfig, MarkdownUtils};
-pub use windowed_task_manager::{
-    WindowedTaskManager, WindowedTaskConfig, TaskProgress, WindowInfo, WindowStatus,
-    MasterTaskEntry, TaskStatus
-};
 
 // Re-export the new core data models
 pub use models::{

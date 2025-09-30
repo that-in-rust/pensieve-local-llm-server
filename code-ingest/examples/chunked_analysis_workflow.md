@@ -118,11 +118,8 @@ LIMIT 15;
 
 ```bash
 # Generate chunked analysis with 500-line chunks
-code-ingest generate-hierarchical-tasks INGEST_20250928160000 \
-  --chunks 500 \
-  --levels 4 \
-  --groups 8 \
-  --output rust_compiler_chunked_500.md \
+code-ingest chunk-level-task-generator INGEST_20250928160000 500 \
+  --output-dir ./rust_compiler_chunked_500 \
   --db-path /Users/username/desktop/RustCompilerDB
 ```
 
@@ -135,12 +132,8 @@ This creates:
 
 ```bash
 # Generate fine-grained chunked analysis
-code-ingest generate-hierarchical-tasks INGEST_20250928160000 \
-  --chunks 300 \
-  --levels 3 \
-  --groups 6 \
-  --prompt-file .kiro/steering/rust-compiler-analysis.md \
-  --output rust_compiler_chunked_300.md \
+code-ingest chunk-level-task-generator INGEST_20250928160000 300 \
+  --output-dir ./rust_compiler_chunked_300 \
   --db-path /Users/username/desktop/RustCompilerDB
 ```
 
@@ -604,11 +597,8 @@ echo "Found $LARGE_FILES files requiring chunking"
 if [ "$LARGE_FILES" -gt 0 ]; then
     # Step 4: Generate chunked analysis
     echo "Step 3: Generating chunked analysis..."
-    code-ingest generate-hierarchical-tasks "$LATEST_TABLE" \
-      --chunks "$CHUNK_SIZE" \
-      --levels 4 \
-      --groups 8 \
-      --output "${ANALYSIS_NAME}_chunked_${CHUNK_SIZE}.md" \
+    code-ingest chunk-level-task-generator "$LATEST_TABLE" "$CHUNK_SIZE" \
+      --output-dir "./${ANALYSIS_NAME}_chunked_${CHUNK_SIZE}" \
       --db-path "$DB_PATH"
     
     # Step 5: Generate analysis reports
