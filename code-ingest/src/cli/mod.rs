@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, Context};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use crate::help::HelpSystem;
@@ -2806,7 +2806,7 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         } else {
             // Create regular single-file system
             let markdown_generator = SimpleTaskGenerator::with_max_tasks(max_tasks);
-            let markdown_content = markdown_generator.generate_simple_markdown(&hierarchy, &working_table_name).await?;
+            let markdown_content = markdown_generator.generate_simple_tasks(&working_table_name, chunks, &prompt_file.to_string_lossy(), hierarchy.total_tasks).await?;
             
             // Step 5: Write output file
             progress.set_message("Writing output file...");
