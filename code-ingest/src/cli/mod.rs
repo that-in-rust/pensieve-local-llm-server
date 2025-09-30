@@ -296,6 +296,9 @@ pub enum Commands {
         /// Output directory for content files
         #[arg(long, default_value = ".raw_data_202509")]
         output_dir: PathBuf,
+        /// Chunk size for filename generation (e.g., 500 for 500-line chunks)
+        #[arg(long)]
+        chunk_size: Option<usize>,
         /// Database path (can also be set globally)
         #[arg(long)]
         db_path: Option<PathBuf>,
@@ -647,9 +650,9 @@ impl Cli {
                 let db_path = db_path.clone().or_else(|| self.db_path.clone());
                 self.execute_count_rows(table_name.clone(), db_path).await
             }
-            Commands::ExtractContent { table_name, output_dir, db_path } => {
+            Commands::ExtractContent { table_name, output_dir, chunk_size, db_path } => {
                 let db_path = db_path.clone().or_else(|| self.db_path.clone());
-                self.execute_extract_content(table_name.clone(), output_dir.clone(), db_path).await
+                self.execute_extract_content(table_name.clone(), output_dir.clone(), *chunk_size, db_path).await
             }
             Commands::Config { action } => {
                 self.execute_config_command(action).await
@@ -2345,7 +2348,7 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
     }
 
     /// Execute extract-content command
-    async fn execute_extract_content(&self, table_name: String, output_dir: PathBuf, db_path: Option<PathBuf>) -> Result<()> {
+    async fn execute_extract_content(&self, table_name: String, output_dir: PathBuf, chunk_size: Option<usize>, db_path: Option<PathBuf>) -> Result<()> {
         use crate::tasks::ContentExtractor;
         use indicatif::{ProgressBar, ProgressStyle};
         
@@ -2381,7 +2384,7 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         progress.set_position(20);
         
         // Extract all content
-        let content_triples = extractor.extract_all_rows(&table_name).await?;
+        let content_triples = extractor.extract_all_rows(&table_name, chunk_size).await?;
         
         progress.set_message("Content extraction complete!");
         progress.set_position(100);
@@ -2753,7 +2756,7 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         
         let output_dir = std::path::PathBuf::from(".raw_data_202509");
         let extractor = ContentExtractor::new(database.pool().clone().into(), output_dir);
-        let content_triples = extractor.extract_all_rows(&working_table_name).await?;
+        let content_triples = extractor.extract_all_rows(&working_table_name, None).await?;
         
         // Step 3: Create hierarchical task structure
         progress.set_message("Creating hierarchical task structure...");

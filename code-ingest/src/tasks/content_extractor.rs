@@ -152,6 +152,7 @@ impl ContentExtractor {
         &self,
         table_name: &str,
         config: ProcessingConfig,
+        chunk_size: Option<usize>,
         mut progress_callback: Option<F>,
         cancellation_token: Option<CancellationToken>,
     ) -> TaskResult<Vec<ContentTriple>>
@@ -208,6 +209,7 @@ impl ContentExtractor {
                     limit,
                     &semaphore,
                     &config,
+                    chunk_size,
                 )
             ).await;
 
@@ -290,6 +292,7 @@ impl ContentExtractor {
         limit: usize,
         semaphore: &Arc<Semaphore>,
         _config: &ProcessingConfig,
+        chunk_size: Option<usize>,
     ) -> TaskResult<Vec<ContentTriple>> {
         // Query batch of rows
         let query = format!(
@@ -323,9 +326,10 @@ impl ContentExtractor {
             let semaphore = Arc::clone(semaphore);
             let extractor = self.clone();
 
+            let chunk_size_capture = chunk_size;
             let task = tokio::spawn(async move {
                 let _permit = semaphore.acquire().await.unwrap();
-                extractor.create_content_files(&metadata, row_number, &table_name).await
+                extractor.create_content_files(&metadata, row_number, &table_name, chunk_size_capture).await
             });
 
             tasks.push(task);
@@ -399,6 +403,7 @@ impl ContentExtractor {
         &'a self,
         table_name: &'a str,
         batch_size: usize,
+        chunk_size: Option<usize>,
     ) -> impl Stream<Item = TaskResult<ContentTriple>> + 'a {
         stream::unfold(
             (0usize, false), // (offset, finished)
@@ -443,7 +448,7 @@ impl ContentExtractor {
                         Err(e) => return Some((Err(e), (offset, true))),
                     };
 
-                    let result = self.create_content_files(&metadata, row_number, table_name).await;
+                    let result = self.create_content_files(&metadata, row_number, table_name, chunk_size).await;
                     let next_offset = offset + 1;
                     let finished = rows.len() < batch_size; // Last batch if less than batch_size
 
@@ -469,7 +474,7 @@ impl ContentExtractor {
     /// let triples = extractor.extract_all_rows("INGEST_20250928101039").await?;
     /// println!("Created {} content triples", triples.len());
     /// ```
-    pub async fn extract_all_rows(&self, table_name: &str) -> TaskResult<Vec<ContentTriple>> {
+    pub async fn extract_all_rows(&self, table_name: &str, chunk_size: Option<usize>) -> TaskResult<Vec<ContentTriple>> {
         debug!("Extracting all rows from table: {}", table_name);
 
         // Validate table name
@@ -520,7 +525,7 @@ impl ContentExtractor {
             let metadata = self.extract_row_metadata(&row)?;
 
             // Create content files for this row
-            let content_triple = self.create_content_files(&metadata, row_number, table_name).await?;
+            let content_triple = self.create_content_files(&metadata, row_number, table_name, chunk_size).await?;
             content_triples.push(content_triple);
         }
 
@@ -534,6 +539,7 @@ impl ContentExtractor {
     /// * `metadata` - Row metadata extracted from database
     /// * `row_number` - Row number (1-based)
     /// * `table_name` - Name of the source table
+    /// * `chunk_size` - Chunk size for filename generation
     ///
     /// # Returns
     /// * `TaskResult<ContentTriple>` - Created content file triple
@@ -542,6 +548,7 @@ impl ContentExtractor {
         metadata: &RowMetadata,
         row_number: usize,
         table_name: &str,
+        chunk_size: Option<usize>,
     ) -> TaskResult<ContentTriple> {
         debug!("Creating content files for row {} from table '{}'", row_number, table_name);
 
@@ -555,8 +562,12 @@ impl ContentExtractor {
             }
         })?;
 
-        // Generate file paths
-        let base_name = format!("{}_{}_Content", table_name, row_number);
+        // Generate file paths with chunk size
+        let base_name = if let Some(chunk_size) = chunk_size {
+            format!("{}_{}_{}_Content", table_name, chunk_size, row_number)
+        } else {
+            format!("{}_{}_Content", table_name, row_number)
+        };
         let content_a = self.output_dir.join(format!("{}.txt", base_name));
         let content_b = self.output_dir.join(format!("{}_L1.txt", base_name));
         let content_c = self.output_dir.join(format!("{}_L2.txt", base_name));
@@ -1600,6 +1611,22 @@ pub trait UserRepository {
         assert!(content_triple.content_a.to_string_lossy().contains("Content.txt"));
         assert!(content_triple.content_b.to_string_lossy().contains("Content_L1.txt"));
         assert!(content_triple.content_c.to_string_lossy().contains("Content_L2.txt"));
+    }
+
+    #[test]
+    fn test_filename_generation_with_chunk_size() {
+        // Test the new filename format: TableName_ChunkSize_RowNumber_Content.txt
+        let table_name = "INGEST_20250930025223";
+        let chunk_size = 500;
+        let row_number = 1;
+        
+        let expected_a = format!("{}_{}_{}_Content.txt", table_name, chunk_size, row_number);
+        let expected_b = format!("{}_{}_{}_Content_L1.txt", table_name, chunk_size, row_number);
+        let expected_c = format!("{}_{}_{}_Content_L2.txt", table_name, chunk_size, row_number);
+        
+        assert_eq!(expected_a, "INGEST_20250930025223_500_1_Content.txt");
+        assert_eq!(expected_b, "INGEST_20250930025223_500_1_Content_L1.txt");
+        assert_eq!(expected_c, "INGEST_20250930025223_500_1_Content_L2.txt");
     }
 
     // Helper functions for testing without database connections

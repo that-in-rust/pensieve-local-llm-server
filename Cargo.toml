@@ -67,4 +67,7 @@ tracing-appender = "0.2"
 # Gitignore pattern matching
 ignore = "0.4"
 
+# Force older version to avoid edition2024 issue
+base64ct = "1.6"
+
 

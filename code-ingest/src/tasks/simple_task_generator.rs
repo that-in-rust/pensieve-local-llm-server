@@ -96,8 +96,8 @@ impl SimpleTaskGenerator {
             ));
             
             output.push_str(&format!(
-                "  - **Content**: `.raw_data_202509/{}{}_Content.txt` as A + `.raw_data_202509/{}_Content_L1.txt` as B + `.raw_data_202509/{}_Content_L2.txt` as C\n",
-                table_name, chunk_suffix, table_name, table_name
+                "  - **Content**: `.wipToBeDeletedFolder/{}{}_{}_Content.txt` as A + `.wipToBeDeletedFolder/{}{}_{}_Content_L1.txt` as B + `.wipToBeDeletedFolder/{}{}_{}_Content_L2.txt` as C\n",
+                table_name, chunk_suffix, row_num, table_name, chunk_suffix, row_num, table_name, chunk_suffix, row_num
             ));
             
             output.push_str(&format!(

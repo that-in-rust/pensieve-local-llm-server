@@ -68,3 +68,6 @@ examples/twitter-analysis-202509/tweets202508.js
 *_demonstration.md
 *_summary.md
 !docs/analysis/
+
+# Work-in-progress folder (temporary, to be deleted after analysis)
+.wipToBeDeletedFolder/
