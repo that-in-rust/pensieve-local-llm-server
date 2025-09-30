@@ -248,10 +248,9 @@ flowchart TD
 - **Work directory management**: `.wipToBeDeletedFolder` with gitignore integration
 
 ### Task generation features
-- **Structured analysis tasks**: TXT format with precise A/B/C file references
-- **Custom prompts**: Integration with analysis prompt files (`.kiro/` directory)
-- **Configurable limits**: Max tasks (default 50), chunk sizes, output formats
-- **Multi-context analysis**: Tasks specify A alone, A+B, B+C, A+B+C analysis patterns
+- **Simplified task generation**: Clean, focused task lists with precise file references
+- **Content file integration**: Direct references to generated A/B/C files
+- **Configurable output**: Custom output directories and file organization
 
 ### Query capabilities
 - Full-text search across all content with PostgreSQL full-text search
@@ -266,20 +265,16 @@ flowchart TD
 # 1. Ingest your data
 ./target/release/code-ingest ingest /path/to/data --folder-flag --db-path ./analysis
 
-# 2. Generate content files for systematic analysis  
+# 2. Generate content files and task list for systematic analysis  
 ./target/release/code-ingest chunk-level-task-generator TABLE_NAME 500 \
   --output-dir .wipToBeDeletedFolder --db-path ./analysis
 
-# 3. Generate structured analysis tasks
-./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME \
-  --output analysis-tasks.txt --chunks 500 --max-tasks 100 \
-  --prompt-file .kiro/your-prompt.md --db-path ./analysis
-
-# 4. Execute systematic analysis using generated A/B/C files
-# Each task references precise files:
+# 3. Execute systematic analysis using generated A/B/C files and task list
+# The command creates:
 # - A: TableName_ChunkSize_RowNumber_Content.txt (individual content)
 # - B: TableName_ChunkSize_RowNumber_Content_L1.txt (L1 context)  
 # - C: TableName_ChunkSize_RowNumber_Content_L2.txt (L2 context)
+# - tasks.md: Structured task list with file references
 ```
 
 **Result**: Structured analysis workflow with precise A/B/C file references, multi-scale context, and systematic task execution. Tasks output to `gringotts/WorkArea/` directory.
@@ -309,12 +304,9 @@ mkdir -p /path/to/database/directory
   --output-dir .wipToBeDeletedFolder \
   --db-path ./analysis
 
-# Generate analysis tasks with custom prompts
-./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME \
-  --output analysis-tasks.txt \
-  --chunks 500 \
-  --max-tasks 100 \
-  --prompt-file .kiro/your-prompt.md \
+# Generate content files and task list (replaces old hierarchical task generation)
+./target/release/code-ingest chunk-level-task-generator TABLE_NAME 500 \
+  --output-dir ./analysis-output \
   --db-path ./analysis
 ```
 
