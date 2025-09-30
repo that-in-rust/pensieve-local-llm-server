@@ -49,32 +49,32 @@
   - **Prompt**: `.kiro/RustPatterns20250930.md` where you try to find insights of A alone ; A in context of B ; B in context of C ; A in context B & C
   - **Output**: `gringotts/WorkArea/INGEST_20250930104957_300_25.md`
 
-- [-] 26. Analyze INGEST_20250930104957 row 26
+- [x] 26. Analyze INGEST_20250930104957 row 26
   - **Content**: `.wipToBeDeletedFolder/INGEST_20250930104957_300_26_Content.txt` as A + `.wipToBeDeletedFolder/INGEST_20250930104957_300_26_Content_L1.txt` as B + `.wipToBeDeletedFolder/INGEST_20250930104957_300_26_Content_L2.txt` as C
   - **Prompt**: `.kiro/RustPatterns20250930.md` where you try to find insights of A alone ; A in context of B ; B in context of C ; A in context B & C
   - **Output**: `gringotts/WorkArea/INGEST_20250930104957_300_26.md`
 
-- [ ] 27. Analyze INGEST_20250930104957 row 27
+- [x] 27. Analyze INGEST_20250930104957 row 27
   - **Content**: `.wipToBeDeletedFolder/INGEST_20250930104957_300_27_Content.txt` as A + `.wipToBeDeletedFolder/INGEST_20250930104957_300_27_Content_L1.txt` as B + `.wipToBeDeletedFolder/INGEST_20250930104957_300_27_Content_L2.txt` as C
   - **Prompt**: `.kiro/RustPatterns20250930.md` where you try to find insights of A alone ; A in context of B ; B in context of C ; A in context B & C
   - **Output**: `gringotts/WorkArea/INGEST_20250930104957_300_27.md`
 
-- [ ] 28. Analyze INGEST_20250930104957 row 28
+- [x] 28. Analyze INGEST_20250930104957 row 28
   - **Content**: `.wipToBeDeletedFolder/INGEST_20250930104957_300_28_Content.txt` as A + `.wipToBeDeletedFolder/INGEST_20250930104957_300_28_Content_L1.txt` as B + `.wipToBeDeletedFolder/INGEST_20250930104957_300_28_Content_L2.txt` as C
   - **Prompt**: `.kiro/RustPatterns20250930.md` where you try to find insights of A alone ; A in context of B ; B in context of C ; A in context B & C
   - **Output**: `gringotts/WorkArea/INGEST_20250930104957_300_28.md`
 
-- [ ] 29. Analyze INGEST_20250930104957 row 29
+- [x] 29. Analyze INGEST_20250930104957 row 29
   - **Content**: `.wipToBeDeletedFolder/INGEST_20250930104957_300_29_Content.txt` as A + `.wipToBeDeletedFolder/INGEST_20250930104957_300_29_Content_L1.txt` as B + `.wipToBeDeletedFolder/INGEST_20250930104957_300_29_Content_L2.txt` as C
   - **Prompt**: `.kiro/RustPatterns20250930.md` where you try to find insights of A alone ; A in context of B ; B in context of C ; A in context B & C
   - **Output**: `gringotts/WorkArea/INGEST_20250930104957_300_29.md`
 
-- [ ] 30. Analyze INGEST_20250930104957 row 30
+- [x] 30. Analyze INGEST_20250930104957 row 30
   - **Content**: `.wipToBeDeletedFolder/INGEST_20250930104957_300_30_Content.txt` as A + `.wipToBeDeletedFolder/INGEST_20250930104957_300_30_Content_L1.txt` as B + `.wipToBeDeletedFolder/INGEST_20250930104957_300_30_Content_L2.txt` as C
   - **Prompt**: `.kiro/RustPatterns20250930.md` where you try to find insights of A alone ; A in context of B ; B in context of C ; A in context B & C
   - **Output**: `gringotts/WorkArea/INGEST_20250930104957_300_30.md`
 
-- [ ] 31. Analyze INGEST_20250930104957 row 31
+- [-] 31. Analyze INGEST_20250930104957 row 31
   - **Content**: `.wipToBeDeletedFolder/INGEST_20250930104957_300_31_Content.txt` as A + `.wipToBeDeletedFolder/INGEST_20250930104957_300_31_Content_L1.txt` as B + `.wipToBeDeletedFolder/INGEST_20250930104957_300_31_Content_L2.txt` as C
   - **Prompt**: `.kiro/RustPatterns20250930.md` where you try to find insights of A alone ; A in context of B ; B in context of C ; A in context B & C
   - **Output**: `gringotts/WorkArea/INGEST_20250930104957_300_31.md`
