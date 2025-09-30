@@ -284,6 +284,67 @@ flowchart TD
 
 **Result**: Structured analysis workflow with precise A/B/C file references, multi-scale context, and systematic task execution. Tasks output to `gringotts/WorkArea/` directory.
 
+## Essential Commands Reference
+
+### Core Ingestion Commands
+```bash
+# Build the tool first
+cd pensieve/code-ingest
+cargo build --release
+
+# Ingest GitHub repository
+./target/release/code-ingest ingest https://github.com/user/repo --db-path ./analysis
+
+# Ingest local folder (requires --folder-flag)
+./target/release/code-ingest ingest /absolute/path/to/folder --folder-flag --db-path ./analysis
+
+# Create database directory if it doesn't exist
+mkdir -p /path/to/database/directory
+```
+
+### Content Extraction & Analysis
+```bash
+# Extract A/B/C content files for analysis
+./target/release/code-ingest extract-content TABLE_NAME \
+  --output-dir .wipToBeDeletedFolder \
+  --chunk-size 500 \
+  --db-path ./analysis
+
+# Generate analysis tasks with custom prompts
+./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME \
+  --output analysis-tasks.txt \
+  --chunks 500 \
+  --max-tasks 100 \
+  --prompt-file .kiro/your-prompt.md \
+  --db-path ./analysis
+```
+
+### Database Management
+```bash
+# List all tables in database
+./target/release/code-ingest list-tables --db-path ./analysis
+
+# Count rows in a table
+./target/release/code-ingest count-rows TABLE_NAME --db-path ./analysis
+
+# Sample data from table
+./target/release/code-ingest sample --table TABLE_NAME --limit 5 --db-path ./analysis
+
+# Get table schema information
+./target/release/code-ingest describe --table TABLE_NAME --db-path ./analysis
+```
+
+### SQL Queries
+```bash
+# Execute custom SQL queries
+./target/release/code-ingest sql "SELECT * FROM TABLE_NAME LIMIT 10" --db-path ./analysis
+
+# Search for patterns
+./target/release/code-ingest sql \
+  "SELECT filepath FROM TABLE_NAME WHERE content_text LIKE '%pattern%'" \
+  --db-path ./analysis
+```
+
 ## Build it
 
 ```bash
