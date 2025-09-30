@@ -1,8 +1,13 @@
-//! Simple Task Generator for Kiro-compatible task files
+//! [DEPRECATED] Simple Task Generator for Kiro-compatible task files
+//!
+//! ⚠️  DEPRECATION WARNING: This module is deprecated and will be removed in a future version.
+//! Please use `chunk_level_task_generator` instead for simpler, more maintainable task generation.
 //!
 //! This module provides a simple task generator that creates clean checkbox markdown
 //! files that Kiro can parse and execute. Unlike the complex L1L8MarkdownGenerator,
 //! this generator focuses on producing minimal, parseable task lists.
+//! 
+//! Migration path: Use `ChunkLevelTaskGenerator` for file-level or chunk-level task generation.
 
 use crate::error::{TaskError, TaskResult};
 use crate::tasks::hierarchical_task_divider::{TaskHierarchy, HierarchicalTaskGroup, AnalysisTask};

@@ -1,7 +1,12 @@
-//! L1L8 Markdown Generator for Task List Generation
+//! [DEPRECATED] L1L8 Markdown Generator for Task List Generation
+//!
+//! ⚠️  DEPRECATION WARNING: This module is deprecated and will be removed in a future version.
+//! Please use `chunk_level_task_generator` instead for simpler, more maintainable task generation.
 //!
 //! This module provides the L1L8MarkdownGenerator struct that creates markdown files
 //! with hierarchical task structures for L1-L8 analysis methodology.
+//! 
+//! Migration path: Use `ChunkLevelTaskGenerator` for file-level or chunk-level task generation.
 
 use crate::error::{TaskError, TaskResult};
 use crate::tasks::hierarchical_task_divider::{TaskHierarchy, HierarchicalTaskGroup, AnalysisTask, AnalysisStage};

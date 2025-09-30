@@ -69,14 +69,14 @@
   - Update CLI help text and documentation
   - _Requirements: 4.1, 4.2_
 
-- [-] 10. Mark existing task generators as deprecated
+- [x] 10. Mark existing task generators as deprecated
   - Add deprecation warnings to `GenerateHierarchicalTasks` command
   - Update help text to recommend using `chunk-level-task-generator` instead
   - Add deprecation comments to related task generation modules
   - Document migration path from old to new command
   - _Requirements: 5.1_
 
-- [ ] 11. Test new command with existing database tables
+- [-] 11. Test new command with existing database tables
   - Test `chunk-level-task-generator` with real ingestion tables
   - Validate content file generation matches expected format
   - Verify task list format is compatible with existing workflows

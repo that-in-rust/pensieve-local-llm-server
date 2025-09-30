@@ -1,7 +1,12 @@
-//! Task structure generation and management
+//! [DEPRECATED] Task structure generation and management
+//! 
+//! ⚠️  DEPRECATION WARNING: This module is deprecated and will be removed in a future version.
+//! Please use `chunk_level_task_generator` instead for simpler, more maintainable task generation.
 //! 
 //! This module provides functionality for building complex task structures
 //! with proper relationships, content file references, and prompt integration.
+//! 
+//! Migration path: Use `ChunkLevelTaskGenerator` for file-level or chunk-level task generation.
 
 use crate::error::{TaskError, TaskResult};
 use crate::tasks::models::{

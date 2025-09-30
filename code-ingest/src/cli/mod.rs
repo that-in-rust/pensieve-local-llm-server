@@ -27,7 +27,7 @@ EXAMPLES:
     # Generate with chunking for large files
     code-ingest chunk-level-task-generator TABLE_NAME 500 --db-path /path/to/db
     
-    # Generate hierarchical tasks (legacy)
+    # Generate hierarchical tasks (DEPRECATED - use chunk-level-task-generator instead)
     code-ingest generate-hierarchical-tasks TABLE_NAME --levels 4 --groups 7 --output tasks.md")]
 pub struct Cli {
     #[command(subcommand)]
@@ -310,17 +310,24 @@ pub enum Commands {
         action: ConfigAction,
     },
 
-    /// [EXPERIMENTAL] Generate simple task lists from database table
+    /// [DEPRECATED] Generate simple task lists from database table
+    /// 
+    /// ⚠️  DEPRECATION WARNING: This command is deprecated and will be removed in a future version.
+    /// Please use `chunk-level-task-generator` instead for better performance and simpler workflow.
+    /// 
+    /// Migration path:
+    ///   OLD: code-ingest generate-hierarchical-tasks TABLE --output tasks.md
+    ///   NEW: code-ingest chunk-level-task-generator TABLE
     /// 
     /// Creates simple checkbox markdown files for systematic analysis.
     /// Focuses on proven patterns over complex hierarchical structures.
     /// 
     /// Examples:
-    ///   # Simple task generation (limited to 50 tasks)
+    ///   # Simple task generation (limited to 50 tasks) - DEPRECATED
     ///   code-ingest generate-hierarchical-tasks INGEST_20250928101039 \
     ///     --output tasks.md --db-path /path/to/db
     ///   
-    ///   # With chunking for large files
+    ///   # With chunking for large files - DEPRECATED
     ///   code-ingest generate-hierarchical-tasks INGEST_20250928101039 \
     ///     --chunks 500 --max-tasks 20 --output tasks.md \
     ///     --prompt-file .kiro/steering/analysis.md --db-path /path/to/db
@@ -2851,8 +2858,9 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         use crate::database::Database;
         use crate::tasks::simple_task_generator::SimpleTaskGenerator;
         
-        println!("🚀 [EXPERIMENTAL] Generating simple task list for table: {}", table_name);
-        println!("📋 Simplified task generation following MVP-First Rigor pattern");
+        println!("⚠️  [DEPRECATED] Generating simple task list for table: {}", table_name);
+        println!("⚠️  This command is deprecated. Please use 'chunk-level-task-generator' instead.");
+        println!("📋 Migration: code-ingest chunk-level-task-generator {} [chunk_size]", table_name);
         println!();
 
         // Validate inputs (following steering principle: Parse, don't validate)
