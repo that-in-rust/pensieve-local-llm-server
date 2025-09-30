@@ -99,12 +99,12 @@ flowchart TD
 - **Context Levels**: A (individual), B (L1 context), C (L2 context)
 
 **Task Generation Results**:
-**Command**: `./target/release/code-ingest generate-hierarchical-tasks INGEST_20250930025223 --output twitter-analysis-tasks-final.txt --chunks 500 --max-tasks 21 --prompt-file .kiro/non-technical-authentic-voice-prompt.md --db-path /home/amuldotexe/Desktop/before-I-go/twitter-analysis-202509`
+The `chunk-level-task-generator` command creates both content files and a structured task list:
 
-- **Tasks Generated**: 21 analysis tasks (limited by max-tasks parameter)
-- **Task Format**: TXT format with precise A/B/C file references
-- **Output Structure**: `gringotts/WorkArea/INGEST_20250930025223_500_1.md`
-- **Prompt Integration**: Custom analysis prompts with multi-context analysis
+- **Content Files**: 126 A/B/C files with both chunked and non-chunked formats
+- **Task List**: Automatically generated `tasks.md` with precise file references
+- **Processing Time**: 1.35 seconds for complete content extraction and task generation
+- **Output Structure**: Organized directory with content files and task list
 
 ## Quick Start
 
@@ -250,17 +250,14 @@ For comprehensive analysis, the system:
 
 ### Content Extraction & Task Management
 ```bash
-# Generate content files for analysis
+# Generate content files and task list for analysis
 ./target/release/code-ingest chunk-level-task-generator TABLE_NAME 500 \
   --output-dir .wipToBeDeletedFolder \
   --db-path /path/to/database
 
-# Generate analysis tasks
-./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME \
-  --output analysis-tasks.txt \
-  --chunks 500 \
-  --max-tasks 100 \
-  --prompt-file .kiro/your-analysis-prompt.md \
+# Generate content files without chunking
+./target/release/code-ingest chunk-level-task-generator TABLE_NAME \
+  --output-dir ./analysis-files \
   --db-path /path/to/database
 ```
 
@@ -480,17 +477,14 @@ mkdir -p /path/to/database/directory
 
 ### Task Generation Commands
 ```bash
-# Generate analysis tasks with custom prompts
-./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME \
-  --output analysis-tasks.txt \
-  --chunks 500 \
-  --max-tasks 100 \
-  --prompt-file .kiro/your-analysis-prompt.md \
+# Generate content files and task list with chunking
+./target/release/code-ingest chunk-level-task-generator TABLE_NAME 500 \
+  --output-dir ./analysis-output \
   --db-path /path/to/database
 
-# Simple task generation (default limits)
-./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME \
-  --output tasks.md \
+# Generate content files and task list without chunking
+./target/release/code-ingest chunk-level-task-generator TABLE_NAME \
+  --output-dir ./analysis-output \
   --db-path /path/to/database
 ```
 
@@ -561,21 +555,12 @@ mkdir -p /path/to/database/directory
   --output-dir .twitter-analysis \
   --db-path /home/user/twitter-analysis
 
-./target/release/code-ingest generate-hierarchical-tasks INGEST_20250930025223 \
-  --output twitter-tasks.txt --chunks 500 --max-tasks 21 \
-  --prompt-file .kiro/non-technical-authentic-voice-prompt.md \
-  --db-path /home/user/twitter-analysis
-
 # Complete Rust documentation analysis
 ./target/release/code-ingest ingest /home/user/rust-docs \
   --folder-flag --db-path /home/user/rust-analysis
 
 ./target/release/code-ingest chunk-level-task-generator INGEST_20250930052722 500 \
   --output-dir .rust-analysis \
-  --db-path /home/user/rust-analysis
-
-./target/release/code-ingest generate-hierarchical-tasks INGEST_20250930052722 \
-  --output rust-analysis-tasks.txt --chunks 500 --max-tasks 20 \
   --db-path /home/user/rust-analysis
 ```
 

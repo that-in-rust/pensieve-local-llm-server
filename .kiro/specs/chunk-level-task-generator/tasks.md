@@ -84,7 +84,7 @@
   - Document any issues or edge cases discovered
   - _Requirements: 1.1, 1.2, 2.1, 2.6, 2.7_
 
-- [-] 12. Clean up deprecated task generation code (after validation)
+- [x] 12. Clean up deprecated task generation code (after validation)
   - Remove `GenerateHierarchicalTasks` command from CLI enum
   - Remove complex task generation modules from `tasks/` directory
   - Remove associated test files for deprecated functionality
