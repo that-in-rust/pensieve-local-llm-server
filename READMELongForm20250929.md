@@ -438,6 +438,149 @@ export CODE_INGEST_MAX_CONCURRENCY=4
 - ✅ Content indexing and search with token counts
 - ✅ Database operations (CRUD) with chunking support
 
+## Complete Command Reference
+
+### Build & Setup
+```bash
+# Clone and build
+git clone <repository>
+cd pensieve/code-ingest
+cargo build --release
+
+# Create database directory
+mkdir -p /path/to/database/directory
+```
+
+### Core Ingestion Commands
+```bash
+# GitHub repository ingestion
+./target/release/code-ingest ingest https://github.com/user/repo \
+  --db-path /path/to/database
+
+# Local folder ingestion (absolute paths required)
+./target/release/code-ingest ingest /absolute/path/to/folder \
+  --folder-flag --db-path /path/to/database
+
+# Example: Ingest Rust examples
+./target/release/code-ingest ingest /home/user/examples/rust202509 \
+  --folder-flag --db-path /home/user/rust-analysis
+```
+
+### Content Extraction Commands
+```bash
+# Extract A/B/C content files with chunking
+./target/release/code-ingest extract-content TABLE_NAME \
+  --output-dir .wipToBeDeletedFolder \
+  --chunk-size 500 \
+  --db-path /path/to/database
+
+# Extract without chunking
+./target/release/code-ingest extract-content TABLE_NAME \
+  --output-dir .analysis-files \
+  --db-path /path/to/database
+```
+
+### Task Generation Commands
+```bash
+# Generate analysis tasks with custom prompts
+./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME \
+  --output analysis-tasks.txt \
+  --chunks 500 \
+  --max-tasks 100 \
+  --prompt-file .kiro/your-analysis-prompt.md \
+  --db-path /path/to/database
+
+# Simple task generation (default limits)
+./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME \
+  --output tasks.md \
+  --db-path /path/to/database
+```
+
+### Database Management Commands
+```bash
+# List all tables
+./target/release/code-ingest list-tables --db-path /path/to/database
+
+# Count rows in table
+./target/release/code-ingest count-rows TABLE_NAME --db-path /path/to/database
+
+# Sample data from table
+./target/release/code-ingest sample --table TABLE_NAME --limit 10 --db-path /path/to/database
+
+# Get table schema
+./target/release/code-ingest describe --table TABLE_NAME --db-path /path/to/database
+
+# Database connection info
+./target/release/code-ingest db-info --db-path /path/to/database
+```
+
+### SQL Query Commands
+```bash
+# Execute custom SQL
+./target/release/code-ingest sql "SELECT * FROM TABLE_NAME LIMIT 5" --db-path /path/to/database
+
+# Search for patterns
+./target/release/code-ingest sql \
+  "SELECT filepath, filename FROM TABLE_NAME WHERE content_text LIKE '%async fn%'" \
+  --db-path /path/to/database
+
+# Analyze file types
+./target/release/code-ingest sql \
+  "SELECT extension, COUNT(*), AVG(line_count) FROM TABLE_NAME GROUP BY extension" \
+  --db-path /path/to/database
+
+# Full-text search
+./target/release/code-ingest sql \
+  "SELECT filepath FROM TABLE_NAME WHERE content_text @@ to_tsquery('rust & function')" \
+  --db-path /path/to/database
+```
+
+### Utility Commands
+```bash
+# Show setup guide
+./target/release/code-ingest setup
+
+# Show command examples
+./target/release/code-ingest examples
+
+# Show troubleshooting guide
+./target/release/code-ingest troubleshoot
+
+# Clean up old tables
+./target/release/code-ingest cleanup-tables --db-path /path/to/database
+
+# Optimize database performance
+./target/release/code-ingest optimize-tables --db-path /path/to/database
+```
+
+### Real-World Examples
+```bash
+# Complete Twitter analysis workflow
+./target/release/code-ingest ingest /home/user/twitter-data \
+  --folder-flag --db-path /home/user/twitter-analysis
+
+./target/release/code-ingest extract-content INGEST_20250930025223 \
+  --output-dir .twitter-analysis --chunk-size 500 \
+  --db-path /home/user/twitter-analysis
+
+./target/release/code-ingest generate-hierarchical-tasks INGEST_20250930025223 \
+  --output twitter-tasks.txt --chunks 500 --max-tasks 21 \
+  --prompt-file .kiro/non-technical-authentic-voice-prompt.md \
+  --db-path /home/user/twitter-analysis
+
+# Complete Rust documentation analysis
+./target/release/code-ingest ingest /home/user/rust-docs \
+  --folder-flag --db-path /home/user/rust-analysis
+
+./target/release/code-ingest extract-content INGEST_20250930052722 \
+  --output-dir .rust-analysis --chunk-size 500 \
+  --db-path /home/user/rust-analysis
+
+./target/release/code-ingest generate-hierarchical-tasks INGEST_20250930052722 \
+  --output rust-analysis-tasks.txt --chunks 500 --max-tasks 20 \
+  --db-path /home/user/rust-analysis
+```
+
 ## Contributing
 
 ### Build from Source
