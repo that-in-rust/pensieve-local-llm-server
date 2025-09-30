@@ -32,14 +32,14 @@
   - _Requirements: 1.1, 2.6_
   - **Implementation**: `code-ingest/src/tasks/content_file_writer.rs` with async file I/O using tokio::fs, configurable naming patterns, concurrent processing, comprehensive error handling, and extensive unit tests. Supports both individual row processing and batch operations with L1/L2 context generation.
 
-- [-] 5. Implement TaskListGenerator for task file creation
+- [x] 5. Implement TaskListGenerator for task file creation
   - Create `TaskListGenerator` struct for generating task lists in txt format
   - Implement `generate_task_list()` method that references content files by row number
   - Create task list format that's compatible with existing task processing workflows
   - Write unit tests for task list generation and format validation
   - _Requirements: 1.2, 2.7_
 
-- [ ] 6. Implement main ChunkLevelTaskGenerator coordinator
+- [x] 6. Implement main ChunkLevelTaskGenerator coordinator
   - Create `ChunkLevelTaskGenerator` struct that orchestrates all services
   - Implement `execute()` method with file-level and chunk-level mode logic
   - Add input validation for table names and chunk sizes
@@ -47,14 +47,14 @@
   - Write unit tests for both execution modes
   - _Requirements: 1.1, 1.2, 2.1, 2.6, 2.7_
 
-- [ ] 7. Add CLI command integration
+- [x] 7. Add CLI command integration
   - Add `ChunkLevelTaskGenerator` command to CLI enum in `cli/mod.rs`
   - Implement `execute_chunk_level_task_generator()` method in CLI handler
   - Add command-line argument parsing for table name, chunk size, and output directory
   - Add help text and usage examples for the new command
   - _Requirements: 1.1, 2.1_
 
-- [ ] 8. Write integration tests for end-to-end workflows
+- [-] 8. Write integration tests for end-to-end workflows
   - Create integration test for file-level mode (no chunk size)
   - Create integration test for chunk-level mode (with chunk size)
   - Test error handling for invalid table names and chunk sizes

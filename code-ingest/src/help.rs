@@ -135,6 +135,23 @@ impl HelpSystem {
         println!("  --original-query \"SELECT filepath, content_text FROM INGEST_20250927143022 WHERE extension = 'rs'\"");
         println!();
         
+        println!("{}", "🎯 Simplified Task Generation".bright_green().bold());
+        println!("# File-level mode: Generate content files for each database row");
+        println!("code-ingest chunk-level-task-generator INGEST_20250927143022 --db-path ./analysis");
+        println!();
+        println!("# Chunk-level mode: Process large files with 500-line chunks");
+        println!("code-ingest chunk-level-task-generator INGEST_20250927143022 500 --db-path ./analysis");
+        println!();
+        println!("# Custom output directory");
+        println!("code-ingest chunk-level-task-generator INGEST_20250927143022 \\");
+        println!("  --output-dir ./task-output --db-path ./analysis");
+        println!();
+        println!("# This creates:");
+        println!("# - content_N.txt, contentL1_N.txt, contentL2_N.txt files");
+        println!("# - task_list.txt with references to content files");
+        println!("# - Optional chunked table for large file processing");
+        println!();
+        
         println!("{}", "📊 Database Management".bright_green().bold());
         println!("# View database status");
         println!("code-ingest db-info --db-path ./analysis");
