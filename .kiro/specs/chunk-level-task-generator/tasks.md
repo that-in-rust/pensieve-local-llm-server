@@ -76,7 +76,7 @@
   - Document migration path from old to new command
   - _Requirements: 5.1_
 
-- [-] 11. Test new command with existing database tables
+- [x] 11. Test new command with existing database tables
   - Test `chunk-level-task-generator` with real ingestion tables
   - Validate content file generation matches expected format
   - Verify task list format is compatible with existing workflows
@@ -84,7 +84,7 @@
   - Document any issues or edge cases discovered
   - _Requirements: 1.1, 1.2, 2.1, 2.6, 2.7_
 
-- [ ] 12. Clean up deprecated task generation code (after validation)
+- [-] 12. Clean up deprecated task generation code (after validation)
   - Remove `GenerateHierarchicalTasks` command from CLI enum
   - Remove complex task generation modules from `tasks/` directory
   - Remove associated test files for deprecated functionality
