@@ -78,27 +78,27 @@
   - **Prompt**: `.kiro/non-technical-authentic-voice-prompt.md` where you try to find insights of A alone ; A in context of B ; B in context of C ; A in context B & C
   - **Output**: `gringotts/WorkArea/INGEST_20250930190405_200_16.md`
 
-- [-] 17. Analyze INGEST_20250930190405 row 17
+- [x] 17. Analyze INGEST_20250930190405 row 17
   - **Content**: `.wipToBeDeletedFolder/INGEST_20250930190405_200_17_Content.txt` as A + `.wipToBeDeletedFolder/INGEST_20250930190405_200_17_Content_L1.txt` as B + `.wipToBeDeletedFolder/INGEST_20250930190405_200_17_Content_L2.txt` as C
   - **Prompt**: `.kiro/non-technical-authentic-voice-prompt.md` where you try to find insights of A alone ; A in context of B ; B in context of C ; A in context B & C
   - **Output**: `gringotts/WorkArea/INGEST_20250930190405_200_17.md`
 
-- [ ] 18. Analyze INGEST_20250930190405 row 18
+- [x] 18. Analyze INGEST_20250930190405 row 18
   - **Content**: `.wipToBeDeletedFolder/INGEST_20250930190405_200_18_Content.txt` as A + `.wipToBeDeletedFolder/INGEST_20250930190405_200_18_Content_L1.txt` as B + `.wipToBeDeletedFolder/INGEST_20250930190405_200_18_Content_L2.txt` as C
   - **Prompt**: `.kiro/non-technical-authentic-voice-prompt.md` where you try to find insights of A alone ; A in context of B ; B in context of C ; A in context B & C
   - **Output**: `gringotts/WorkArea/INGEST_20250930190405_200_18.md`
 
-- [ ] 19. Analyze INGEST_20250930190405 row 19
+- [x] 19. Analyze INGEST_20250930190405 row 19
   - **Content**: `.wipToBeDeletedFolder/INGEST_20250930190405_200_19_Content.txt` as A + `.wipToBeDeletedFolder/INGEST_20250930190405_200_19_Content_L1.txt` as B + `.wipToBeDeletedFolder/INGEST_20250930190405_200_19_Content_L2.txt` as C
   - **Prompt**: `.kiro/non-technical-authentic-voice-prompt.md` where you try to find insights of A alone ; A in context of B ; B in context of C ; A in context B & C
   - **Output**: `gringotts/WorkArea/INGEST_20250930190405_200_19.md`
 
-- [ ] 20. Analyze INGEST_20250930190405 row 20
+- [x] 20. Analyze INGEST_20250930190405 row 20
   - **Content**: `.wipToBeDeletedFolder/INGEST_20250930190405_200_20_Content.txt` as A + `.wipToBeDeletedFolder/INGEST_20250930190405_200_20_Content_L1.txt` as B + `.wipToBeDeletedFolder/INGEST_20250930190405_200_20_Content_L2.txt` as C
   - **Prompt**: `.kiro/non-technical-authentic-voice-prompt.md` where you try to find insights of A alone ; A in context of B ; B in context of C ; A in context B & C
   - **Output**: `gringotts/WorkArea/INGEST_20250930190405_200_20.md`
 
-- [ ] 21. Analyze INGEST_20250930190405 row 21
+- [x] 21. Analyze INGEST_20250930190405 row 21
   - **Content**: `.wipToBeDeletedFolder/INGEST_20250930190405_200_21_Content.txt` as A + `.wipToBeDeletedFolder/INGEST_20250930190405_200_21_Content_L1.txt` as B + `.wipToBeDeletedFolder/INGEST_20250930190405_200_21_Content_L2.txt` as C
   - **Prompt**: `.kiro/non-technical-authentic-voice-prompt.md` where you try to find insights of A alone ; A in context of B ; B in context of C ; A in context B & C
   - **Output**: `gringotts/WorkArea/INGEST_20250930190405_200_21.md`
