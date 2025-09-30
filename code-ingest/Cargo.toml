@@ -1,6 +1,6 @@
 [package]
 name = "code-ingest"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 authors = ["Code Ingest Team <team@code-ingest.dev>"]
 description = "A high-performance Rust tool for ingesting GitHub repositories into PostgreSQL databases for fast code analysis"

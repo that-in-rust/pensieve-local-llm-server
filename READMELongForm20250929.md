@@ -72,35 +72,39 @@ flowchart TD
 
 ## Validated Performance Results
 
-### Test Case 1: XSV Repository (GitHub)
-**Command**: `./target/release/code-ingest ingest https://github.com/BurntSushi/xsv --db-path /Users/neetipatni/desktop/PensieveDB01`
+### Test Case 1: Twitter Data Analysis (Local Folder)
+**Command**: `./target/release/code-ingest ingest /home/amuldotexe/Desktop/Work20250929/pensieve/examples/twitter-analysis-202509 --folder-flag --db-path /home/amuldotexe/Desktop/before-I-go/twitter-analysis-202509`
 
 **Results**:
-- **Files Processed**: 59 files
-- **Processing Time**: 1.79 seconds
-- **Throughput**: 32.96 files/second
-- **Memory Usage**: 8.04 MB peak
-- **Table Created**: `INGEST_20250929040158`
+- **Files Processed**: 21 JavaScript files (105MB total)
+- **Processing Time**: 85.71 seconds
+- **Throughput**: 0.24 files/second (large files)
+- **Memory Usage**: 60.00 MB peak
+- **Table Created**: `INGEST_20250930025223`
 
 **Database Results**:
-- **Files Ingested**: 59 files with full content and metadata
-- **Searchable Content**: All file content indexed for full-text search
-- **Query Ready**: Immediate SQL access to all code and metadata
+- **Files Ingested**: 21 Twitter data files with full content and metadata
+- **Searchable Content**: All tweet content indexed for full-text search
+- **Query Ready**: Immediate SQL access to all tweets and metadata
 
-### Test Case 2: Local Folder Analysis
-**Command**: `./target/release/code-ingest ingest /Users/neetipatni/Desktop/Game20250927/number-12-grimmauld-place/LibraryOfOrderOfThePhoenix --folder-flag --db-path /Users/neetipatni/desktop/PensieveDB01`
+### Test Case 2: Content Extraction & Task Generation
+**Command**: `./target/release/code-ingest extract-content INGEST_20250930025223 --output-dir .wipToBeDeletedFolder --chunk-size 500 --db-path /home/amuldotexe/Desktop/before-I-go/twitter-analysis-202509`
 
 **Results**:
-- **Files Processed**: 9 files (4.3MB total)
-- **Processing Time**: 1.46 seconds
-- **Throughput**: 6.16 files/second
-- **Memory Usage**: 10.84 MB peak
-- **Table Created**: `INGEST_20250929042515`
+- **Content Files Created**: 126 files (42 A/B/C triples - both chunked and non-chunked)
+- **Processing Time**: 1.35 seconds
+- **File Formats**: 
+  - Non-chunked: `INGEST_20250930025223_1_Content.txt`
+  - Chunked: `INGEST_20250930025223_500_1_Content.txt`
+- **Context Levels**: A (individual), B (L1 context), C (L2 context)
 
-**Database Results**:
-- **Files Ingested**: 9 large files (4.3MB) with full content and metadata
-- **Searchable Content**: All file content indexed for full-text search
-- **Query Ready**: Immediate SQL access to all code and metadata
+**Task Generation Results**:
+**Command**: `./target/release/code-ingest generate-hierarchical-tasks INGEST_20250930025223 --output twitter-analysis-tasks-final.txt --chunks 500 --max-tasks 21 --prompt-file .kiro/non-technical-authentic-voice-prompt.md --db-path /home/amuldotexe/Desktop/before-I-go/twitter-analysis-202509`
+
+- **Tasks Generated**: 21 analysis tasks (limited by max-tasks parameter)
+- **Task Format**: TXT format with precise A/B/C file references
+- **Output Structure**: `gringotts/WorkArea/INGEST_20250930025223_500_1.md`
+- **Prompt Integration**: Custom analysis prompts with multi-context analysis
 
 ## Quick Start
 
@@ -244,6 +248,23 @@ For comprehensive analysis, the system:
   --db-path /path/to/database
 ```
 
+### Content Extraction & Task Management
+```bash
+# Extract content files for analysis
+./target/release/code-ingest extract-content TABLE_NAME \
+  --output-dir .wipToBeDeletedFolder \
+  --chunk-size 500 \
+  --db-path /path/to/database
+
+# Generate analysis tasks
+./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME \
+  --output analysis-tasks.txt \
+  --chunks 500 \
+  --max-tasks 100 \
+  --prompt-file .kiro/your-analysis-prompt.md \
+  --db-path /path/to/database
+```
+
 ### Table Management
 ```bash
 # List all tables
@@ -261,16 +282,17 @@ For comprehensive analysis, the system:
 ## Performance Characteristics
 
 ### Throughput Benchmarks
-- **Small Files** (< 1KB): 100+ files/second
-- **Medium Files** (1-10KB): 50+ files/second  
-- **Large Files** (10KB+): 20+ files/second
-- **Memory Usage**: Constant ~10-25MB regardless of repository size
+- **Large Files** (5MB avg): 0.24 files/second (Twitter data analysis)
+- **Content Extraction**: 126 A/B/C files in 1.35 seconds (93 files/second)
+- **Task Generation**: 21 tasks with precise references in <1 second
+- **Memory Usage**: 60MB peak for 105MB dataset processing
 
 ### Scalability
-- **Tested**: Up to 10,000+ files per repository
-- **Database**: PostgreSQL with optimized connection pooling
-- **Concurrency**: Automatic CPU core scaling
-- **Storage**: Efficient compression and indexing
+- **Tested**: 21 large files (105MB total) with full content extraction
+- **Database**: PostgreSQL with timestamped tables and multi-scale context
+- **Content Extraction**: Supports both chunked and non-chunked file processing
+- **Task Generation**: Configurable limits (max-tasks parameter) to prevent overload
+- **Storage**: Efficient A/B/C file generation with precise naming conventions
 
 ## File Type Support
 
@@ -284,40 +306,57 @@ For comprehensive analysis, the system:
 
 The system creates timestamped PostgreSQL tables with comprehensive metadata:
 
-### Table Structure (Example: `INGEST_20250929040158`)
+### Table Structure (Example: `INGEST_20250930025223`)
 ```sql
-CREATE TABLE INGEST_20250929040158 (
+CREATE TABLE "INGEST_20250930025223" (
     file_id BIGSERIAL PRIMARY KEY,
+    ingestion_id BIGINT NOT NULL,
     filepath VARCHAR NOT NULL,
     filename VARCHAR NOT NULL,
     extension VARCHAR,
-    file_size_bytes BIGINT,
+    file_size_bytes BIGINT NOT NULL,
     line_count INTEGER,
     word_count INTEGER,
+    token_count INTEGER,              -- Token count for analysis
     content_text TEXT,                -- Full file content (searchable)
+    file_type VARCHAR NOT NULL CHECK (file_type IN ('direct_text', 'convertible', 'non_text')),
+    conversion_command VARCHAR,       -- Conversion method used
+    relative_path VARCHAR NOT NULL,   -- Relative file path
+    absolute_path VARCHAR NOT NULL,   -- Absolute file path
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Multi-scale context columns for knowledge arbitrage
     parent_filepath VARCHAR,          -- Directory context
     l1_window_content TEXT,           -- Directory-level context
     l2_window_content TEXT,           -- System-level context
-    ast_patterns JSONB,               -- Semantic patterns
-    file_type VARCHAR,                -- Processing type
-    ingestion_timestamp TIMESTAMP DEFAULT NOW()
+    ast_patterns JSONB                -- Semantic patterns
 );
 ```
 
 ### Query Examples
 ```sql
--- Find all async functions
-SELECT filepath, filename FROM INGEST_20250929040158 
-WHERE content_text LIKE '%async fn%';
+-- Find tweets with specific content
+SELECT filepath, filename FROM INGEST_20250930025223 
+WHERE content_text LIKE '%full_text%';
 
 -- Analyze file complexity
-SELECT extension, AVG(line_count), COUNT(*) 
-FROM INGEST_20250929040158 
+SELECT extension, AVG(line_count), COUNT(*), AVG(token_count) 
+FROM INGEST_20250930025223 
 GROUP BY extension ORDER BY AVG(line_count) DESC;
 
--- Full-text search
-SELECT filepath FROM INGEST_20250929040158 
-WHERE content_text @@ to_tsquery('error & handling');
+-- Full-text search across Twitter data
+SELECT filepath FROM INGEST_20250930025223 
+WHERE content_text @@ to_tsquery('tweet & data');
+
+-- Find largest files by token count
+SELECT filepath, filename, token_count, line_count 
+FROM INGEST_20250930025223 
+ORDER BY token_count DESC LIMIT 10;
+
+-- Check file types processed
+SELECT file_type, COUNT(*), AVG(file_size_bytes) 
+FROM INGEST_20250930025223 
+GROUP BY file_type;
 ```
 
 ## System Requirements
@@ -378,22 +417,26 @@ export CODE_INGEST_MAX_CONCURRENCY=4
 
 ## Development Status
 
-### Version 0.2 Features
+### Version 0.3 Features
 - ✅ GitHub repository ingestion
 - ✅ Local folder ingestion  
-- ✅ Multi-scale context windows
-- ✅ SQL query interface
+- ✅ Multi-scale context windows (L1/L2)
+- ✅ Content extraction with A/B/C file generation
+- ✅ Hierarchical task generation with custom prompts
+- ✅ Chunked and non-chunked file processing
+- ✅ SQL query interface with token count support
 - ✅ Full-text search capabilities
-- ✅ PostgreSQL optimization
-- ✅ SQL query interface
-- ✅ Performance monitoring
+- ✅ PostgreSQL optimization with enhanced schema
+- ✅ Performance monitoring and validation
+- ✅ Systematic analysis workflow automation
 
 ### Validated Test Cases
-- ✅ XSV repository (59 files, 1.79s)
-- ✅ Local folder (9 files, 1.46s)
-- ✅ Database schema creation
-- ✅ Content indexing and search
-- ✅ Database operations (CRUD)
+- ✅ Twitter data analysis (21 files, 105MB, 85.7s)
+- ✅ Content extraction (126 A/B/C files, 1.35s)
+- ✅ Task generation (21 tasks with precise file references)
+- ✅ Database schema creation with multi-scale context
+- ✅ Content indexing and search with token counts
+- ✅ Database operations (CRUD) with chunking support
 
 ## Contributing
 

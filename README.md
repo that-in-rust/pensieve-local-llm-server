@@ -135,10 +135,11 @@ flowchart TD
 
 ## Real performance
 
-Tested on actual repos:
-- **59 files processed in 1.79 seconds** (XSV repository)
-- **9 large files in 1.46 seconds** (local folder)
-- **Memory usage under 25MB** for both
+Tested on actual data:
+- **21 large files (105MB) in 85.7 seconds** (Twitter data analysis)
+- **126 content files extracted in 1.35 seconds** (A/B/C extraction with chunking)
+- **21 analysis tasks generated** with precise A/B/C file references
+- **Memory usage 60MB peak** for large dataset processing
 
 ## Common workflows
 
@@ -234,17 +235,54 @@ flowchart TD
 ```
 
 ### Database schema
-- **File content**: Full text with search indexing
-- **Metadata**: File paths, sizes, types, line counts
-- **Context windows**: Directory and system-level relationships
+- **File content**: Full text with search indexing and token counts
+- **Metadata**: File paths, sizes, types, line counts, word counts
+- **Context windows**: L1 (directory) and L2 (system) level relationships
 - **Timestamps**: When files were ingested and processed
+- **Processing info**: File types (direct_text/convertible/non_text), conversion methods, relative/absolute paths
+
+### Content extraction capabilities
+- **A/B/C file generation**: Individual, L1 context, L2 context files
+- **Dual file formats**: Both chunked (`TableName_500_1_Content.txt`) and non-chunked (`TableName_1_Content.txt`)
+- **Configurable chunk sizes**: 50-10000 lines per chunk
+- **Work directory management**: `.wipToBeDeletedFolder` with gitignore integration
+
+### Task generation features
+- **Structured analysis tasks**: TXT format with precise A/B/C file references
+- **Custom prompts**: Integration with analysis prompt files (`.kiro/` directory)
+- **Configurable limits**: Max tasks (default 50), chunk sizes, output formats
+- **Multi-context analysis**: Tasks specify A alone, A+B, B+C, A+B+C analysis patterns
 
 ### Query capabilities
-- Full-text search across all content
-- Metadata filtering (file types, sizes, etc.)
+- Full-text search across all content with PostgreSQL full-text search
+- Metadata filtering (file types, sizes, token counts, etc.)
 - Pattern matching and regex searches
-- Relationship queries between files
+- Relationship queries between files using multi-scale context
 - Performance analytics (largest files, most complex, etc.)
+
+## Complete workflow example
+
+```bash
+# 1. Ingest your data
+./target/release/code-ingest ingest /path/to/data --folder-flag --db-path ./analysis
+
+# 2. Extract content for systematic analysis  
+./target/release/code-ingest extract-content TABLE_NAME \
+  --output-dir .wipToBeDeletedFolder --chunk-size 500 --db-path ./analysis
+
+# 3. Generate structured analysis tasks
+./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME \
+  --output analysis-tasks.txt --chunks 500 --max-tasks 100 \
+  --prompt-file .kiro/your-prompt.md --db-path ./analysis
+
+# 4. Execute systematic analysis using generated A/B/C files
+# Each task references precise files:
+# - A: TableName_ChunkSize_RowNumber_Content.txt (individual content)
+# - B: TableName_ChunkSize_RowNumber_Content_L1.txt (L1 context)  
+# - C: TableName_ChunkSize_RowNumber_Content_L2.txt (L2 context)
+```
+
+**Result**: Structured analysis workflow with precise A/B/C file references, multi-scale context, and systematic task execution. Tasks output to `gringotts/WorkArea/` directory.
 
 ## Build it
 
