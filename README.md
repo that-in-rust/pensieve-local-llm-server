@@ -266,9 +266,9 @@ flowchart TD
 # 1. Ingest your data
 ./target/release/code-ingest ingest /path/to/data --folder-flag --db-path ./analysis
 
-# 2. Extract content for systematic analysis  
-./target/release/code-ingest extract-content TABLE_NAME \
-  --output-dir .wipToBeDeletedFolder --chunk-size 500 --db-path ./analysis
+# 2. Generate content files for systematic analysis  
+./target/release/code-ingest chunk-level-task-generator TABLE_NAME 500 \
+  --output-dir .wipToBeDeletedFolder --db-path ./analysis
 
 # 3. Generate structured analysis tasks
 ./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME \
@@ -304,10 +304,9 @@ mkdir -p /path/to/database/directory
 
 ### Content Extraction & Analysis
 ```bash
-# Extract A/B/C content files for analysis
-./target/release/code-ingest extract-content TABLE_NAME \
+# Generate content files for analysis
+./target/release/code-ingest chunk-level-task-generator TABLE_NAME 500 \
   --output-dir .wipToBeDeletedFolder \
-  --chunk-size 500 \
   --db-path ./analysis
 
 # Generate analysis tasks with custom prompts

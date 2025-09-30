@@ -317,7 +317,7 @@ impl L1L8MarkdownGenerator {
         markdown.push_str("# Count rows in source table\n");
         markdown.push_str(&format!("code-ingest count-rows {}\n", table_name));
         markdown.push_str("\n# Extract content files\n");
-        markdown.push_str(&format!("code-ingest extract-content {} --output-dir .raw_data_202509\n", table_name));
+        markdown.push_str(&format!("code-ingest chunk-level-task-generator {} --output-dir .raw_data_202509\n", table_name));
         markdown.push_str("\n# Generate hierarchical tasks\n");
         markdown.push_str(&format!("code-ingest generate-hierarchical-tasks {} --levels 4 --groups 7 --output {}_tasks.md\n", table_name, table_name));
         markdown.push_str("```\n\n");

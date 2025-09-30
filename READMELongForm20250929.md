@@ -87,8 +87,8 @@ flowchart TD
 - **Searchable Content**: All tweet content indexed for full-text search
 - **Query Ready**: Immediate SQL access to all tweets and metadata
 
-### Test Case 2: Content Extraction & Task Generation
-**Command**: `./target/release/code-ingest extract-content INGEST_20250930025223 --output-dir .wipToBeDeletedFolder --chunk-size 500 --db-path /home/amuldotexe/Desktop/before-I-go/twitter-analysis-202509`
+### Test Case 2: Content Generation & Task Generation
+**Command**: `./target/release/code-ingest chunk-level-task-generator INGEST_20250930025223 500 --output-dir .wipToBeDeletedFolder --db-path /home/amuldotexe/Desktop/before-I-go/twitter-analysis-202509`
 
 **Results**:
 - **Content Files Created**: 126 files (42 A/B/C triples - both chunked and non-chunked)
@@ -250,10 +250,9 @@ For comprehensive analysis, the system:
 
 ### Content Extraction & Task Management
 ```bash
-# Extract content files for analysis
-./target/release/code-ingest extract-content TABLE_NAME \
+# Generate content files for analysis
+./target/release/code-ingest chunk-level-task-generator TABLE_NAME 500 \
   --output-dir .wipToBeDeletedFolder \
-  --chunk-size 500 \
   --db-path /path/to/database
 
 # Generate analysis tasks
@@ -468,14 +467,13 @@ mkdir -p /path/to/database/directory
 
 ### Content Extraction Commands
 ```bash
-# Extract A/B/C content files with chunking
-./target/release/code-ingest extract-content TABLE_NAME \
+# Generate content files with chunking
+./target/release/code-ingest chunk-level-task-generator TABLE_NAME 500 \
   --output-dir .wipToBeDeletedFolder \
-  --chunk-size 500 \
   --db-path /path/to/database
 
-# Extract without chunking
-./target/release/code-ingest extract-content TABLE_NAME \
+# Generate content files without chunking
+./target/release/code-ingest chunk-level-task-generator TABLE_NAME \
   --output-dir .analysis-files \
   --db-path /path/to/database
 ```
@@ -559,8 +557,8 @@ mkdir -p /path/to/database/directory
 ./target/release/code-ingest ingest /home/user/twitter-data \
   --folder-flag --db-path /home/user/twitter-analysis
 
-./target/release/code-ingest extract-content INGEST_20250930025223 \
-  --output-dir .twitter-analysis --chunk-size 500 \
+./target/release/code-ingest chunk-level-task-generator INGEST_20250930025223 500 \
+  --output-dir .twitter-analysis \
   --db-path /home/user/twitter-analysis
 
 ./target/release/code-ingest generate-hierarchical-tasks INGEST_20250930025223 \
@@ -572,8 +570,8 @@ mkdir -p /path/to/database/directory
 ./target/release/code-ingest ingest /home/user/rust-docs \
   --folder-flag --db-path /home/user/rust-analysis
 
-./target/release/code-ingest extract-content INGEST_20250930052722 \
-  --output-dir .rust-analysis --chunk-size 500 \
+./target/release/code-ingest chunk-level-task-generator INGEST_20250930052722 500 \
+  --output-dir .rust-analysis \
   --db-path /home/user/rust-analysis
 
 ./target/release/code-ingest generate-hierarchical-tasks INGEST_20250930052722 \
