@@ -150,3 +150,31 @@ flowchart TD
     D --> G
 ```
 
+## Essential Commands
+
+### Ingestion Commands
+
+```bash
+# Ingest GitHub repository
+./target/release/code-ingest ingest https://github.com/user/repo --db-path ./analysis
+
+# Ingest local folder (requires --folder-flag)
+./target/release/code-ingest ingest /absolute/path/to/folder --folder-flag --db-path ./analysis
+```
+
+### Content Extraction & Task Generation
+
+```bash
+# Extract content with chunk size
+./target/release/code-ingest extract-content TABLE_NAME --chunk-size 300 --output-dir .wipToBeDeletedFolder --db-path ./analysis
+
+# Generate hierarchical tasks with chunk size
+./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME --chunks 300 --output TABLE_NAME_tasks.md --prompt-file .kiro/steering/analysis.md --db-path ./analysis
+
+# Extract content without chunking
+./target/release/code-ingest extract-content TABLE_NAME --output-dir .wipToBeDeletedFolder --db-path ./analysis
+
+# Generate hierarchical tasks without chunking
+./target/release/code-ingest generate-hierarchical-tasks TABLE_NAME --output TABLE_NAME_tasks.md --prompt-file .kiro/steering/analysis.md --db-path ./analysis
+```
+
