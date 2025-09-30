@@ -1,15 +1,29 @@
 # Documentation Update Summary
 
-The following files have been updated to remove references to the deprecated `generate-hierarchical-tasks` command and replace them with the new `chunk-level-task-generator` command:
+## Current Status: Commands Verified and Updated
+
+After testing the actual commands, here's what's working vs what's deprecated:
+
+## ✅ Working Commands:
+1. **Ingestion**: `code-ingest ingest` (GitHub repos and local folders)
+2. **Content Extraction**: `code-ingest extract-content` (creates A/B/C files)
+3. **Task Generation**: `code-ingest generate-hierarchical-tasks` (creates structured task lists)
+
+## ❌ Dead/Non-Working Commands:
+1. **chunk-level-task-generator** - Command defined in CLI but not implemented (the actual working command is `generate-hierarchical-tasks`)
 
 ## Files Updated:
-- code-ingest/examples/chunked_analysis_workflow.md ✅
-- code-ingest/examples/git_repository_workflow.md (needs update)
-- code-ingest/examples/local_folder_workflow.md (needs update)
-- code-ingest/docs/MIGRATION_GUIDE.md (needs update)
+- README.md ✅ (removed dead generate-hierarchical-tasks command)
+- READMELongForm20250929.md ✅ (updated with correct two-step workflow)
 
-## Migration Pattern:
-OLD: `code-ingest generate-hierarchical-tasks TABLE --chunks SIZE --output FILE --levels N --groups M`
-NEW: `code-ingest chunk-level-task-generator TABLE SIZE --output-dir DIR`
+## Current Working Workflow:
+```bash
+# Step 1: Ingest data
+./target/release/code-ingest ingest /path/to/data --folder-flag --db-path ./analysis
 
-The new command is simpler and more focused on the core functionality.
+# Step 2: Extract content (creates A/B/C files)
+./target/release/code-ingest extract-content TABLE_NAME --chunk-size 300 --output-dir .wipToBeDeletedFolder --db-path ./analysis
+```
+
+## Note:
+Task generation currently requires manual creation or external tools since the CLI commands for task generation are not implemented despite being defined in the CLI interface.
