@@ -21,11 +21,14 @@ EXAMPLES:
     # Ingest local folder
     code-ingest ingest /absolute/path/to/folder --folder-flag --db-path /path/to/db
     
-    # Generate hierarchical tasks
-    code-ingest generate-hierarchical-tasks TABLE_NAME --levels 4 --groups 7 --output tasks.md
+    # Generate content files and task lists (simplified approach)
+    code-ingest chunk-level-task-generator TABLE_NAME --db-path /path/to/db
     
-    # Generate tasks with chunking for large files
-    code-ingest generate-hierarchical-tasks TABLE_NAME --chunks 500 --output tasks.md")]
+    # Generate with chunking for large files
+    code-ingest chunk-level-task-generator TABLE_NAME 500 --db-path /path/to/db
+    
+    # Generate hierarchical tasks (legacy)
+    code-ingest generate-hierarchical-tasks TABLE_NAME --levels 4 --groups 7 --output tasks.md")]
 pub struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -414,6 +417,39 @@ pub enum Commands {
         #[arg(long, help = "Task number to reset the current window to")]
         to: usize,
     },
+
+    /// Generate content files and task lists with simplified chunk-level processing
+    /// 
+    /// This command replaces the complex task generation system with two simple modes:
+    /// - File-level mode (no chunk size): generates content files for each database row
+    /// - Chunk-level mode (with chunk size): processes large files with chunking
+    /// 
+    /// Examples:
+    ///   # File-level mode - generate content files for each row
+    ///   code-ingest chunk-level-task-generator INGEST_20250928101039 --db-path /path/to/db
+    ///   
+    ///   # Chunk-level mode - process large files with 500-line chunks
+    ///   code-ingest chunk-level-task-generator INGEST_20250928101039 500 --db-path /path/to/db
+    ///   
+    ///   # Custom output directory
+    ///   code-ingest chunk-level-task-generator INGEST_20250928101039 --output-dir ./output --db-path /path/to/db
+    ChunkLevelTaskGenerator {
+        /// Database table name containing ingested code data
+        #[arg(help = "Name of the database table to generate tasks from (e.g., INGEST_20250928101039)")]
+        table_name: String,
+        
+        /// Optional chunk size for large file processing (lines of code)
+        #[arg(help = "Optional chunk size in lines of code for processing large files (50-10000)")]
+        chunk_size: Option<usize>,
+        
+        /// Database path (can also be set globally)
+        #[arg(long, help = "Path to PostgreSQL database directory")]
+        db_path: Option<PathBuf>,
+        
+        /// Output directory for content files and task list
+        #[arg(long, default_value = ".", help = "Directory where content files and task list will be created")]
+        output_dir: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -689,6 +725,15 @@ impl Cli {
             Commands::ResetWindow { task_dir: _, to: _ } => {
                 eprintln!("ResetWindow command not yet implemented");
                 Ok(())
+            }
+            Commands::ChunkLevelTaskGenerator { table_name, chunk_size, db_path, output_dir } => {
+                let db_path = db_path.clone().or_else(|| self.db_path.clone());
+                self.execute_chunk_level_task_generator(
+                    table_name.clone(),
+                    *chunk_size,
+                    db_path,
+                    output_dir.clone(),
+                ).await
             }
         }
     }
@@ -2987,6 +3032,147 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         
         Ok(())
     }
+
+    /// Execute chunk-level task generator command
+    /// 
+    /// This method implements the simplified chunk-level task generation that replaces
+    /// the complex existing task generation system with two modes:
+    /// - File-level mode (no chunk size): generates content files for each database row
+    /// - Chunk-level mode (with chunk size): processes large files with chunking
+    /// 
+    /// # Requirements
+    /// Satisfies requirements 1.1 and 2.1 by providing CLI integration for the
+    /// ChunkLevelTaskGenerator with proper argument parsing and user feedback.
+    #[instrument(skip(self))]
+    async fn execute_chunk_level_task_generator(
+        &self,
+        table_name: String,
+        chunk_size: Option<usize>,
+        db_path: Option<PathBuf>,
+        output_dir: PathBuf,
+    ) -> Result<()> {
+        use crate::tasks::chunk_level_task_generator::ChunkLevelTaskGenerator;
+        use crate::tasks::database_service::DatabaseService;
+        use crate::tasks::content_file_writer::ContentFileWriter;
+        use crate::tasks::task_list_generator::TaskListGenerator;
+        use crate::tasks::chunking_service::ChunkingService;
+        use crate::database::Database;
+        use indicatif::{ProgressBar, ProgressStyle};
+        use std::sync::Arc;
+
+        // Display command information
+        println!("🚀 {}", "Chunk-Level Task Generator".bright_green().bold());
+        println!("📋 Table: {}", table_name.bright_cyan());
+        if let Some(chunk_size) = chunk_size {
+            println!("📏 Chunk Size: {} lines (chunk-level mode)", chunk_size.to_string().bright_yellow());
+        } else {
+            println!("📄 Mode: File-level (no chunking)");
+        }
+        println!("📂 Output Directory: {}", output_dir.display().to_string().bright_yellow());
+        println!();
+
+        // Get database connection
+        info!("Connecting to database");
+        let database = if let Some(path) = db_path {
+            Database::from_path(&path).await
+                .with_context(|| format!("Failed to connect to database at path: {}", path.display()))?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            Database::new(&database_url).await
+                .with_context(|| "Failed to connect to database using DATABASE_URL")?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        // Create progress bar
+        let progress = ProgressBar::new(100);
+        progress.set_style(
+            ProgressStyle::default_bar()
+                .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos:>7}/{len:7} {msg}")
+                .unwrap()
+                .progress_chars("#>-"),
+        );
+
+        progress.set_message("Initializing services...");
+        progress.set_position(10);
+
+        // Initialize all required services
+        let database_service = Arc::new(DatabaseService::new(database.pool().clone()));
+        let content_writer = ContentFileWriter::new(output_dir.clone());
+        let task_generator = TaskListGenerator::new();
+        let chunking_service = ChunkingService::new(database_service.clone());
+
+        progress.set_message("Creating task generator...");
+        progress.set_position(20);
+
+        // Create the chunk-level task generator
+        let generator = ChunkLevelTaskGenerator::new(
+            database_service,
+            content_writer,
+            task_generator,
+            chunking_service,
+        );
+
+        progress.set_message("Validating table and inputs...");
+        progress.set_position(30);
+
+        // Execute the task generation
+        info!("Starting task generation for table '{}' with chunk_size {:?}", table_name, chunk_size);
+        let result = generator.execute(&table_name, chunk_size, None).await
+            .with_context(|| format!("Failed to execute chunk-level task generation for table '{}'", table_name))?;
+
+        progress.set_message("Task generation complete!");
+        progress.set_position(100);
+        progress.finish_with_message("✅ Task generation completed!");
+
+        // Display results
+        println!();
+        println!("📊 {}", "Generation Summary:".bright_green().bold());
+        println!("   Table Used: {}", result.table_used.bright_cyan());
+        println!("   Rows Processed: {}", result.rows_processed.to_string().bright_green());
+        println!("   Content Files Created: {}", result.content_files_created.to_string().bright_green());
+        println!("   Task List: {}", result.task_list_path.display().to_string().bright_yellow());
+        
+        if let Some(chunked_table) = &result.chunked_table_created {
+            println!("   Chunked Table Created: {}", chunked_table.bright_magenta());
+        }
+
+        // Display processing statistics
+        let stats = &result.processing_stats;
+        println!();
+        println!("⚡ {}", "Processing Statistics:".bright_blue().bold());
+        println!("   Processing Time: {}ms", stats.processing_time_ms.to_string().bright_yellow());
+        println!("   Files Chunked: {}", stats.files_chunked.to_string().bright_green());
+        println!("   Files Copied: {}", stats.files_copied.to_string().bright_green());
+        println!("   Total Files Processed: {}", stats.total_files_processed().to_string().bright_cyan());
+        
+        if stats.total_chunks_created > 0 {
+            println!("   Total Chunks Created: {}", stats.total_chunks_created.to_string().bright_magenta());
+            println!("   Average Chunk Size: {:.1} lines", stats.average_chunk_size.to_string().bright_yellow());
+        }
+        
+        if stats.processing_time_ms > 0 {
+            println!("   Processing Rate: {:.1} files/sec", stats.processing_rate_fps().to_string().bright_green());
+        }
+
+        // Display next steps
+        println!();
+        println!("🎯 {}", "Next Steps:".bright_green().bold());
+        println!("   1. Review generated content files in: {}", output_dir.display().to_string().bright_yellow());
+        println!("   2. Open task list: {}", result.task_list_path.display().to_string().bright_yellow());
+        println!("   3. Execute tasks using your preferred method");
+        
+        if result.used_chunking() {
+            println!("   4. Chunked table '{}' is available for further analysis", 
+                    result.chunked_table_created.as_ref().unwrap().bright_magenta());
+        }
+
+        // Cleanup resources
+        generator.cleanup().await
+            .with_context(|| "Failed to cleanup resources after task generation")?;
+
+        info!("Chunk-level task generation completed successfully");
+        Ok(())
+    }
 }
 #[cfg(test)]
 mod tests {
@@ -3302,6 +3488,62 @@ mod tests {
         let args = vec!["code-ingest", "sample"];
         let result = Cli::try_parse_from(args);
         assert!(result.is_err()); // Missing --table argument
+    }
+
+    #[test]
+    fn test_cli_parsing_chunk_level_task_generator() {
+        // Test chunk-level task generator command - file-level mode
+        let args = vec![
+            "code-ingest",
+            "chunk-level-task-generator",
+            "INGEST_20250928101039",
+            "--db-path",
+            "/tmp/test.db",
+            "--output-dir",
+            "./output",
+        ];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match &cli.command {
+            Some(Commands::ChunkLevelTaskGenerator { 
+                table_name, 
+                chunk_size, 
+                db_path, 
+                output_dir 
+            }) => {
+                assert_eq!(table_name, "INGEST_20250928101039");
+                assert_eq!(*chunk_size, None);
+                assert_eq!(db_path.as_ref().unwrap().to_str().unwrap(), "/tmp/test.db");
+                assert_eq!(output_dir.to_str().unwrap(), "./output");
+            }
+            _ => panic!("Expected ChunkLevelTaskGenerator command"),
+        }
+
+        // Test chunk-level task generator command - chunk-level mode
+        let args = vec![
+            "code-ingest",
+            "chunk-level-task-generator",
+            "INGEST_20250928101039",
+            "500",
+            "--db-path",
+            "/tmp/test.db",
+        ];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match &cli.command {
+            Some(Commands::ChunkLevelTaskGenerator { 
+                table_name, 
+                chunk_size, 
+                db_path, 
+                output_dir 
+            }) => {
+                assert_eq!(table_name, "INGEST_20250928101039");
+                assert_eq!(*chunk_size, Some(500));
+                assert_eq!(db_path.as_ref().unwrap().to_str().unwrap(), "/tmp/test.db");
+                assert_eq!(output_dir.to_str().unwrap(), ".");
+            }
+            _ => panic!("Expected ChunkLevelTaskGenerator command"),
+        }
     }
 
     #[test]
