@@ -1,4 +1,4 @@
-- [-] 1. Analyze INGEST_20250930104957 row 1
+- [ ] 1. Analyze INGEST_20250930104957 row 1
   - **Content**: `.wipToBeDeletedFolder/INGEST_20250930104957_300_1_Content.txt` as A + `.wipToBeDeletedFolder/INGEST_20250930104957_300_1_Content_L1.txt` as B + `.wipToBeDeletedFolder/INGEST_20250930104957_300_1_Content_L2.txt` as C
   - **Prompt**: `.kiro/RustPatterns20250930.md` where you try to find insights of A alone ; A in context of B ; B in context of C ; A in context B & C
   - **Output**: `gringotts/WorkArea/INGEST_20250930104957_300_1.md`
