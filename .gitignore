@@ -58,6 +58,9 @@ test_*
 zzzzArchive/
 zzArchive/
 
+# Large data files
+examples/twitter-analysis-202509/tweets202508.js
+
 # Temporary analysis files (keep organized versions in docs/)
 *_analysis.md
 *_strategy.md

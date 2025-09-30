@@ -135,12 +135,18 @@ impl QueryExecutor {
             self.format_for_terminal(&limited_result, config)
         };
         
+        let offset_info = if config.offset > 0 { 
+            format!(" (offset: {})", config.offset) 
+        } else { 
+            String::new() 
+        };
+        
         info!(
             "Query executed successfully: {} rows in {}ms{}{}",
             limited_result.row_count,
             limited_result.execution_time_ms,
             if truncated { " (truncated)" } else { "" },
-            if config.offset > 0 { &format!(" (offset: {})", config.offset) } else { "" }
+            offset_info
         );
         
         Ok(FormattedQueryOutput {
