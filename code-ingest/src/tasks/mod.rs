@@ -6,6 +6,8 @@
 pub mod database_query_engine;
 pub mod content_extractor;
 pub mod content_generator;
+pub mod content_file_writer;
+pub mod content_file_writer_test;
 pub mod hierarchical_task_divider;
 pub mod hierarchical_generator;
 pub mod l1l8_markdown_generator;
@@ -17,10 +19,15 @@ pub mod task_structure_builder;
 pub mod windowed_task_manager;
 pub mod chunk_level_task_generator;
 pub mod database_service;
+pub mod chunking_service;
+pub mod chunking_service_test;
+pub mod task_list_generator;
+pub mod task_list_generator_test;
 
 pub use database_query_engine::{DatabaseQueryEngine, TableValidation, DatabaseConnectionStats};
 pub use content_extractor::{ContentExtractor, ContentTriple, RowMetadata};
 pub use content_generator::{ContentGenerator, ContentFileSet, RowData, ContentStatistics, FileStatistics};
+pub use content_file_writer::{ContentFileWriter, ContentWriteConfig, ContentWriteResult, ContentNamingPattern};
 pub use output_directory_manager::{
     OutputDirectoryManager, OutputDirectoryConfig, DirectoryStatistics, FileConflict, 
     ConflictResolution, CleanupResult, OrganizationResult, ClearResult, BackupResult
@@ -60,6 +67,12 @@ pub use chunk_level_task_generator::{
 
 // Re-export database service types
 pub use database_service::{DatabaseService, TableInfo};
+
+// Re-export chunking service types
+pub use chunking_service::ChunkingService;
+
+// Re-export task list generator types
+pub use task_list_generator::TaskListGenerator;
 
 use crate::error::{TaskError, TaskResult};
 use serde::{Deserialize, Serialize};
