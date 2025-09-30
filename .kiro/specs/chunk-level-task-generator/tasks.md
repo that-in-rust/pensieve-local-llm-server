@@ -6,15 +6,16 @@
   - Write unit tests for error type conversions and data model serialization
   - _Requirements: 3.1, 3.2_
 
-- [-] 2. Implement DatabaseService for table operations
-  - Create `DatabaseService` struct with connection pool management
-  - Implement `validate_table()` method to check table existence and schema
-  - Implement `query_rows()` method to fetch `IngestedFile` records from tables
-  - Implement `create_chunked_table()` method for chunk-level mode
-  - Write unit tests for database operations with mock database
+- [x] 2. Implement DatabaseService for table operations
+  - ✅ Create `DatabaseService` struct with connection pool management
+  - ✅ Implement `validate_table()` method to check table existence and schema
+  - ✅ Implement `query_rows()` method to fetch `IngestedFile` records from tables
+  - ✅ Implement `create_chunked_table()` method for chunk-level mode
+  - ✅ Write unit tests for database operations with mock database
   - _Requirements: 1.1, 2.1, 2.2_
+  - **Implementation**: `code-ingest/src/tasks/database_service.rs` with Arc<PgPool> connection management, comprehensive table validation, IngestedFile querying, and chunked table creation. Includes 15+ unit tests and integration test support.
 
-- [ ] 3. Implement ChunkingService for file processing logic
+- [x] 3. Implement ChunkingService for file processing logic
   - Create `ChunkingService` struct with chunking algorithms
   - Implement `apply_chunking_rules()` method: copy small files, chunk large files
   - Implement L1 (row+next) and L2 (row+next+next2) concatenation logic
@@ -22,15 +23,16 @@
   - Write unit tests for chunking logic with various file sizes
   - _Requirements: 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 4. Implement ContentFileWriter for file generation
-  - Create `ContentFileWriter` struct with async file I/O operations
-  - Implement `write_content_files()` method to create content, contentL1, contentL2 files
-  - Implement `write_row_files()` method for individual row processing
-  - Use `tokio::fs` for async file operations with proper error handling
-  - Write unit tests for file creation and content validation
+- [x] 4. Implement ContentFileWriter for file generation
+  - ✅ Create `ContentFileWriter` struct with async file I/O operations
+  - ✅ Implement `write_content_files()` method to create content, contentL1, contentL2 files
+  - ✅ Implement `write_row_files()` method for individual row processing
+  - ✅ Use `tokio::fs` for async file operations with proper error handling
+  - ✅ Write unit tests for file creation and content validation
   - _Requirements: 1.1, 2.6_
+  - **Implementation**: `code-ingest/src/tasks/content_file_writer.rs` with async file I/O using tokio::fs, configurable naming patterns, concurrent processing, comprehensive error handling, and extensive unit tests. Supports both individual row processing and batch operations with L1/L2 context generation.
 
-- [ ] 5. Implement TaskListGenerator for task file creation
+- [-] 5. Implement TaskListGenerator for task file creation
   - Create `TaskListGenerator` struct for generating task lists in txt format
   - Implement `generate_task_list()` method that references content files by row number
   - Create task list format that's compatible with existing task processing workflows
