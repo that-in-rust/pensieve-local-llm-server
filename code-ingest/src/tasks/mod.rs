@@ -15,6 +15,8 @@ pub mod output_directory_manager;
 pub mod simple_task_generator;
 pub mod task_structure_builder;
 pub mod windowed_task_manager;
+pub mod chunk_level_task_generator;
+pub mod database_service;
 
 pub use database_query_engine::{DatabaseQueryEngine, TableValidation, DatabaseConnectionStats};
 pub use content_extractor::{ContentExtractor, ContentTriple, RowMetadata};
@@ -49,6 +51,15 @@ pub use models::{
     ContentFileType, GenerationConfig, GenerationConfigMetadata,
     TaskHierarchyMetadata, TaskHierarchyStatistics
 };
+
+// Re-export chunk-level task generator types
+pub use chunk_level_task_generator::{
+    TaskGeneratorError, ChunkedFile, TaskGenerationResult, ContentFiles,
+    ProcessingStats, ChunkingResult, TaskGeneratorResult
+};
+
+// Re-export database service types
+pub use database_service::{DatabaseService, TableInfo};
 
 use crate::error::{TaskError, TaskResult};
 use serde::{Deserialize, Serialize};
