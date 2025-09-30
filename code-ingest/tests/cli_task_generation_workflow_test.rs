@@ -15,7 +15,7 @@ async fn test_complete_task_generation_workflow() -> Result<()> {
 
     // Test workflow:
     // 1. count-rows -> verify table exists and has data
-    // 2. extract-content -> create A/B/C files
+    // 2. chunk-level-task-generator -> create content files and task lists
     // 3. generate-hierarchical-tasks -> create markdown with proper structure
     
     let table_name = "test_workflow_table";
@@ -31,7 +31,7 @@ async fn test_complete_task_generation_workflow() -> Result<()> {
     // In a real test, this would:
     // 1. Set up test database with sample data
     // 2. Execute count-rows command and verify output
-    // 3. Execute extract-content command and verify A/B/C files
+    // 3. Execute chunk-level-task-generator command and verify content files
     // 4. Execute generate-hierarchical-tasks and verify markdown structure
     // 5. Validate hierarchical numbering (1.1.1.1 format)
     // 6. Verify content file references in tasks
@@ -45,7 +45,7 @@ async fn test_complete_task_generation_workflow() -> Result<()> {
 async fn test_workflow_error_handling() -> Result<()> {
     // Test error scenarios:
     // 1. Non-existent table in count-rows
-    // 2. Empty table in extract-content
+    // 2. Empty table in chunk-level-task-generator
     // 3. Missing prompt file in generate-hierarchical-tasks
     // 4. Invalid parameters (levels=0, groups=0)
     
@@ -66,10 +66,10 @@ fn test_cli_command_parameter_validation() {
     let count_cli = code_ingest::cli::Cli::try_parse_from(count_args).unwrap();
     println!("Count-rows command parsed successfully");
     
-    // 2. extract-content
-    let extract_args = vec!["code-ingest", "extract-content", "test_table", "--output-dir", ".raw_data"];
-    let extract_cli = code_ingest::cli::Cli::try_parse_from(extract_args).unwrap();
-    println!("Extract-content command parsed successfully");
+    // 2. chunk-level-task-generator
+    let chunk_args = vec!["code-ingest", "chunk-level-task-generator", "test_table", "--output-dir", ".raw_data"];
+    let chunk_cli = code_ingest::cli::Cli::try_parse_from(chunk_args).unwrap();
+    println!("Chunk-level-task-generator command parsed successfully");
     
     // 3. generate-hierarchical-tasks
     let generate_args = vec![
@@ -85,7 +85,7 @@ fn test_cli_command_parameter_validation() {
 fn test_requirements_command_sequence() {
     // Based on the requirements, the expected command sequence is:
     // 1. code-ingest count-rows INGEST_20250928101039
-    // 2. code-ingest extract-content INGEST_20250928101039 --output-dir .raw_data_202509
+    // 2. code-ingest chunk-level-task-generator INGEST_20250928101039 --output-dir .raw_data_202509
     // 3. code-ingest generate-hierarchical-tasks INGEST_20250928101039 --levels 4 --groups 7 --output INGEST_20250928101039_tasks.md
     
     use clap::Parser;
@@ -97,10 +97,10 @@ fn test_requirements_command_sequence() {
     let count_cli = code_ingest::cli::Cli::try_parse_from(count_args).unwrap();
     println!("Count-rows command parsed successfully for {}", table_name);
     
-    // Command 2: extract-content
-    let extract_args = vec!["code-ingest", "extract-content", table_name, "--output-dir", ".raw_data_202509"];
-    let extract_cli = code_ingest::cli::Cli::try_parse_from(extract_args).unwrap();
-    println!("Extract-content command parsed successfully for {}", table_name);
+    // Command 2: chunk-level-task-generator
+    let chunk_args = vec!["code-ingest", "chunk-level-task-generator", table_name, "--output-dir", ".raw_data_202509"];
+    let chunk_cli = code_ingest::cli::Cli::try_parse_from(chunk_args).unwrap();
+    println!("Chunk-level-task-generator command parsed successfully for {}", table_name);
     
     // Command 3: generate-hierarchical-tasks
     let output_file = format!("{}_tasks.md", table_name);

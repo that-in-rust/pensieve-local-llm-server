@@ -54,7 +54,7 @@
   - Add help text and usage examples for the new command
   - _Requirements: 1.1, 2.1_
 
-- [-] 8. Write integration tests for end-to-end workflows
+- [x] 8. Write integration tests for end-to-end workflows
   - Create integration test for file-level mode (no chunk size)
   - Create integration test for chunk-level mode (with chunk size)
   - Test error handling for invalid table names and chunk sizes
@@ -62,14 +62,14 @@
   - Verify chunked table creation and population
   - _Requirements: 1.1, 1.2, 2.1, 2.6, 2.7, 3.1, 3.2_
 
-- [ ] 9. Remove ExtractContent command and related code
+- [x] 9. Remove ExtractContent command and related code
   - Remove `ExtractContent` variant from CLI `Commands` enum
   - Remove `execute_extract_content()` method from CLI implementation
   - Remove any associated test files for ExtractContent functionality
   - Update CLI help text and documentation
   - _Requirements: 4.1, 4.2_
 
-- [ ] 10. Mark existing task generators as deprecated
+- [-] 10. Mark existing task generators as deprecated
   - Add deprecation warnings to `GenerateHierarchicalTasks` command
   - Update help text to recommend using `chunk-level-task-generator` instead
   - Add deprecation comments to related task generation modules

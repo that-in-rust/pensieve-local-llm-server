@@ -292,20 +292,7 @@ pub enum Commands {
         db_path: Option<PathBuf>,
     },
 
-    /// Extract content from database table to A/B/C files
-    ExtractContent {
-        /// Table name to extract content from
-        table_name: String,
-        /// Output directory for content files
-        #[arg(long, default_value = ".raw_data_202509")]
-        output_dir: PathBuf,
-        /// Chunk size for filename generation (e.g., 500 for 500-line chunks)
-        #[arg(long)]
-        chunk_size: Option<usize>,
-        /// Database path (can also be set globally)
-        #[arg(long)]
-        db_path: Option<PathBuf>,
-    },
+
 
     /// Configuration management commands
     /// 
@@ -686,10 +673,7 @@ impl Cli {
                 let db_path = db_path.clone().or_else(|| self.db_path.clone());
                 self.execute_count_rows(table_name.clone(), db_path).await
             }
-            Commands::ExtractContent { table_name, output_dir, chunk_size, db_path } => {
-                let db_path = db_path.clone().or_else(|| self.db_path.clone());
-                self.execute_extract_content(table_name.clone(), output_dir.clone(), *chunk_size, db_path).await
-            }
+
             Commands::Config { action } => {
                 self.execute_config_command(action).await
             }
@@ -2382,7 +2366,7 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         println!();
         println!("🎯 Next Steps:");
         if row_count > 0 {
-            println!("   1. Extract content: code-ingest extract-content {}", table_name);
+            println!("   1. Generate content files: code-ingest chunk-level-task-generator {}", table_name);
             println!("   2. Generate tasks: code-ingest generate-hierarchical-tasks {} --output {}_tasks.md", table_name, table_name);
             println!("   3. Sample data: code-ingest sample --table {}", table_name);
         } else {
@@ -2392,78 +2376,7 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         Ok(())
     }
 
-    /// Execute extract-content command
-    async fn execute_extract_content(&self, table_name: String, output_dir: PathBuf, chunk_size: Option<usize>, db_path: Option<PathBuf>) -> Result<()> {
-        use crate::tasks::ContentExtractor;
-        use indicatif::{ProgressBar, ProgressStyle};
-        
-        println!("📁 Extracting content from table: {}", table_name.bright_cyan());
-        println!("📂 Output directory: {}", output_dir.display().to_string().bright_yellow());
-        println!();
-        
-        // Get database connection
-        let database = if let Some(path) = db_path {
-            crate::database::Database::from_path(&path).await?
-        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
-            crate::database::Database::new(&database_url).await?
-        } else {
-            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
-        };
 
-        // Create progress bar
-        let progress = ProgressBar::new(100);
-        progress.set_style(
-            ProgressStyle::default_bar()
-                .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos:>7}/{len:7} {msg}")
-                .unwrap()
-                .progress_chars("#>-"),
-        );
-        
-        progress.set_message("Initializing content extractor...");
-        progress.set_position(10);
-        
-        // Create content extractor
-        let extractor = ContentExtractor::new(database.pool().clone().into(), output_dir.clone());
-        
-        progress.set_message("Validating table and counting rows...");
-        progress.set_position(20);
-        
-        // Extract all content
-        let content_triples = extractor.extract_all_rows(&table_name, chunk_size).await?;
-        
-        progress.set_message("Content extraction complete!");
-        progress.set_position(100);
-        progress.finish_with_message("✅ Content extraction completed!");
-        
-        // Display results
-        println!();
-        println!("📊 Extraction Summary:");
-        println!("   Table: {}", table_name);
-        println!("   Files Created: {}", (content_triples.len() * 3).to_string().bright_green());
-        println!("   Content Triples: {}", content_triples.len());
-        println!("   Output Directory: {}", output_dir.display());
-        
-        println!();
-        println!("📁 Generated Files:");
-        for (i, triple) in content_triples.iter().take(5).enumerate() {
-            println!("   Row {}: ", i + 1);
-            println!("     A: {}", triple.content_a.display());
-            println!("     B: {}", triple.content_b.display());
-            println!("     C: {}", triple.content_c.display());
-        }
-        
-        if content_triples.len() > 5 {
-            println!("   ... and {} more content triples", content_triples.len() - 5);
-        }
-        
-        println!();
-        println!("🎯 Next Steps:");
-        println!("   1. Generate hierarchical tasks:");
-        println!("      code-ingest generate-hierarchical-tasks {} --output {}_tasks.md", table_name, table_name);
-        println!("   2. Review generated content files in: {}", output_dir.display());
-        
-        Ok(())
-    }
 
     /// Execute configuration management commands
     async fn execute_config_command(&self, action: &ConfigAction) -> Result<()> {
