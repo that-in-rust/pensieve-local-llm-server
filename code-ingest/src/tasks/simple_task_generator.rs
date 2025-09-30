@@ -51,49 +51,102 @@ impl SimpleTaskGenerator {
         }
     }
 
-    /// Generate simple checkbox markdown for a complete task structure
+    /// Generate simple checkbox task list following the exact format specified
     ///
     /// # Arguments
-    /// * `hierarchy` - Task hierarchy to generate markdown for
     /// * `table_name` - Name of the source table
+    /// * `chunk_size` - Chunk size in LOC for file naming
+    /// * `prompt_file` - Path to the prompt file
+    /// * `total_rows` - Total number of rows to process
     ///
     /// # Returns
-    /// * `TaskResult<String>` - Generated simple markdown content
-    pub async fn generate_simple_markdown(
+    /// * `TaskResult<String>` - Generated simple task list content
+    pub async fn generate_simple_tasks(
         &self,
-        hierarchy: &TaskHierarchy,
-        _table_name: &str,
+        table_name: &str,
+        chunk_size: Option<usize>,
+        prompt_file: &str,
+        total_rows: usize,
     ) -> TaskResult<String> {
-        debug!("Generating simple checkbox markdown");
+        debug!("Generating simple checkbox task list for {} with {} rows", table_name, total_rows);
 
-        let mut markdown = String::new();
+        let mut output = String::new();
+        let chunk_suffix = if let Some(size) = chunk_size {
+            format!("_{}", size)
+        } else {
+            String::new()
+        };
 
-        // Process each level to create hierarchical tasks
-        self.add_hierarchy_tasks(&mut markdown, hierarchy, 0).await?;
+        // Process each row up to max_tasks limit
+        let max_rows = if let Some(max) = self.max_tasks {
+            std::cmp::min(max, total_rows)
+        } else {
+            total_rows
+        };
 
-        info!("Generated simple markdown with {} total tasks", hierarchy.total_tasks);
-        Ok(markdown)
+        for row_num in 1..=max_rows {
+            // Skip rows based on offset
+            if row_num <= self.offset {
+                continue;
+            }
+
+            output.push_str(&format!(
+                "- [ ] {}. Analyze {} row {}\n",
+                row_num, table_name, row_num
+            ));
+            
+            output.push_str(&format!(
+                "  - **Content**: `.raw_data_202509/{}{}_Content.txt` as A + `.raw_data_202509/{}_Content_L1.txt` as B + `.raw_data_202509/{}_Content_L2.txt` as C\n",
+                table_name, chunk_suffix, table_name, table_name
+            ));
+            
+            output.push_str(&format!(
+                "  - **Prompt**: `{}` where you try to find insights of A alone ; A in context of B ; B in context of C ; A in context B & C\n",
+                prompt_file
+            ));
+            
+            output.push_str(&format!(
+                "  - **Output**: `gringotts/WorkArea/{}{}_{}.md`\n\n",
+                table_name, chunk_suffix, row_num
+            ));
+        }
+
+        // Add note if there are more rows
+        if total_rows > max_rows {
+            output.push_str(&format!(
+                "<!-- Note: {} more rows available. Use --offset {} to continue -->\n",
+                total_rows - max_rows,
+                max_rows
+            ));
+        }
+
+        info!("Generated simple task list with {} tasks", max_rows);
+        Ok(output)
     }
 
-    /// Write simple markdown to a file
+    /// Write simple task list to a file
     ///
     /// # Arguments
-    /// * `hierarchy` - Task hierarchy to write
     /// * `table_name` - Name of the source table
+    /// * `chunk_size` - Chunk size in LOC for file naming
+    /// * `prompt_file` - Path to the prompt file
+    /// * `total_rows` - Total number of rows to process
     /// * `output_file` - Path to the output file
     ///
     /// # Returns
     /// * `TaskResult<()>` - Success or error
-    pub async fn write_simple_markdown_to_file(
+    pub async fn write_simple_tasks_to_file(
         &self,
-        hierarchy: &TaskHierarchy,
         table_name: &str,
+        chunk_size: Option<usize>,
+        prompt_file: &str,
+        total_rows: usize,
         output_file: &Path,
     ) -> TaskResult<()> {
-        debug!("Writing simple markdown to file: {}", output_file.display());
+        debug!("Writing simple task list to file: {}", output_file.display());
 
-        // Generate markdown content
-        let markdown = self.generate_simple_markdown(hierarchy, table_name).await?;
+        // Generate task content
+        let tasks = self.generate_simple_tasks(table_name, chunk_size, prompt_file, total_rows).await?;
 
         // Ensure parent directory exists
         if let Some(parent) = output_file.parent() {
@@ -107,8 +160,8 @@ impl SimpleTaskGenerator {
             })?;
         }
 
-        // Write markdown to file
-        tokio::fs::write(output_file, markdown).await.map_err(|e| {
+        // Write tasks to file
+        tokio::fs::write(output_file, tasks).await.map_err(|e| {
             TaskError::TaskFileCreationFailed {
                 path: output_file.display().to_string(),
                 cause: e.to_string(),
@@ -117,11 +170,13 @@ impl SimpleTaskGenerator {
             }
         })?;
 
-        info!("Successfully wrote simple markdown to: {}", output_file.display());
+        info!("Successfully wrote simple task list to: {}", output_file.display());
         Ok(())
     }
 
-    /// Add hierarchy tasks to markdown recursively
+
+
+    /// Add hierarchy tasks to markdown recursively (legacy method)
     async fn add_hierarchy_tasks(
         &self,
         markdown: &mut String,
@@ -434,25 +489,29 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_generate_simple_markdown() {
+    async fn test_generate_simple_tasks() {
         let generator = SimpleTaskGenerator::new();
-        let hierarchy = create_test_hierarchy();
-        let markdown = generator.generate_simple_markdown(&hierarchy, "TEST_TABLE").await.unwrap();
+        let tasks = generator.generate_simple_tasks("TEST_TABLE", Some(500), ".kiro/steering/test.md", 3).await.unwrap();
         
         // Verify simple checkbox format
-        assert!(markdown.contains("- [ ]"));
-        assert!(!markdown.contains("# L1-L8 Analysis Tasks")); // Should not contain complex headers
-        assert!(!markdown.contains("## Task Generation Metadata")); // Should not contain metadata
-        assert!(!markdown.contains("**Content**:")); // Should not contain detailed content info
+        assert!(tasks.contains("- [ ] 1. Analyze TEST_TABLE row 1"));
+        assert!(tasks.contains("- [ ] 2. Analyze TEST_TABLE row 2"));
+        assert!(tasks.contains("- [ ] 3. Analyze TEST_TABLE row 3"));
+        assert!(tasks.contains("**Content**:"));
+        assert!(tasks.contains("**Prompt**:"));
+        assert!(tasks.contains("**Output**:"));
+        assert!(tasks.contains(".raw_data_202509/TEST_TABLE_500_Content.txt"));
+        assert!(tasks.contains("gringotts/WorkArea/TEST_TABLE_500_"));
         
-        // Should be simple and clean
-        let lines: Vec<&str> = markdown.lines().collect();
-        for line in lines {
-            if !line.trim().is_empty() {
-                // Each non-empty line should be a checkbox or indented checkbox
-                assert!(line.contains("- [ ]") || line.starts_with("  "));
-            }
-        }
+        // Should be simple checkbox list with proper structure
+        let lines: Vec<&str> = tasks.lines().collect();
+        let task_lines: Vec<&str> = lines.iter()
+            .filter(|line| line.trim().starts_with("- [ ]"))
+            .cloned()
+            .collect();
+        
+        // Should have 3 main task lines
+        assert_eq!(task_lines.len(), 3);
     }
 
     #[test]
@@ -518,56 +577,73 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_write_simple_markdown_to_file() {
+    async fn test_write_simple_tasks_to_file() {
         let generator = SimpleTaskGenerator::new();
-        let hierarchy = create_test_hierarchy();
         
         // Create a temporary file path
         let temp_dir = tempfile::tempdir().unwrap();
         let output_file = temp_dir.path().join("simple_tasks.md");
         
         // Write the task structure
-        generator.write_simple_markdown_to_file(&hierarchy, "TEST_TABLE", &output_file).await.unwrap();
+        generator.write_simple_tasks_to_file("TEST_TABLE", Some(500), ".kiro/steering/test.md", 3, &output_file).await.unwrap();
         
         // Verify the file was created and contains expected content
         assert!(output_file.exists());
         let content = tokio::fs::read_to_string(&output_file).await.unwrap();
         
         // Should contain simple checkbox format
-        assert!(content.contains("- [ ]"));
-        assert!(!content.contains("# L1-L8")); // Should not contain complex headers
+        assert!(content.contains("- [ ] 1. Analyze TEST_TABLE row 1"));
+        assert!(content.contains("**Content**:"));
+        assert!(content.contains("**Prompt**:"));
+        assert!(content.contains("**Output**:"));
+        assert!(content.contains(".raw_data_202509/TEST_TABLE_500_Content.txt"));
         
-        // Should be parseable by simple markdown parsers
+        // Should be simple checkbox list
         let lines: Vec<&str> = content.lines().collect();
-        for line in lines {
-            if !line.trim().is_empty() {
-                assert!(line.contains("- [ ]") || line.starts_with("  "));
-            }
-        }
+        let task_lines: Vec<&str> = lines.iter()
+            .filter(|line| line.trim().starts_with("- [ ]"))
+            .cloned()
+            .collect();
+        
+        assert!(!task_lines.is_empty(), "Should have checkbox task lines");
     }
 
     #[tokio::test]
-    async fn test_format_matches_reference() {
+    async fn test_format_matches_simple_reference() {
         let generator = SimpleTaskGenerator::new();
-        let hierarchy = create_test_hierarchy();
-        let markdown = generator.generate_simple_markdown(&hierarchy, "TEST_TABLE").await.unwrap();
+        let tasks = generator.generate_simple_tasks("TEST_TABLE", Some(500), ".kiro/steering/test.md", 2).await.unwrap();
         
-        // The format should match the reference file pattern:
-        // - [ ] 1. Task 1
-        //   - [ ] 1.1 Task 1.1
-        //     - [ ] 1.1.1 Task 1.1.1
+        // The format should match the exact specification:
+        // - [ ] 1. Analyze TEST_TABLE row 1
+        //   - **Content**: .raw_data_202509/TEST_TABLE_500_Content.txt as A + ...
+        //   - **Prompt**: .kiro/steering/test.md where you try to find insights...
+        //   - **Output**: gringotts/WorkArea/TEST_TABLE_500_1.md
         
-        // Check for proper indentation and checkbox format
-        let lines: Vec<&str> = markdown.lines().filter(|line| !line.trim().is_empty()).collect();
+        // Check for proper checkbox format
+        let lines: Vec<&str> = tasks.lines().filter(|line| !line.trim().is_empty()).collect();
+        let mut found_checkbox_tasks = false;
+        let mut found_content_lines = false;
+        let mut found_prompt_lines = false;
+        let mut found_output_lines = false;
         
         for line in lines {
-            // Each line should be a checkbox with proper indentation
-            let trimmed = line.trim_start();
-            assert!(trimmed.starts_with("- [ ]"), "Line should start with checkbox: {}", line);
-            
-            // Indentation should be multiples of 2 spaces
-            let indent_count = line.len() - line.trim_start().len();
-            assert_eq!(indent_count % 2, 0, "Indentation should be multiples of 2 spaces: {}", line);
+            if line.trim().starts_with("- [ ]") && line.contains("Analyze TEST_TABLE row") {
+                found_checkbox_tasks = true;
+            }
+            if line.trim().starts_with("- **Content**:") {
+                found_content_lines = true;
+            }
+            if line.trim().starts_with("- **Prompt**:") {
+                found_prompt_lines = true;
+            }
+            if line.trim().starts_with("- **Output**:") {
+                found_output_lines = true;
+            }
         }
+        
+        assert!(found_checkbox_tasks, "Should have found checkbox task lines");
+        assert!(found_content_lines, "Should have found content lines");
+        assert!(found_prompt_lines, "Should have found prompt lines");
+        assert!(found_output_lines, "Should have found output lines");
     }
 }

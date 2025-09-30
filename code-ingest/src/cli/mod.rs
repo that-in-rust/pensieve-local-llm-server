@@ -317,21 +317,20 @@ pub enum Commands {
         action: ConfigAction,
     },
 
-    /// Generate hierarchical task lists from database table for systematic code analysis
+    /// [EXPERIMENTAL] Generate simple task lists from database table
     /// 
-    /// Creates structured markdown files with hierarchical task numbering for systematic
-    /// codebase analysis. Supports both basic file-level analysis and advanced chunked
-    /// processing for large files. Automatically limits task count to prevent Kiro IDE overload.
+    /// Creates simple checkbox markdown files for systematic analysis.
+    /// Focuses on proven patterns over complex hierarchical structures.
     /// 
     /// Examples:
-    ///   # Basic hierarchical task generation (limited to 50 tasks)
+    ///   # Simple task generation (limited to 50 tasks)
     ///   code-ingest generate-hierarchical-tasks INGEST_20250928101039 \
-    ///     --levels 4 --groups 7 --output tasks.md --db-path /path/to/db
+    ///     --output tasks.md --db-path /path/to/db
     ///   
-    ///   # Chunked analysis with custom task limit
+    ///   # With chunking for large files
     ///   code-ingest generate-hierarchical-tasks INGEST_20250928101039 \
-    ///     --chunks 500 --levels 4 --groups 7 --max-tasks 20 --output tasks.md \
-    ///     --prompt-file custom_prompt.md --db-path /path/to/db
+    ///     --chunks 500 --max-tasks 20 --output tasks.md \
+    ///     --prompt-file .kiro/steering/analysis.md --db-path /path/to/db
     GenerateHierarchicalTasks {
         /// Database table name containing ingested code data
         #[arg(help = "Name of the database table to generate tasks from (e.g., INGEST_20250928101039)")]
@@ -657,25 +656,22 @@ impl Cli {
             }
             Commands::GenerateHierarchicalTasks { 
                 table_name, 
-                levels, 
-                groups, 
+                levels: _, // Ignore for now - keep simple
+                groups: _, // Ignore for now - keep simple
                 output, 
                 prompt_file, 
                 chunks,
                 max_tasks,
-                windowed,
+                windowed: _, // Ignore for now - keep simple
                 db_path 
             } => {
                 let db_path = db_path.clone().or_else(|| self.db_path.clone());
-                self.execute_generate_hierarchical_tasks(
+                self.execute_generate_simple_tasks(
                     table_name.clone(),
-                    *levels,
-                    *groups,
                     output.clone(),
                     prompt_file.clone(),
                     *chunks,
                     *max_tasks,
-                    *windowed,
                     db_path,
                 ).await
             }
@@ -2861,6 +2857,130 @@ Complete tasks systematically, starting with Phase 1 and progressing through eac
         println!("   3. Execute tasks systematically using Kiro");
         println!("   4. Content files are available in: .raw_data_202509/");
         println!("   5. Analysis outputs will be saved to: gringotts/WorkArea/");
+        
+        Ok(())
+    }
+
+    /// Execute simple task generation (experimental - simplified approach)
+    /// 
+    /// # Preconditions
+    /// - table_name exists in database
+    /// - output path is writable
+    /// - prompt_file exists and is readable
+    /// 
+    /// # Postconditions
+    /// - Creates simple checkbox markdown file
+    /// - Each task follows format: "- [ ] N. Analyze TABLE row N"
+    /// - Includes Content/Prompt/Output paths
+    /// 
+    /// # Error Conditions
+    /// - DatabaseError if table doesn't exist
+    /// - IoError if output path not writable
+    /// - ValidationError if max_tasks > 1000
+    #[instrument(skip(self))]
+    async fn execute_generate_simple_tasks(
+        &self,
+        table_name: String,
+        output: PathBuf,
+        prompt_file: PathBuf,
+        chunks: Option<usize>,
+        max_tasks: usize,
+        db_path: Option<PathBuf>,
+    ) -> anyhow::Result<()> {
+        use crate::database::Database;
+        use crate::tasks::simple_task_generator::SimpleTaskGenerator;
+        
+        println!("🚀 [EXPERIMENTAL] Generating simple task list for table: {}", table_name);
+        println!("📋 Simplified task generation following MVP-First Rigor pattern");
+        println!();
+
+        // Validate inputs (following steering principle: Parse, don't validate)
+        if max_tasks > 1000 {
+            anyhow::bail!("max_tasks cannot exceed 1000 (got {}). This prevents Kiro IDE overload.", max_tasks);
+        }
+        
+        if !prompt_file.exists() {
+            anyhow::bail!("Prompt file does not exist: {}", prompt_file.display());
+        }
+
+        // Get database connection
+        let database = if let Some(path) = db_path {
+            Database::from_path(&path).await?
+        } else if let Ok(database_url) = std::env::var("DATABASE_URL") {
+            Database::new(&database_url).await?
+        } else {
+            anyhow::bail!("No database path provided. Use --db-path or set DATABASE_URL environment variable");
+        };
+
+        // Count rows in the table with timeout (following steering: timeout all external calls)
+        let row_count_query = format!("SELECT COUNT(*) FROM \"{}\"", table_name);
+        let pool = database.pool();
+        
+        let start = std::time::Instant::now();
+        let row: (i64,) = tokio::time::timeout(
+            std::time::Duration::from_secs(30),
+            sqlx::query_as(&row_count_query).fetch_one(pool)
+        )
+        .await
+        .with_context(|| format!("Query timeout after 30s for table {}", table_name))?
+        .with_context(|| format!("Failed to count rows in table {}", table_name))?;
+        
+        let query_time = start.elapsed();
+        let total_rows = row.0 as usize;
+        
+        println!("📊 Found {} rows in table {} (query: {:?})", total_rows, table_name, query_time);
+        
+        // Performance contract validation (following steering: performance claims must be test-validated)
+        if query_time > std::time::Duration::from_secs(5) {
+            println!("⚠️  Warning: Row count query took {:?} (>5s). Consider table optimization.", query_time);
+        }
+
+        // Create simple task generator with max_tasks limit
+        let generator = SimpleTaskGenerator::with_max_tasks(max_tasks);
+        
+        // Generate simple tasks with performance tracking
+        let prompt_file_str = prompt_file.to_string_lossy();
+        
+        println!("📝 Generating tasks...");
+        let generation_start = std::time::Instant::now();
+        
+        generator.write_simple_tasks_to_file(
+            &table_name,
+            chunks,
+            &prompt_file_str,
+            total_rows,
+            &output,
+        ).await
+        .with_context(|| format!("Failed to write tasks to {}", output.display()))?;
+        
+        let generation_time = generation_start.elapsed();
+        
+        // Performance contract: Task generation should complete in <1s for typical workloads
+        if generation_time > std::time::Duration::from_secs(1) {
+            println!("⚠️  Warning: Task generation took {:?} (>1s). Consider reducing max_tasks.", generation_time);
+        }
+
+        println!("✅ Simple task generation completed!");
+        println!();
+        println!("📋 Task Details:");
+        println!("   Table: {}", table_name);
+        println!("   Total Rows: {}", total_rows);
+        println!("   Max Tasks: {}", max_tasks);
+        if let Some(chunk_size) = chunks {
+            println!("   Chunk Size: {} LOC", chunk_size);
+        }
+        println!("   Prompt File: {}", prompt_file.display());
+        println!("   Output File: {}", output.display());
+        
+        println!();
+        println!("🎯 Next Steps:");
+        println!("   1. Open the tasks file: {}", output.display());
+        println!("   2. Each task follows the simple format:");
+        println!("      - [ ] N. Analyze {} row N", table_name);
+        println!("      - **Content**: A/B/C files in .raw_data_202509/");
+        println!("      - **Prompt**: {}", prompt_file.display());
+        println!("      - **Output**: gringotts/WorkArea/");
+        println!("   3. Execute tasks one by one using Kiro");
         
         Ok(())
     }
