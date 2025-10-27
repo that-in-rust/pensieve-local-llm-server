@@ -38,6 +38,13 @@ bytes = "1.0"
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 async-stream = "0.3"
+
+# Candle ML framework dependencies (L2 and L3 only)
+candle-core = { version = "0.8", features = ["metal", "accelerate"] }
+candle-nn = { version = "0.8" }
+candle-transformers = { version = "0.8" }
+safetensors = "0.4"
+
 # Testing dependencies
 proptest = "1.0"
 

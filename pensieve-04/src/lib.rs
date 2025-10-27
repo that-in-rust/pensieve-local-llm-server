@@ -77,6 +77,385 @@ pub mod engine {
     }
 }
 
+/// Device abstraction layer for compute backends
+pub mod device {
+    use super::{CoreError, CoreResult, Resource, Reset, Validate};
+
+    #[cfg(feature = "std")]
+    use candle_core::{Device, Tensor};
+
+    #[cfg(feature = "std")]
+    use std::{string::String, vec::Vec, format, println};
+
+    /// Compute device types
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum DeviceType {
+        Cpu,
+        Metal,
+        Cuda,
+    }
+
+    /// Device information and capabilities
+    #[derive(Debug, Clone)]
+    pub struct DeviceInfo {
+        pub device_type: DeviceType,
+        #[cfg(feature = "std")]
+        pub name: String,
+        #[cfg(not(feature = "std"))]
+        pub name: &'static str,
+        pub memory_mb: Option<usize>,
+        pub is_available: bool,
+    }
+
+    /// Abstraction over compute devices (CPU, GPU, etc.)
+    pub trait ComputeDevice: Resource + Reset + Validate {
+        /// Get device information
+        fn info(&self) -> &DeviceInfo;
+
+        /// Get the underlying Candle device
+        #[cfg(feature = "std")]
+        fn candle_device(&self) -> &Device;
+
+        /// Check if device is ready for computation
+        fn is_ready(&self) -> bool {
+            self.info().is_available && self.is_available()
+        }
+
+        /// Allocate memory for tensors
+        #[cfg(feature = "std")]
+        fn allocate_tensor(&self, shape: &[usize], dtype: candle_core::DType) -> CoreResult<Tensor>;
+
+        /// Synchronize device operations
+        #[cfg(feature = "std")]
+        fn synchronize(&self) -> CoreResult<()>;
+    }
+
+    /// Device manager for handling multiple compute devices
+    pub trait DeviceManager: Resource + Reset + Validate {
+        type Device: ComputeDevice;
+
+        /// Create a new device manager
+        fn new() -> CoreResult<Self>
+        where
+            Self: Sized;
+
+        /// Get the best available device
+        fn get_best_device(&self) -> CoreResult<&Self::Device>;
+
+        /// Get device by type
+        fn get_device_by_type(&self, device_type: DeviceType) -> CoreResult<&Self::Device>;
+
+        /// List all available devices
+        #[cfg(feature = "std")]
+        fn list_devices(&self) -> CoreResult<Vec<&DeviceInfo>>;
+
+        /// List all available devices (no_std version)
+        #[cfg(not(feature = "std"))]
+        fn list_devices(&self) -> CoreResult<usize>;
+
+        /// Add a device to the manager
+        fn add_device(&mut self, device: Self::Device) -> CoreResult<()>;
+    }
+}
+
+#[cfg(feature = "std")]
+pub mod concrete_devices {
+    use super::{
+        device::{ComputeDevice, DeviceInfo, DeviceManager, DeviceType},
+        CoreError, CoreResult, Resource, Reset, Validate,
+    };
+    use candle_core::{Device, Tensor, DType};
+    use std::{vec::Vec, string::ToString, format};
+
+    /// CPU device implementation
+    #[derive(Debug)]
+    pub struct CpuDevice {
+        info: DeviceInfo,
+        candle_device: Device,
+        resource_available: bool,
+    }
+
+    impl CpuDevice {
+        /// Create a new CPU device
+        pub fn new() -> Self {
+            Self {
+                info: DeviceInfo {
+                    device_type: DeviceType::Cpu,
+                    name: "CPU".to_string(),
+                    memory_mb: None, // CPU doesn't have fixed memory
+                    is_available: true,
+                },
+                candle_device: Device::Cpu,
+                resource_available: true,
+            }
+        }
+    }
+
+    impl Resource for CpuDevice {
+        type Error = CoreError;
+
+        fn is_available(&self) -> bool {
+            self.resource_available
+        }
+
+        fn acquire(&mut self) -> core::result::Result<(), Self::Error> {
+            self.resource_available = true;
+            Ok(())
+        }
+
+        fn release(&mut self) -> core::result::Result<(), Self::Error> {
+            self.resource_available = false;
+            Ok(())
+        }
+    }
+
+    impl Reset for CpuDevice {
+        fn reset(&mut self) {
+            self.resource_available = true;
+        }
+    }
+
+    impl Validate for CpuDevice {
+        fn validate(&self) -> CoreResult<()> {
+            if !self.resource_available {
+                return Err(CoreError::Unavailable("CPU device not available"));
+            }
+            Ok(())
+        }
+    }
+
+    impl ComputeDevice for CpuDevice {
+        fn info(&self) -> &DeviceInfo {
+            &self.info
+        }
+
+        fn candle_device(&self) -> &Device {
+            &self.candle_device
+        }
+
+        fn allocate_tensor(&self, shape: &[usize], dtype: DType) -> CoreResult<Tensor> {
+            Tensor::zeros(shape, dtype, &self.candle_device)
+                .map_err(|_| CoreError::Generic("tensor allocation failed"))
+        }
+
+        fn synchronize(&self) -> CoreResult<()> {
+            // CPU doesn't need synchronization
+            Ok(())
+        }
+    }
+
+    /// Metal device implementation (macOS only)
+    #[cfg(target_os = "macos")]
+    #[derive(Debug)]
+    pub struct MetalDevice {
+        info: DeviceInfo,
+        candle_device: Device,
+        resource_available: bool,
+    }
+
+    #[cfg(target_os = "macos")]
+    impl MetalDevice {
+        /// Try to create a Metal device, fallback to None if unavailable
+        pub fn try_new() -> Option<Self> {
+            match Device::new_metal(0) {
+                Ok(device) => Some(Self {
+                    info: DeviceInfo {
+                        device_type: DeviceType::Metal,
+                        name: "Apple GPU".to_string(),
+                        memory_mb: None, // Could query this but not essential now
+                        is_available: true,
+                    },
+                    candle_device: device,
+                    resource_available: true,
+                }),
+                Err(_) => None,
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    impl Resource for MetalDevice {
+        type Error = CoreError;
+
+        fn is_available(&self) -> bool {
+            self.resource_available
+        }
+
+        fn acquire(&mut self) -> core::result::Result<(), Self::Error> {
+            self.resource_available = true;
+            Ok(())
+        }
+
+        fn release(&mut self) -> core::result::Result<(), Self::Error> {
+            self.resource_available = false;
+            Ok(())
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    impl Reset for MetalDevice {
+        fn reset(&mut self) {
+            self.resource_available = true;
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    impl Validate for MetalDevice {
+        fn validate(&self) -> CoreResult<()> {
+            if !self.resource_available {
+                return Err(CoreError::Unavailable("Metal device not available"));
+            }
+            Ok(())
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    impl ComputeDevice for MetalDevice {
+        fn info(&self) -> &DeviceInfo {
+            &self.info
+        }
+
+        fn candle_device(&self) -> &Device {
+            &self.candle_device
+        }
+
+        fn allocate_tensor(&self, shape: &[usize], dtype: DType) -> CoreResult<Tensor> {
+            Tensor::zeros(shape, dtype, &self.candle_device)
+                .map_err(|_| CoreError::Generic("tensor allocation failed"))
+        }
+
+        fn synchronize(&self) -> CoreResult<()> {
+            // Metal device synchronization
+            // For now, just return Ok - actual sync can be added later
+            Ok(())
+        }
+    }
+
+    /// Basic device manager implementation
+    #[derive(Debug)]
+    pub struct BasicDeviceManager {
+        cpu_device: CpuDevice,
+        #[cfg(target_os = "macos")]
+        metal_device: Option<MetalDevice>,
+    }
+
+    impl BasicDeviceManager {
+        /// Create a new device manager and detect available devices
+        pub fn new() -> CoreResult<Self> {
+            Ok(Self {
+                cpu_device: CpuDevice::new(),
+                #[cfg(target_os = "macos")]
+                metal_device: MetalDevice::try_new(),
+            })
+        }
+
+        /// Get the CPU device (always available)
+        pub fn cpu_device(&self) -> &CpuDevice {
+            &self.cpu_device
+        }
+
+        /// Get the Metal device if available
+        #[cfg(target_os = "macos")]
+        pub fn metal_device(&self) -> Option<&MetalDevice> {
+            self.metal_device.as_ref()
+        }
+    }
+
+    impl Resource for BasicDeviceManager {
+        type Error = CoreError;
+
+        fn is_available(&self) -> bool {
+            let cpu_available = self.cpu_device.is_available();
+            #[cfg(target_os = "macos")]
+            let metal_available = self.metal_device.as_ref().map_or(true, |d| d.is_available());
+            #[cfg(not(target_os = "macos"))]
+            let metal_available = true;
+
+            cpu_available && metal_available
+        }
+
+        fn acquire(&mut self) -> core::result::Result<(), Self::Error> {
+            self.cpu_device.acquire()?;
+            #[cfg(target_os = "macos")]
+            if let Some(ref mut device) = self.metal_device {
+                device.acquire()?;
+            }
+            Ok(())
+        }
+
+        fn release(&mut self) -> core::result::Result<(), Self::Error> {
+            self.cpu_device.release()?;
+            #[cfg(target_os = "macos")]
+            if let Some(ref mut device) = self.metal_device {
+                device.release()?;
+            }
+            Ok(())
+        }
+    }
+
+    impl Reset for BasicDeviceManager {
+        fn reset(&mut self) {
+            self.cpu_device.reset();
+            #[cfg(target_os = "macos")]
+            if let Some(ref mut device) = self.metal_device {
+                device.reset();
+            }
+        }
+    }
+
+    impl Validate for BasicDeviceManager {
+        fn validate(&self) -> CoreResult<()> {
+            self.cpu_device.validate()?;
+            #[cfg(target_os = "macos")]
+            if let Some(ref device) = self.metal_device {
+                device.validate()?;
+            }
+            Ok(())
+        }
+    }
+
+    impl DeviceManager for BasicDeviceManager {
+        type Device = CpuDevice;
+
+        fn new() -> CoreResult<Self>
+        where
+            Self: Sized,
+        {
+            Self::new()
+        }
+
+        fn get_best_device(&self) -> CoreResult<&Self::Device> {
+            // For now, just return the CPU device as a simple implementation
+            Ok(&self.cpu_device)
+        }
+
+        fn get_device_by_type(&self, device_type: DeviceType) -> CoreResult<&Self::Device> {
+            match device_type {
+                DeviceType::Cpu => Ok(&self.cpu_device),
+                DeviceType::Metal => Err(CoreError::NotFound("Metal device not available")),
+                DeviceType::Cuda => Err(CoreError::NotFound("CUDA not supported yet")),
+            }
+        }
+
+        fn list_devices(&self) -> CoreResult<Vec<&DeviceInfo>> {
+            let mut devices = Vec::new();
+            devices.push(&self.cpu_device.info);
+
+            #[cfg(target_os = "macos")]
+            if let Some(ref metal_device) = self.metal_device {
+                devices.push(&metal_device.info);
+            }
+
+            Ok(devices)
+        }
+
+        fn add_device(&mut self, _device: Self::Device) -> CoreResult<()> {
+            // For now, we don't support adding custom devices
+            Err(CoreError::Unsupported("Adding custom devices not supported"))
+        }
+    }
+}
+
 /// CPU-based inference implementation
 pub mod cpu {
     use super::{
@@ -273,6 +652,212 @@ pub use engine::{InferenceEngine, Sampler};
 mod tests {
     use super::*;
     use crate::cpu::CpuContext;
+
+    #[cfg(feature = "std")]
+    use std::{string::{String, ToString}, format};
+
+    #[test]
+    fn test_device_type_equality() {
+        assert_eq!(device::DeviceType::Cpu, device::DeviceType::Cpu);
+        assert_ne!(device::DeviceType::Cpu, device::DeviceType::Metal);
+        assert_ne!(device::DeviceType::Metal, device::DeviceType::Cuda);
+    }
+
+    #[test]
+    fn test_device_info_creation() {
+        let info = device::DeviceInfo {
+            device_type: device::DeviceType::Cpu,
+            #[cfg(feature = "std")]
+            name: "Apple M1 CPU".to_string(),
+            #[cfg(not(feature = "std"))]
+            name: "Apple M1 CPU",
+            memory_mb: Some(8192),
+            is_available: true,
+        };
+
+        assert_eq!(info.device_type, device::DeviceType::Cpu);
+        assert_eq!(info.name, "Apple M1 CPU");
+        assert_eq!(info.memory_mb, Some(8192));
+        assert!(info.is_available);
+    }
+
+    #[test]
+    fn test_device_info_debug_format() {
+        let info = device::DeviceInfo {
+            device_type: device::DeviceType::Metal,
+            #[cfg(feature = "std")]
+            name: "Apple M1 GPU".to_string(),
+            #[cfg(not(feature = "std"))]
+            name: "Apple M1 GPU",
+            memory_mb: Some(16384),
+            is_available: false,
+        };
+
+        #[cfg(feature = "std")]
+        {
+            let debug_str = format!("{:?}", info);
+            assert!(debug_str.contains("Metal"));
+            assert!(debug_str.contains("Apple M1 GPU"));
+        }
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_candle_device_import() {
+        // This test verifies that candle-core is properly linked
+        use candle_core::Device;
+
+        let device = Device::Cpu;
+        match device {
+            Device::Cpu => assert!(true), // CPU device created successfully
+            Device::Metal(_) => assert!(true), // Metal device created successfully
+            Device::Cuda(_) => assert!(true), // CUDA device created successfully
+        }
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_tensor_creation_failure() {
+        // This test should fail initially because we haven't implemented
+        // the concrete device types yet
+        use candle_core::{Device, Tensor, DType};
+
+        let device = Device::Cpu;
+        let result = Tensor::zeros((2, 3), DType::F32, &device);
+
+        // This should work with Candle, showing the integration is functional
+        assert!(result.is_ok());
+        let tensor = result.unwrap();
+        assert_eq!(tensor.dims(), &[2, 3]);
+    }
+
+    #[test]
+    fn test_device_manager_trait_exists() {
+        // Verify the DeviceManager trait is properly defined
+        use super::device::DeviceManager;
+
+        // This test just verifies the trait exists and compiles
+        // Concrete implementations will be added in the GREEN step
+        assert!(true);
+    }
+
+    #[test]
+    fn test_compute_device_trait_exists() {
+        // Verify the ComputeDevice trait is properly defined
+        use super::device::ComputeDevice;
+
+        // This test just verifies the trait exists and compiles
+        // Concrete implementations will be added in the GREEN step
+        assert!(true);
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_cpu_device_creation() {
+        use super::concrete_devices::CpuDevice;
+        use super::device::ComputeDevice;
+
+        let device = CpuDevice::new();
+        assert!(device.is_available());
+        assert_eq!(device.info().device_type, device::DeviceType::Cpu);
+        assert_eq!(device.info().name, "CPU");
+        assert!(device.info().is_available);
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_cpu_device_tensor_allocation() {
+        use super::concrete_devices::CpuDevice;
+        use super::device::ComputeDevice;
+        use candle_core::DType;
+
+        let device = CpuDevice::new();
+        let result = device.allocate_tensor(&[2, 3], DType::F32);
+
+        assert!(result.is_ok());
+        let tensor = result.unwrap();
+        assert_eq!(tensor.dims(), &[2, 3]);
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_cpu_device_validation() {
+        use super::concrete_devices::CpuDevice;
+        use super::Validate;
+
+        let device = CpuDevice::new();
+        assert!(device.validate().is_ok());
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_basic_device_manager_creation() {
+        use super::concrete_devices::BasicDeviceManager;
+
+        let manager = BasicDeviceManager::new();
+        assert!(manager.is_ok());
+
+        let manager = manager.unwrap();
+        assert!(manager.is_available());
+        assert!(manager.validate().is_ok());
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_device_manager_list_devices() {
+        use super::concrete_devices::BasicDeviceManager;
+        use super::device::DeviceManager;
+
+        let manager = BasicDeviceManager::new().unwrap();
+        let devices = manager.list_devices();
+
+        assert!(devices.is_ok());
+        let devices = devices.unwrap();
+        assert!(!devices.is_empty());
+
+        // Should have at least CPU device
+        assert!(devices.iter().any(|d| d.device_type == device::DeviceType::Cpu));
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_device_manager_get_best_device() {
+        use super::concrete_devices::BasicDeviceManager;
+        use super::device::{DeviceManager, ComputeDevice};
+
+        let manager = BasicDeviceManager::new().unwrap();
+        let device = manager.get_best_device();
+
+        assert!(device.is_ok());
+        let device = device.unwrap();
+        assert_eq!(device.info().device_type, device::DeviceType::Cpu);
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_device_manager_get_cpu_device() {
+        use super::concrete_devices::BasicDeviceManager;
+        use super::device::{DeviceManager, ComputeDevice};
+
+        let manager = BasicDeviceManager::new().unwrap();
+        let device = manager.get_device_by_type(device::DeviceType::Cpu);
+
+        assert!(device.is_ok());
+        let device = device.unwrap();
+        assert_eq!(device.info().device_type, device::DeviceType::Cpu);
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_device_manager_get_metal_device_should_fail() {
+        use super::concrete_devices::BasicDeviceManager;
+        use super::device::DeviceManager;
+
+        let manager = BasicDeviceManager::new().unwrap();
+        let device = manager.get_device_by_type(device::DeviceType::Metal);
+
+        assert!(device.is_err());
+    }
 
     #[test]
     fn test_cpu_engine_creation() {
