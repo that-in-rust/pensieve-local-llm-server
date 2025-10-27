@@ -1,5 +1,23 @@
 [package]
-name = "pensieve-04"
+name = "pensieve-04_engine"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Core inference engine for the Pensieve LLM server"
+categories = ["algorithms", "science", "mathematics"]
+keywords = ["llm", "inference", "engine", "cpu"]
+
+[dependencies]
+# Only depend on L1 (core) crate
+pensieve-07_core = { path = "../pensieve-07", package = "pensieve-07_core" }
+
+[dev-dependencies]
+# Testing dependencies
+proptest = { workspace = true }
+
+[features]
+default = ["std"]
+std = ["pensieve-07_core/std"]
 
