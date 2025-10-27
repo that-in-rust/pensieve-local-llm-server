@@ -1,0 +1,4 @@
+[package]
+name = "pensieve-02"
+version.workspace = true
+edition.workspace = true

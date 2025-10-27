@@ -1,0 +1,43 @@
+[workspace]
+members = [
+    "pensieve-01",
+    "pensieve-02",
+    "pensieve-03",
+    "pensieve-04",
+    "pensieve-05",
+    "pensieve-06",
+    "pensieve-07",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Amul <amul@example.com>"]
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/amuldotexe/pensieve"
+repository = "https://github.com/amuldotexe/pensieve"
+description = "A modular local LLM server built with independent Rust crates"
+
+[workspace.dependencies]
+# Common dependencies that can be shared across crates
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4.0", features = ["derive"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+[profile.dev]
+debug = true
+opt-level = 0
+
+[profile.release]
+debug = false
+lto = true
+codegen-units = 1
+panic = "abort"
