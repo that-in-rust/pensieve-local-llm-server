@@ -129,7 +129,7 @@ pub mod gguf {
     use crate::model::ModelMetadata;
     use alloc::{
         string::String,
-        vec::Vec
+        vec::Vec,
     };
 
     /// GGUF file header information
@@ -222,7 +222,7 @@ pub mod gguf {
     }
 
     /// GGUF data types - extended for quantization support
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub enum GgufDataType {
         /// 8-bit unsigned integer
         U8,
@@ -1315,6 +1315,972 @@ pub mod mock {
     }
 }
 
+/// Advanced memory management with pooling and optimization
+#[cfg(feature = "std")]
+pub mod memory {
+    use super::{
+        gguf::{GgufDataType, MemoryUsage},
+        loader::{LoadedTensor},
+        CoreError, CoreResult,
+    };
+    use std::{
+        collections::HashMap,
+        sync::{Arc, Mutex},
+        alloc::{GlobalAlloc, Layout, System},
+        ptr::NonNull,
+        vec::Vec,
+    };
+
+    /// Memory pool for efficient tensor allocation
+    #[derive(Debug)]
+    pub struct MemoryPool {
+        /// Available memory blocks by size
+        available_blocks: HashMap<usize, Vec<NonNull<u8>>>,
+        /// Allocated blocks tracking
+        allocated_blocks: HashMap<NonNull<u8>, usize>,
+        /// Total memory managed by pool
+        total_memory: usize,
+        /// Used memory
+        used_memory: usize,
+        /// Peak memory usage
+        peak_memory: usize,
+    }
+
+    unsafe impl Send for MemoryPool {}
+    unsafe impl Sync for MemoryPool {}
+
+    impl MemoryPool {
+        /// Create new memory pool with initial capacity
+        pub fn new(initial_capacity_mb: usize) -> Self {
+            let initial_capacity = initial_capacity_mb * 1024 * 1024;
+            Self {
+                available_blocks: HashMap::new(),
+                allocated_blocks: HashMap::new(),
+                total_memory: 0,
+                used_memory: 0,
+                peak_memory: 0,
+            }
+        }
+
+        /// Allocate memory block of given size
+        pub fn allocate(&mut self, size: usize) -> CoreResult<NonNull<u8>> {
+            // Align size to 8-byte boundary
+            let aligned_size = (size + 7) & !7;
+
+            // Try to reuse existing block
+            if let Some(blocks) = self.available_blocks.get_mut(&aligned_size) {
+                if let Some(ptr) = blocks.pop() {
+                    self.allocated_blocks.insert(ptr, aligned_size);
+                    self.used_memory += aligned_size;
+                    self.peak_memory = self.peak_memory.max(self.used_memory);
+                    return Ok(ptr);
+                }
+            }
+
+            // Allocate new block
+            let layout = Layout::from_size_align(aligned_size, 8)
+                .map_err(|_| CoreError::Generic("Invalid layout"))?;
+
+            let ptr = unsafe {
+                std::alloc::alloc(layout)
+            };
+
+            if ptr.is_null() {
+                return Err(CoreError::Unavailable("Memory allocation failed"));
+            }
+
+            let non_null_ptr = NonNull::new(ptr)
+                .ok_or_else(|| CoreError::Unavailable("Memory allocation failed"))?;
+
+            self.allocated_blocks.insert(non_null_ptr, aligned_size);
+            self.used_memory += aligned_size;
+            self.total_memory += aligned_size;
+            self.peak_memory = self.peak_memory.max(self.used_memory);
+
+            Ok(non_null_ptr)
+        }
+
+        /// Deallocate memory block
+        pub fn deallocate(&mut self, ptr: NonNull<u8>) -> CoreResult<()> {
+            if let Some(size) = self.allocated_blocks.remove(&ptr) {
+                self.used_memory -= size;
+
+                // Add to available blocks for reuse
+                self.available_blocks.entry(size).or_insert_with(Vec::new).push(ptr);
+                Ok(())
+            } else {
+                Err(CoreError::InvalidInput("Invalid pointer for deallocation"))
+            }
+        }
+
+        /// Get memory usage statistics
+        pub fn get_stats(&self) -> MemoryStats {
+            MemoryStats {
+                total_memory: self.total_memory,
+                used_memory: self.used_memory,
+                peak_memory: self.peak_memory,
+                available_blocks: self.available_blocks.iter().map(|(size, blocks)| (*size, blocks.len())).collect(),
+                fragmentation_ratio: if self.total_memory > 0 {
+                    1.0 - (self.used_memory as f64 / self.total_memory as f64)
+                } else {
+                    0.0
+                },
+            }
+        }
+
+        /// Optimize memory layout
+        pub fn optimize(&mut self) -> CoreResult<()> {
+            // Consolidate small blocks into larger ones
+            let mut to_consolidate: Vec<(usize, Vec<NonNull<u8>>)> = Vec::new();
+
+            for (size, blocks) in &self.available_blocks {
+                if blocks.len() > 10 && *size < 1024 * 1024 { // Many small blocks
+                    to_consolidate.push((*size, blocks.clone()));
+                }
+            }
+
+            for (size, blocks) in to_consolidate {
+                // Remove small blocks
+                for ptr in &blocks {
+                    self.available_blocks.get_mut(&size).unwrap().retain(|p| p != ptr);
+                }
+
+                // Create larger blocks by combining
+                let combined_size = size * blocks.len();
+                let combined_ptr = self.allocate(combined_size)?;
+
+                // Put combined block back to pool
+                self.deallocate(combined_ptr)?;
+            }
+
+            Ok(())
+        }
+
+        /// Clean up unused memory
+        pub fn cleanup(&mut self) -> CoreResult<()> {
+            // Release blocks that haven't been used recently
+            for (size, blocks) in &mut self.available_blocks {
+                // Keep only the most recent 5 blocks of each size
+                if blocks.len() > 5 {
+                    let to_release = blocks.split_off(blocks.len() - 5);
+                    for ptr in to_release {
+                        unsafe {
+                            let layout = Layout::from_size_align(*size, 8).unwrap();
+                            std::alloc::dealloc(ptr.as_ptr(), layout);
+                        }
+                        self.total_memory -= size;
+                    }
+                }
+            }
+            Ok(())
+        }
+    }
+
+    impl Default for MemoryPool {
+        fn default() -> Self {
+            Self::new(64) // 64MB default pool
+        }
+    }
+
+    /// Memory usage statistics
+    #[derive(Debug, Clone)]
+    pub struct MemoryStats {
+        /// Total memory managed by pool
+        pub total_memory: usize,
+        /// Currently used memory
+        pub used_memory: usize,
+        /// Peak memory usage
+        pub peak_memory: usize,
+        /// Available blocks by size
+        pub available_blocks: Vec<(usize, usize)>,
+        /// Memory fragmentation ratio (0.0 = no fragmentation, 1.0 = fully fragmented)
+        pub fragmentation_ratio: f64,
+    }
+
+    impl MemoryStats {
+        /// Get memory usage in MB
+        pub fn total_mb(&self) -> f64 {
+            self.total_memory as f64 / (1024.0 * 1024.0)
+        }
+
+        /// Get used memory in MB
+        pub fn used_mb(&self) -> f64 {
+            self.used_memory as f64 / (1024.0 * 1024.0)
+        }
+
+        /// Get peak memory in MB
+        pub fn peak_mb(&self) -> f64 {
+            self.peak_memory as f64 / (1024.0 * 1024.0)
+        }
+
+        /// Get memory utilization ratio
+        pub fn utilization_ratio(&self) -> f64 {
+            if self.total_memory > 0 {
+                self.used_memory as f64 / self.total_memory as f64
+            } else {
+                0.0
+            }
+        }
+    }
+
+    /// Advanced memory manager with pooling and optimization
+    #[derive(Debug)]
+    pub struct AdvancedMemoryManager {
+        /// Memory pool for allocations
+        pool: Arc<Mutex<MemoryPool>>,
+        /// Memory limits
+        limits: MemoryLimits,
+        /// Allocation strategy
+        strategy: AllocationStrategy,
+        /// Memory usage tracking
+        usage_tracker: Arc<Mutex<MemoryUsageTracker>>,
+    }
+
+    impl AdvancedMemoryManager {
+        /// Create new advanced memory manager
+        pub fn new(limits: MemoryLimits, strategy: AllocationStrategy) -> Self {
+            Self {
+                pool: Arc::new(Mutex::new(MemoryPool::new(limits.initial_pool_mb))),
+                limits,
+                strategy,
+                usage_tracker: Arc::new(Mutex::new(MemoryUsageTracker::new())),
+            }
+        }
+
+        /// Allocate tensor with optimal memory usage
+        pub fn allocate_tensor(&mut self, shape: &[usize], dtype: GgufDataType) -> CoreResult<PooledTensor> {
+            let size = self.calculate_tensor_size(shape, dtype);
+
+            // Check memory limits
+            {
+                let tracker = self.usage_tracker.lock().unwrap();
+                if tracker.current_usage + size > self.limits.max_memory_bytes {
+                    return Err(CoreError::Unavailable("Memory limit exceeded"));
+                }
+            }
+
+            // Allocate from pool
+            let ptr = {
+                let mut pool = self.pool.lock().unwrap();
+                pool.allocate(size)?
+            };
+
+            // Update usage tracking
+            {
+                let mut tracker = self.usage_tracker.lock().unwrap();
+                tracker.track_allocation(size, dtype);
+            }
+
+            Ok(PooledTensor {
+                ptr,
+                size,
+                shape: shape.to_vec(),
+                dtype,
+                pool: self.pool.clone(),
+                tracker: self.usage_tracker.clone(),
+            })
+        }
+
+        /// Get memory usage statistics
+        pub fn get_memory_stats(&self) -> MemoryStats {
+            self.pool.lock().unwrap().get_stats()
+        }
+
+        /// Get usage tracking information
+        pub fn get_usage_info(&self) -> UsageInfo {
+            self.usage_tracker.lock().unwrap().get_info()
+        }
+
+        /// Optimize memory usage
+        pub fn optimize_memory(&mut self) -> CoreResult<()> {
+            let mut pool = self.pool.lock().unwrap();
+            pool.optimize()?;
+            pool.cleanup()?;
+            Ok(())
+        }
+
+        /// Check if memory pressure requires cleanup
+        pub fn should_optimize(&self) -> bool {
+            let stats = self.get_memory_stats();
+            stats.fragmentation_ratio > 0.3 || stats.utilization_ratio() < 0.7
+        }
+
+        /// Calculate tensor size in bytes
+        fn calculate_tensor_size(&self, shape: &[usize], dtype: GgufDataType) -> usize {
+            let element_count: usize = shape.iter().product();
+            let bytes_per_element = dtype.size();
+            element_count * bytes_per_element
+        }
+    }
+
+    /// Memory limits configuration
+    #[derive(Debug, Clone)]
+    pub struct MemoryLimits {
+        /// Maximum memory usage in bytes
+        pub max_memory_bytes: usize,
+        /// Initial pool size in MB
+        pub initial_pool_mb: usize,
+        /// Maximum tensor size in bytes
+        pub max_tensor_size: usize,
+        /// Memory pressure threshold (0.0 to 1.0)
+        pub pressure_threshold: f64,
+    }
+
+    impl MemoryLimits {
+        /// Create conservative limits for M1 systems
+        pub fn conservative_m1() -> Self {
+            Self {
+                max_memory_bytes: 12 * 1024 * 1024 * 1024, // 12GB
+                initial_pool_mb: 512, // 512MB
+                max_tensor_size: 2 * 1024 * 1024 * 1024, // 2GB
+                pressure_threshold: 0.8, // 80%
+            }
+        }
+
+        /// Create aggressive limits for high-performance systems
+        pub fn aggressive() -> Self {
+            Self {
+                max_memory_bytes: 32 * 1024 * 1024 * 1024, // 32GB
+                initial_pool_mb: 2048, // 2GB
+                max_tensor_size: 8 * 1024 * 1024 * 1024, // 8GB
+                pressure_threshold: 0.9, // 90%
+            }
+        }
+    }
+
+    impl Default for MemoryLimits {
+        fn default() -> Self {
+            Self::conservative_m1()
+        }
+    }
+
+    /// Allocation strategy for memory management
+    #[derive(Debug, Clone)]
+    pub enum AllocationStrategy {
+        /// Optimize for speed (reuse existing blocks)
+        Speed,
+        /// Optimize for memory efficiency (compact allocations)
+        Memory,
+        /// Balanced approach
+        Balanced,
+        /// Adaptive based on usage patterns
+        Adaptive,
+    }
+
+    impl Default for AllocationStrategy {
+        fn default() -> Self {
+            Self::Balanced
+        }
+    }
+
+    /// Memory usage tracking
+    #[derive(Debug)]
+    pub struct MemoryUsageTracker {
+        /// Current memory usage in bytes
+        pub current_usage: usize,
+        /// Peak usage
+        pub peak_usage: usize,
+        /// Allocation history
+        pub allocation_history: Vec<AllocationRecord>,
+        /// Usage by data type
+        pub usage_by_type: HashMap<GgufDataType, usize>,
+    }
+
+    impl MemoryUsageTracker {
+        /// Create new usage tracker
+        pub fn new() -> Self {
+            Self {
+                current_usage: 0,
+                peak_usage: 0,
+                allocation_history: Vec::new(),
+                usage_by_type: HashMap::new(),
+            }
+        }
+
+        /// Track memory allocation
+        pub fn track_allocation(&mut self, size: usize, dtype: GgufDataType) {
+            self.current_usage += size;
+            self.peak_usage = self.peak_usage.max(self.current_usage);
+
+            *self.usage_by_type.entry(dtype).or_insert(0) += size;
+
+            self.allocation_history.push(AllocationRecord {
+                size,
+                dtype,
+                timestamp: std::time::SystemTime::now(),
+            });
+
+            // Keep only last 1000 records
+            if self.allocation_history.len() > 1000 {
+                self.allocation_history.remove(0);
+            }
+        }
+
+        /// Track memory deallocation
+        pub fn track_deallocation(&mut self, size: usize, dtype: GgufDataType) {
+            self.current_usage = self.current_usage.saturating_sub(size);
+            *self.usage_by_type.entry(dtype).or_insert(0) =
+                self.usage_by_type[&dtype].saturating_sub(size);
+        }
+
+        /// Get usage information
+        pub fn get_info(&self) -> UsageInfo {
+            UsageInfo {
+                current_usage: self.current_usage,
+                peak_usage: self.peak_usage,
+                total_allocations: self.allocation_history.len(),
+                usage_by_type: self.usage_by_type.clone(),
+            }
+        }
+    }
+
+    /// Individual allocation record
+    #[derive(Debug, Clone)]
+    pub struct AllocationRecord {
+        /// Size of allocation in bytes
+        pub size: usize,
+        /// Data type allocated
+        pub dtype: GgufDataType,
+        /// When allocation occurred
+        pub timestamp: std::time::SystemTime,
+    }
+
+    /// Usage information summary
+    #[derive(Debug, Clone)]
+    pub struct UsageInfo {
+        /// Current memory usage in bytes
+        pub current_usage: usize,
+        /// Peak memory usage in bytes
+        pub peak_usage: usize,
+        /// Total number of allocations
+        pub total_allocations: usize,
+        /// Usage breakdown by data type
+        pub usage_by_type: HashMap<GgufDataType, usize>,
+    }
+
+    impl UsageInfo {
+        /// Get current usage in MB
+        pub fn current_mb(&self) -> f64 {
+            self.current_usage as f64 / (1024.0 * 1024.0)
+        }
+
+        /// Get peak usage in MB
+        pub fn peak_mb(&self) -> f64 {
+            self.peak_usage as f64 / (1024.0 * 1024.0)
+        }
+    }
+
+    /// Pooled tensor with automatic memory management
+    #[derive(Debug)]
+    pub struct PooledTensor {
+        /// Pointer to allocated memory
+        ptr: NonNull<u8>,
+        /// Size of allocation
+        size: usize,
+        /// Tensor shape
+        shape: Vec<usize>,
+        /// Data type
+        dtype: GgufDataType,
+        /// Memory pool reference
+        pool: Arc<Mutex<MemoryPool>>,
+        /// Usage tracker reference
+        tracker: Arc<Mutex<MemoryUsageTracker>>,
+    }
+
+    impl PooledTensor {
+        /// Get tensor shape
+        pub fn shape(&self) -> &[usize] {
+            &self.shape
+        }
+
+        /// Get data type
+        pub fn dtype(&self) -> GgufDataType {
+            self.dtype
+        }
+
+        /// Get size in bytes
+        pub fn size(&self) -> usize {
+            self.size
+        }
+
+        /// Get element count
+        pub fn element_count(&self) -> usize {
+            self.shape.iter().product()
+        }
+
+        /// Convert to loaded tensor (consumes pooled tensor)
+        pub fn into_loaded_tensor(self) -> LoadedTensor {
+            // Extract data from pooled memory
+            let data = unsafe {
+                let slice = std::slice::from_raw_parts(self.ptr.as_ptr(), self.size);
+                slice.to_vec()
+            };
+
+            // Create loaded tensor
+            LoadedTensor::new(data, self.shape.clone(), self.dtype)
+        }
+    }
+
+    impl Drop for PooledTensor {
+        fn drop(&mut self) {
+            // Return memory to pool
+            if let Ok(mut pool) = self.pool.lock() {
+                let _ = pool.deallocate(self.ptr);
+            }
+
+            // Update usage tracking
+            if let Ok(mut tracker) = self.tracker.lock() {
+                tracker.track_deallocation(self.size, self.dtype);
+            }
+        }
+    }
+
+    unsafe impl Send for PooledTensor {}
+    unsafe impl Sync for PooledTensor {}
+}
+
+/// Performance benchmarks and optimization framework
+#[cfg(feature = "std")]
+pub mod benchmarks {
+    use super::{
+        loader::{GgufLoader, LoadedWeights, LoadedTensor},
+        gguf::{GgufDataType, GgufTensor, QuantizationConfig, MemoryUsage},
+        CoreError, CoreResult,
+        Resource,
+    };
+    use std::{
+        time::{Duration, Instant},
+        collections::HashMap,
+        fs::File,
+        io::Write,
+        path::Path,
+        vec,
+        string::{String, ToString},
+        vec::Vec,
+        format,
+    };
+
+    /// Performance metrics for model loading operations
+    #[derive(Debug, Clone)]
+    pub struct LoadingMetrics {
+        /// Total loading time
+        pub total_time: Duration,
+        /// Header parsing time
+        pub header_time: Duration,
+        /// Tensor loading time
+        pub tensor_time: Duration,
+        /// Metadata parsing time
+        pub metadata_time: Duration,
+        /// Peak memory usage during loading
+        pub peak_memory_bytes: usize,
+        /// Number of tensors loaded
+        pub tensor_count: usize,
+        /// Total bytes of tensor data
+        pub total_tensor_bytes: usize,
+    }
+
+    impl LoadingMetrics {
+        /// Create new loading metrics
+        pub fn new() -> Self {
+            Self {
+                total_time: Duration::ZERO,
+                header_time: Duration::ZERO,
+                tensor_time: Duration::ZERO,
+                metadata_time: Duration::ZERO,
+                peak_memory_bytes: 0,
+                tensor_count: 0,
+                total_tensor_bytes: 0,
+            }
+        }
+
+        /// Get loading speed in MB/s
+        pub fn loading_speed_mbps(&self) -> f64 {
+            if self.total_time.as_secs_f64() > 0.0 {
+                (self.total_tensor_bytes as f64) / (1024.0 * 1024.0) / self.total_time.as_secs_f64()
+            } else {
+                0.0
+            }
+        }
+
+        /// Get average loading time per tensor
+        pub fn avg_time_per_tensor(&self) -> Duration {
+            if self.tensor_count > 0 {
+                self.tensor_time / self.tensor_count as u32
+            } else {
+                Duration::ZERO
+            }
+        }
+
+        /// Get memory efficiency ratio
+        pub fn memory_efficiency(&self) -> f64 {
+            if self.peak_memory_bytes > 0 {
+                self.total_tensor_bytes as f64 / self.peak_memory_bytes as f64
+            } else {
+                0.0
+            }
+        }
+    }
+
+    impl Default for LoadingMetrics {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    /// Performance benchmark suite for GGUF loading
+    #[derive(Debug)]
+    pub struct GgufBenchmarkSuite {
+        /// Loader to benchmark
+        loader: GgufLoader,
+        /// Collected metrics
+        metrics: Vec<LoadingMetrics>,
+        /// Benchmark configuration
+        config: BenchmarkConfig,
+    }
+
+    impl GgufBenchmarkSuite {
+        /// Create new benchmark suite
+        pub fn new(config: BenchmarkConfig) -> Self {
+            Self {
+                loader: GgufLoader::new(),
+                metrics: Vec::new(),
+                config,
+            }
+        }
+
+        /// Run comprehensive loading benchmark
+        pub fn benchmark_loading(&mut self, test_file: &str) -> CoreResult<LoadingMetrics> {
+            let mut metrics = LoadingMetrics::new();
+            let start_time = Instant::now();
+
+            // Acquire loader
+            self.loader.acquire()?;
+
+            // Benchmark header parsing
+            let header_start = Instant::now();
+            let mut file = File::open(test_file)
+                .map_err(|_| CoreError::Generic("Cannot open test file"))?;
+            let header = self.loader.read_gguf_header(&mut file)?;
+            metrics.header_time = header_start.elapsed();
+
+            // Benchmark metadata parsing
+            let metadata_start = Instant::now();
+            let metadata = self.loader.parse_metadata(test_file)?;
+            metrics.metadata_time = metadata_start.elapsed();
+
+            // Benchmark tensor loading
+            let tensor_start = Instant::now();
+            let loaded_weights = self.loader.load_weights(test_file)?;
+            metrics.tensor_time = tensor_start.elapsed();
+            metrics.tensor_count = loaded_weights.tensor_count();
+            metrics.total_tensor_bytes = loaded_weights.memory_usage.weights_bytes;
+            metrics.peak_memory_bytes = loaded_weights.memory_usage.total_bytes;
+
+            // Total time
+            metrics.total_time = start_time.elapsed();
+
+            // Store metrics
+            self.metrics.push(metrics.clone());
+
+            self.loader.release()?;
+            Ok(metrics)
+        }
+
+        /// Benchmark tensor creation performance
+        pub fn benchmark_tensor_creation(&self, size_mb: usize) -> CoreResult<Duration> {
+            let total_elements = (size_mb * 1024 * 1024) / 4; // Assume F32
+            let shape = vec![total_elements];
+            let data = vec![0u8; size_mb * 1024 * 1024];
+
+            let start_time = Instant::now();
+
+            // Create multiple tensors to benchmark
+            for _ in 0..100 {
+                let tensor = LoadedTensor::new(data.clone(), shape.clone(), GgufDataType::F32);
+                // Force validation
+                tensor.validate()?;
+            }
+
+            Ok(start_time.elapsed())
+        }
+
+        /// Benchmark memory usage patterns
+        pub fn benchmark_memory_usage(&self, tensor_count: usize, tensor_size: usize) -> CoreResult<MemoryUsage> {
+            let mut total_memory = 0;
+            let tensors_start = Instant::now();
+
+            // Simulate loading multiple tensors
+            for i in 0..tensor_count {
+                let data = vec![0u8; tensor_size];
+                let shape = vec![tensor_size / 4]; // Assume F32
+                let tensor = LoadedTensor::new(data, shape, GgufDataType::F32);
+                total_memory += tensor.size_bytes();
+            }
+
+            let loading_time = tensors_start.elapsed();
+
+            // Estimate KV cache and overhead
+            let kv_cache_bytes = if total_memory > 4_000_000_000 {
+                2_000_000_000 // 2GB for large models
+            } else if total_memory > 1_000_000_000 {
+                1_000_000_000 // 1GB for medium models
+            } else {
+                500_000_000 // 500MB for small models
+            };
+
+            let overhead_bytes = 512_000_000; // 512MB overhead
+
+            Ok(MemoryUsage::new(
+                total_memory + kv_cache_bytes + overhead_bytes,
+                total_memory,
+                kv_cache_bytes,
+                overhead_bytes,
+            ))
+        }
+
+        /// Get benchmark statistics
+        pub fn get_statistics(&self) -> BenchmarkStats {
+            BenchmarkStats::from_metrics(&self.metrics)
+        }
+
+        /// Run full benchmark suite
+        pub fn run_full_suite(&mut self) -> CoreResult<BenchmarkStats> {
+            // Create test files for benchmarking
+            self.create_test_files()?;
+
+            // Run benchmarks on different file sizes
+            let sizes = vec!["1mb", "10mb", "100mb", "1gb"];
+
+            for size in sizes {
+                let test_file = format!("benchmark_test_{}.gguf", size);
+                if Path::new(&test_file).exists() {
+                    let _ = self.benchmark_loading(&test_file);
+                }
+            }
+
+            Ok(self.get_statistics())
+        }
+
+        /// Create test files for benchmarking
+        fn create_test_files(&self) -> CoreResult<()> {
+            let sizes = vec![
+                ("1mb", 1_024 * 1024),
+                ("10mb", 10 * 1024 * 1024),
+                ("100mb", 100 * 1024 * 1024),
+                // Note: 1GB file creation is omitted to avoid long test times
+            ];
+
+            for (name, size) in sizes {
+                let filename = format!("benchmark_test_{}.gguf", name);
+                if !Path::new(&filename).exists() {
+                    self.create_mock_gguf_file(&filename, size)?;
+                }
+            }
+
+            Ok(())
+        }
+
+        /// Create a mock GGUF file for testing
+        fn create_mock_gguf_file(&self, filename: &str, size: usize) -> CoreResult<()> {
+            let mut file = File::create(filename)
+                .map_err(|_| CoreError::Generic("Cannot create test file"))?;
+
+            // Write GGUF header
+            file.write_all(&0x46554747u32.to_le_bytes()) // GGUF magic
+                .map_err(|_| CoreError::Generic("Failed to write header"))?;
+            file.write_all(&3u32.to_le_bytes()) // Version
+                .map_err(|_| CoreError::Generic("Failed to write version"))?;
+            file.write_all(&10u32.to_le_bytes()) // Tensor count
+                .map_err(|_| CoreError::Generic("Failed to write tensor count"))?;
+            file.write_all(&5u32.to_le_bytes()) // KV count
+                .map_err(|_| CoreError::Generic("Failed to write KV count"))?;
+
+            // Calculate header size and remaining data size
+            let header_size = 16; // 4 * 4 bytes
+            let remaining_size = size.saturating_sub(header_size);
+
+            // Write mock data
+            let mock_data = vec![0u8; remaining_size];
+            file.write_all(&mock_data)
+                .map_err(|_| CoreError::Generic("Failed to write mock data"))?;
+
+            file.flush()
+                .map_err(|_| CoreError::Generic("Failed to flush file"))?;
+
+            Ok(())
+        }
+    }
+
+    /// Benchmark configuration
+    #[derive(Debug, Clone)]
+    pub struct BenchmarkConfig {
+        /// Number of iterations for each benchmark
+        pub iterations: usize,
+        /// Whether to create test files
+        pub create_test_files: bool,
+        /// Test file sizes in MB
+        pub test_sizes_mb: Vec<usize>,
+        /// Whether to clean up test files after benchmarking
+        pub cleanup_after: bool,
+    }
+
+    impl Default for BenchmarkConfig {
+        fn default() -> Self {
+            Self {
+                iterations: 5,
+                create_test_files: true,
+                test_sizes_mb: vec![1, 10, 100],
+                cleanup_after: true,
+            }
+        }
+    }
+
+    /// Benchmark statistics summary
+    #[derive(Debug, Clone)]
+    pub struct BenchmarkStats {
+        /// Average loading time
+        pub avg_loading_time: Duration,
+        /// Fastest loading time
+        pub min_loading_time: Duration,
+        /// Slowest loading time
+        pub max_loading_time: Duration,
+        /// Average loading speed in MB/s
+        pub avg_speed_mbps: f64,
+        /// Average memory efficiency
+        pub avg_memory_efficiency: f64,
+        /// Total benchmarks run
+        pub total_benchmarks: usize,
+    }
+
+    impl BenchmarkStats {
+        /// Create statistics from metrics
+        pub fn from_metrics(metrics: &[LoadingMetrics]) -> Self {
+            if metrics.is_empty() {
+                return Self {
+                    avg_loading_time: Duration::ZERO,
+                    min_loading_time: Duration::ZERO,
+                    max_loading_time: Duration::ZERO,
+                    avg_speed_mbps: 0.0,
+                    avg_memory_efficiency: 0.0,
+                    total_benchmarks: 0,
+                };
+            }
+
+            let total_time: Duration = metrics.iter().map(|m| m.total_time).sum();
+            let avg_time = total_time / metrics.len() as u32;
+            let min_time = metrics.iter().map(|m| m.total_time).min().unwrap_or(Duration::ZERO);
+            let max_time = metrics.iter().map(|m| m.total_time).max().unwrap_or(Duration::ZERO);
+
+            let total_speed: f64 = metrics.iter().map(|m| m.loading_speed_mbps()).sum();
+            let avg_speed = total_speed / metrics.len() as f64;
+
+            let total_efficiency: f64 = metrics.iter().map(|m| m.memory_efficiency()).sum();
+            let avg_efficiency = total_efficiency / metrics.len() as f64;
+
+            Self {
+                avg_loading_time: avg_time,
+                min_loading_time: min_time,
+                max_loading_time: max_time,
+                avg_speed_mbps: avg_speed,
+                avg_memory_efficiency: avg_efficiency,
+                total_benchmarks: metrics.len(),
+            }
+        }
+
+        /// Check if performance meets Phase 2.4 targets
+        pub fn meets_phase24_targets(&self) -> bool {
+            // Phase 2.4 targets:
+            // - Loading speed: >100 MB/s for efficient loading
+            // - Memory efficiency: >85% (low overhead)
+            // - Consistency: max_time should be < 2x avg_time
+            self.avg_speed_mbps > 100.0
+                && self.avg_memory_efficiency > 0.85
+                && self.max_loading_time.as_secs_f64() < 2.0 * self.avg_loading_time.as_secs_f64()
+        }
+
+        /// Get performance recommendations
+        pub fn get_recommendations(&self) -> Vec<&'static str> {
+            let mut recommendations = Vec::new();
+
+            if self.avg_speed_mbps < 100.0 {
+                recommendations.push("Consider implementing memory-mapped file I/O for faster loading");
+                recommendations.push("Optimize tensor reading with buffered I/O");
+            }
+
+            if self.avg_memory_efficiency < 0.85 {
+                recommendations.push("Implement memory pooling to reduce allocation overhead");
+                recommendations.push("Consider lazy loading for non-critical tensors");
+            }
+
+            let consistency_ratio = self.max_loading_time.as_secs_f64() / self.avg_loading_time.as_secs_f64();
+            if consistency_ratio > 2.0 {
+                recommendations.push("Investigate inconsistent loading performance");
+                recommendations.push("Implement background preloading for better consistency");
+            }
+
+            if recommendations.is_empty() {
+                recommendations.push("Performance targets met - consider advanced optimizations");
+            }
+
+            recommendations
+        }
+    }
+
+    /// Performance profiling helper
+    #[derive(Debug)]
+    pub struct Profiler {
+        start_time: Instant,
+        checkpoints: HashMap<String, Duration>,
+    }
+
+    impl Profiler {
+        /// Create new profiler
+        pub fn new() -> Self {
+            Self {
+                start_time: Instant::now(),
+                checkpoints: HashMap::new(),
+            }
+        }
+
+        /// Start profiling
+        pub fn start(&mut self) {
+            self.start_time = Instant::now();
+            self.checkpoints.clear();
+        }
+
+        /// Add a checkpoint
+        pub fn checkpoint(&mut self, name: &str) {
+            let elapsed = self.start_time.elapsed();
+            self.checkpoints.insert(name.to_string(), elapsed);
+        }
+
+        /// Get checkpoint duration
+        pub fn get_checkpoint(&self, name: &str) -> Option<Duration> {
+            self.checkpoints.get(name).copied()
+        }
+
+        /// Get duration between checkpoints
+        pub fn get_duration_between(&self, start: &str, end: &str) -> Option<Duration> {
+            if let (Some(start_time), Some(end_time)) = (self.checkpoints.get(start), self.checkpoints.get(end)) {
+                Some(*end_time - *start_time)
+            } else {
+                None
+            }
+        }
+
+        /// Get total elapsed time
+        pub fn total_elapsed(&self) -> Duration {
+            self.start_time.elapsed()
+        }
+    }
+
+    impl Default for Profiler {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+}
+
 /// Candle tensor integration module
 #[cfg(feature = "std")]
 pub mod candle_integration {
@@ -1507,6 +2473,432 @@ pub mod candle_integration {
     }
 }
 
+/// Enhanced error handling for production use
+#[cfg(feature = "std")]
+pub mod enhanced_errors {
+    use super::CoreError;
+    use std::{
+        collections::HashMap,
+        fmt,
+        time::SystemTime,
+        format,
+        vec,
+        string::{String, ToString},
+        vec::Vec,
+    };
+
+    /// Enhanced error categories for better handling
+    #[derive(Debug, Clone, PartialEq)]
+    pub enum ErrorCategory {
+        /// File system related errors
+        FileSystem,
+        /// Memory allocation errors
+        Memory,
+        /// Network or I/O errors
+        Io,
+        /// Data format or parsing errors
+        DataFormat,
+        /// Configuration errors
+        Configuration,
+        /// Resource exhaustion
+        ResourceExhaustion,
+        /// Validation errors
+        Validation,
+        /// Timeout errors
+        Timeout,
+        /// Unknown or uncategorized errors
+        Unknown,
+    }
+
+    /// Enhanced error severity levels
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    pub enum ErrorSeverity {
+        /// Low severity - informational
+        Low,
+        /// Medium severity - warning
+        Medium,
+        /// High severity - error
+        High,
+        /// Critical severity - system failure
+        Critical,
+    }
+
+    /// Enhanced error context for debugging
+    #[derive(Debug, Clone)]
+    pub struct ErrorContext {
+        /// Error identifier
+        pub error_id: String,
+        /// Timestamp when error occurred
+        pub timestamp: SystemTime,
+        /// Operation that failed
+        pub operation: String,
+        /// Component that failed
+        pub component: String,
+        /// Additional context data
+        pub context: HashMap<String, String>,
+        /// Stack trace (if available)
+        pub stack_trace: Option<String>,
+    }
+
+    impl ErrorContext {
+        /// Create new error context
+        pub fn new(operation: &str, component: &str) -> Self {
+            use std::sync::atomic::{AtomicU64, Ordering};
+            static ERROR_COUNTER: AtomicU64 = AtomicU64::new(1);
+
+            let error_id = format!("ERR_{:016X}", ERROR_COUNTER.fetch_add(1, Ordering::SeqCst));
+
+            Self {
+                error_id,
+                timestamp: SystemTime::now(),
+                operation: operation.to_string(),
+                component: component.to_string(),
+                context: HashMap::new(),
+                stack_trace: None,
+            }
+        }
+
+        /// Add context data
+        pub fn add_context<K: Into<String>, V: Into<String>>(mut self, key: K, value: V) -> Self {
+            self.context.insert(key.into(), value.into());
+            self
+        }
+
+        /// Set stack trace
+        pub fn with_stack_trace(mut self, trace: String) -> Self {
+            self.stack_trace = Some(trace);
+            self
+        }
+    }
+
+    /// Enhanced error with comprehensive information
+    #[derive(Debug, Clone)]
+    pub struct EnhancedError {
+        /// Error category
+        pub category: ErrorCategory,
+        /// Error severity
+        pub severity: ErrorSeverity,
+        /// Human-readable message
+        pub message: String,
+        /// Technical details
+        pub technical_details: String,
+        /// Error context
+        pub context: ErrorContext,
+        /// Whether error is recoverable
+        pub recoverable: bool,
+        /// Suggested recovery actions
+        pub recovery_actions: Vec<String>,
+        /// Root cause (if known)
+        pub root_cause: Option<String>,
+        /// Error code for external reference
+        pub error_code: String,
+    }
+
+    impl EnhancedError {
+        /// Create new enhanced error
+        pub fn new(
+            category: ErrorCategory,
+            severity: ErrorSeverity,
+            message: String,
+            context: ErrorContext,
+        ) -> Self {
+            let error_code = match category {
+                ErrorCategory::FileSystem => "FS_001",
+                ErrorCategory::Memory => "MEM_001",
+                ErrorCategory::Io => "IO_001",
+                ErrorCategory::DataFormat => "DF_001",
+                ErrorCategory::Configuration => "CFG_001",
+                ErrorCategory::ResourceExhaustion => "RES_001",
+                ErrorCategory::Validation => "VAL_001",
+                ErrorCategory::Timeout => "TO_001",
+                ErrorCategory::Unknown => "UNK_001",
+            }.to_string();
+
+            let (recoverable, recovery_actions) = Self::determine_recovery_info(&category, &severity);
+
+            Self {
+                category,
+                severity,
+                message,
+                technical_details: String::new(),
+                context,
+                recoverable,
+                recovery_actions,
+                root_cause: None,
+                error_code,
+            }
+        }
+
+        /// Add technical details
+        pub fn with_technical_details(mut self, details: String) -> Self {
+            self.technical_details = details;
+            self
+        }
+
+        /// Add root cause
+        pub fn with_root_cause(mut self, cause: String) -> Self {
+            self.root_cause = Some(cause);
+            self
+        }
+
+        /// Add custom recovery actions
+        pub fn with_recovery_actions(mut self, actions: Vec<String>) -> Self {
+            self.recovery_actions = actions;
+            self
+        }
+
+        /// Determine recovery information based on error type
+        fn determine_recovery_info(category: &ErrorCategory, severity: &ErrorSeverity) -> (bool, Vec<String>) {
+            match (category, severity) {
+                (ErrorCategory::FileSystem, ErrorSeverity::Medium) => {
+                    (true, vec![
+                        "Check file permissions".to_string(),
+                        "Verify file path exists".to_string(),
+                        "Retry operation after delay".to_string(),
+                    ])
+                },
+                (ErrorCategory::Memory, ErrorSeverity::High) => {
+                    (true, vec![
+                        "Free up system memory".to_string(),
+                        "Reduce model size or batch size".to_string(),
+                        "Restart application".to_string(),
+                    ])
+                },
+                (ErrorCategory::DataFormat, ErrorSeverity::Medium) => {
+                    (true, vec![
+                        "Verify model file integrity".to_string(),
+                        "Check file format compatibility".to_string(),
+                        "Re-download model file if corrupted".to_string(),
+                    ])
+                },
+                (ErrorCategory::ResourceExhaustion, ErrorSeverity::Critical) => {
+                    (false, vec![
+                        "System resources exhausted".to_string(),
+                        "Requires manual intervention".to_string(),
+                    ])
+                },
+                (ErrorCategory::Timeout, ErrorSeverity::Medium) => {
+                    (true, vec![
+                        "Increase timeout duration".to_string(),
+                        "Check network connectivity".to_string(),
+                        "Retry operation".to_string(),
+                    ])
+                },
+                _ => (false, vec!["Contact support for assistance".to_string()]),
+            }
+        }
+
+        /// Get user-friendly summary
+        pub fn get_user_summary(&self) -> String {
+            format!(
+                "Error {}: {} ({}) - {}",
+                self.error_code,
+                self.message,
+                self.category_as_str(),
+                if self.recoverable { "Recoverable" } else { "Non-recoverable" }
+            )
+        }
+
+        /// Get category as string
+        fn category_as_str(&self) -> &'static str {
+            match self.category {
+                ErrorCategory::FileSystem => "File System",
+                ErrorCategory::Memory => "Memory",
+                ErrorCategory::Io => "I/O",
+                ErrorCategory::DataFormat => "Data Format",
+                ErrorCategory::Configuration => "Configuration",
+                ErrorCategory::ResourceExhaustion => "Resource Exhaustion",
+                ErrorCategory::Validation => "Validation",
+                ErrorCategory::Timeout => "Timeout",
+                ErrorCategory::Unknown => "Unknown",
+            }
+        }
+
+        /// Check if error should be retried
+        pub fn should_retry(&self) -> bool {
+            self.recoverable && match self.category {
+                ErrorCategory::FileSystem | ErrorCategory::Io | ErrorCategory::Timeout => true,
+                ErrorCategory::Memory | ErrorCategory::ResourceExhaustion => false,
+                _ => self.severity <= ErrorSeverity::Medium,
+            }
+        }
+
+        /// Get recommended retry delay in milliseconds
+        pub fn retry_delay_ms(&self) -> u64 {
+            match self.category {
+                ErrorCategory::FileSystem => 1000, // 1 second
+                ErrorCategory::Io => 2000, // 2 seconds
+                ErrorCategory::Timeout => 5000, // 5 seconds
+                _ => 1000, // Default 1 second
+            }
+        }
+    }
+
+    impl fmt::Display for EnhancedError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{} - {}", self.error_code, self.message)
+        }
+    }
+
+    impl std::error::Error for EnhancedError {}
+
+    /// Error recovery strategies
+    #[derive(Debug, Clone)]
+    pub enum RecoveryStrategy {
+        /// Retry with exponential backoff
+        ExponentialBackoff { max_retries: u32, base_delay_ms: u64 },
+        /// Retry with fixed delay
+        FixedDelay { retries: u32, delay_ms: u64 },
+        /// Circuit breaker pattern
+        CircuitBreaker { failure_threshold: u32, timeout_ms: u64 },
+        /// Fallback to alternative implementation
+        Fallback { alternative: String },
+        /// Graceful degradation
+        GracefulDegradation { degraded_features: Vec<String> },
+        /// No recovery possible
+        None,
+    }
+
+    impl RecoveryStrategy {
+        /// Get appropriate recovery strategy for error
+        pub fn for_error(error: &EnhancedError) -> Self {
+            if !error.should_retry() {
+                return RecoveryStrategy::None;
+            }
+
+            match error.category {
+                ErrorCategory::FileSystem | ErrorCategory::Io => {
+                    RecoveryStrategy::ExponentialBackoff {
+                        max_retries: 3,
+                        base_delay_ms: error.retry_delay_ms(),
+                    }
+                },
+                ErrorCategory::Memory => {
+                    RecoveryStrategy::GracefulDegradation {
+                        degraded_features: vec!["Large model loading".to_string()],
+                    }
+                },
+                ErrorCategory::Timeout => {
+                    RecoveryStrategy::CircuitBreaker {
+                        failure_threshold: 5,
+                        timeout_ms: 30000, // 30 seconds
+                    }
+                },
+                _ => RecoveryStrategy::FixedDelay {
+                    retries: 2,
+                    delay_ms: error.retry_delay_ms(),
+                },
+            }
+        }
+    }
+
+    /// Error recovery manager
+    #[derive(Debug)]
+    pub struct ErrorRecoveryManager {
+        /// Error statistics
+        error_stats: HashMap<String, u32>,
+        /// Circuit breaker states
+        circuit_breakers: HashMap<String, CircuitBreakerState>,
+    }
+
+    impl ErrorRecoveryManager {
+        /// Create new recovery manager
+        pub fn new() -> Self {
+            Self {
+                error_stats: HashMap::new(),
+                circuit_breakers: HashMap::new(),
+            }
+        }
+
+        /// Handle error and determine recovery action
+        pub fn handle_error(&mut self, error: &EnhancedError) -> RecoveryStrategy {
+            // Track error statistics
+            let count = self.error_stats.entry(error.error_code.clone()).or_insert(0);
+            *count += 1;
+
+            // Get recovery strategy
+            let strategy = RecoveryStrategy::for_error(error);
+
+            // Handle circuit breaker logic
+            if matches!(strategy, RecoveryStrategy::CircuitBreaker { .. }) {
+                self.update_circuit_breaker(&error.error_code);
+            }
+
+            strategy
+        }
+
+        /// Update circuit breaker state
+        fn update_circuit_breaker(&mut self, error_code: &str) {
+            let state = self.circuit_breakers.entry(error_code.to_string()).or_insert_with(|| {
+                CircuitBreakerState {
+                    failure_count: 0,
+                    last_failure: SystemTime::now(),
+                    is_open: false,
+                }
+            });
+
+            state.failure_count += 1;
+            state.last_failure = SystemTime::now();
+
+            // Open circuit after 5 failures
+            if state.failure_count >= 5 {
+                state.is_open = true;
+            }
+        }
+
+        /// Check if circuit is open for error type
+        pub fn is_circuit_open(&self, error_code: &str) -> bool {
+            self.circuit_breakers
+                .get(error_code)
+                .map(|state| state.is_open)
+                .unwrap_or(false)
+        }
+
+        /// Reset circuit breaker
+        pub fn reset_circuit_breaker(&mut self, error_code: &str) {
+            if let Some(state) = self.circuit_breakers.get_mut(error_code) {
+                state.failure_count = 0;
+                state.is_open = false;
+            }
+        }
+
+        /// Get error statistics
+        pub fn get_error_stats(&self) -> &HashMap<String, u32> {
+            &self.error_stats
+        }
+    }
+
+    impl Default for ErrorRecoveryManager {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    /// Circuit breaker state
+    #[derive(Debug, Clone)]
+    struct CircuitBreakerState {
+        failure_count: u32,
+        last_failure: SystemTime,
+        is_open: bool,
+    }
+
+    /// Convert from basic CoreError to EnhancedError
+    pub fn enhance_core_error(error: CoreError, operation: &str, component: &str) -> EnhancedError {
+        let (category, severity) = match error {
+            CoreError::InvalidConfig(_) => (ErrorCategory::Configuration, ErrorSeverity::Medium),
+            CoreError::NotFound(_) => (ErrorCategory::FileSystem, ErrorSeverity::Medium),
+            CoreError::InvalidInput(_) => (ErrorCategory::Validation, ErrorSeverity::Medium),
+            CoreError::Unsupported(_) => (ErrorCategory::Configuration, ErrorSeverity::Low),
+            CoreError::Unavailable(_) => (ErrorCategory::ResourceExhaustion, ErrorSeverity::High),
+            CoreError::Generic(_) => (ErrorCategory::Unknown, ErrorSeverity::Medium),
+        };
+
+        let context = ErrorContext::new(operation, component);
+
+        EnhancedError::new(category, severity, format!("{}", error), context)
+    }
+}
+
 // Re-export key types for convenience
 pub use model::{ModelLoader, ModelMetadata, ModelRequirements, ModelValidator};
 #[cfg(feature = "std")]
@@ -1519,6 +2911,20 @@ pub use loader::{
 };
 #[cfg(feature = "std")]
 pub use candle_integration::{CandleTensor, TensorConverter, StreamingTensorLoader};
+#[cfg(feature = "std")]
+pub use memory::{
+    MemoryPool, AdvancedMemoryManager, MemoryLimits, AllocationStrategy,
+    PooledTensor, MemoryStats, UsageInfo
+};
+#[cfg(feature = "std")]
+pub use benchmarks::{
+    LoadingMetrics, GgufBenchmarkSuite, BenchmarkConfig, BenchmarkStats, Profiler
+};
+#[cfg(feature = "std")]
+pub use enhanced_errors::{
+    EnhancedError, ErrorCategory, ErrorSeverity, ErrorContext,
+    RecoveryStrategy, ErrorRecoveryManager, enhance_core_error
+};
 pub use mock::{MockModel, MockModelLoader};
 
 #[cfg(test)]
