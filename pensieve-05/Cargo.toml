@@ -13,6 +13,11 @@ keywords = ["llm", "gguf", "models", "data", "parsing"]
 # Only depend on L1 (core) crate
 pensieve-07_core = { path = "../pensieve-07", package = "pensieve-07_core" }
 
+# Candle ML framework dependencies
+candle-core = { workspace = true }
+candle-transformers = { workspace = true }
+safetensors = { workspace = true }
+
 [dev-dependencies]
 # Testing dependencies
 proptest = { workspace = true }
