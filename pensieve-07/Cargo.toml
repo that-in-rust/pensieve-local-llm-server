@@ -1,4 +1,5 @@
 [package]
-name = pensieve-07
+name = "pensieve-07"
 version.workspace = true
 edition.workspace = true
+
