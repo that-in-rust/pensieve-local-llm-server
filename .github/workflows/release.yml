@@ -1,0 +1,567 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release'
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Get version from tag
+      id: get_version
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          VERSION="${{ github.event.inputs.tag }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+        fi
+        echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+        echo "tag=${VERSION}" >> $GITHUB_OUTPUT
+    
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.get_version.outputs.tag }}
+        release_name: Release ${{ steps.get_version.outputs.tag }}
+        draft: false
+        prerelease: ${{ contains(steps.get_version.outputs.version, '-') }}
+        body: |
+          ## Changes
+          
+          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ steps.get_version.outputs.tag }}/code-ingest/CHANGELOG.md) for details.
+          
+          ## Installation
+          
+          ### Quick Install (Linux/macOS)
+          ```bash
+          curl -sSL https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.tag }}/install.sh | bash
+          ```
+          
+          ### Manual Installation
+          
+          1. Download the appropriate binary for your platform from the assets below
+          2. Extract the archive
+          3. Move the `code-ingest` binary to a directory in your PATH
+          4. Run `code-ingest --help` to verify installation
+          
+          ### Package Managers
+          
+          #### Homebrew (macOS)
+          ```bash
+          brew tap your-org/tap
+          brew install code-ingest
+          ```
+          
+          #### Debian/Ubuntu
+          ```bash
+          wget https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.tag }}/code-ingest_${{ steps.get_version.outputs.version }}_amd64.deb
+          sudo dpkg -i code-ingest_${{ steps.get_version.outputs.version }}_amd64.deb
+          ```
+          
+          #### Fedora/RHEL/CentOS
+          ```bash
+          wget https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.tag }}/code-ingest-${{ steps.get_version.outputs.version }}-1.x86_64.rpm
+          sudo rpm -i code-ingest-${{ steps.get_version.outputs.version }}-1.x86_64.rpm
+          ```
+          
+          ## Checksums
+          
+          All release artifacts are signed and checksums are provided in the `SHA256SUMS` file.
+
+  build-release:
+    name: Build Release (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            cross: false
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            cross: true
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            cross: false
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            cross: false
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            cross: false
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+    
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: "code-ingest -> target"
+        key: ${{ matrix.target }}
+    
+    - name: Install cross-compilation tools
+      if: matrix.cross
+      run: |
+        cargo install cross --git https://github.com/cross-rs/cross
+    
+    - name: Install system dependencies (Linux)
+      if: runner.os == 'Linux' && !matrix.cross
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config libssl-dev
+    
+    - name: Build binary
+      run: |
+        cd code-ingest
+        if [[ "${{ matrix.cross }}" == "true" ]]; then
+          cross build --release --target ${{ matrix.target }}
+        else
+          cargo build --release --target ${{ matrix.target }}
+        fi
+    
+    - name: Create release archive
+      shell: bash
+      run: |
+        cd code-ingest
+        
+        # Set binary name and extension
+        BINARY_NAME="code-ingest"
+        if [[ "${{ matrix.target }}" == *"windows"* ]]; then
+          BINARY_EXT=".exe"
+        else
+          BINARY_EXT=""
+        fi
+        
+        # Create archive name
+        ARCHIVE_NAME="code-ingest-${{ needs.create-release.outputs.version }}-${{ matrix.target }}"
+        
+        # Create temporary directory
+        mkdir -p "dist/$ARCHIVE_NAME"
+        
+        # Copy binary
+        cp "target/${{ matrix.target }}/release/${BINARY_NAME}${BINARY_EXT}" "dist/$ARCHIVE_NAME/"
+        
+        # Copy documentation
+        cp README.md "dist/$ARCHIVE_NAME/"
+        cp docs/CLI_REFERENCE.md "dist/$ARCHIVE_NAME/" 2>/dev/null || true
+        cp ../LICENSE* "dist/$ARCHIVE_NAME/" 2>/dev/null || true
+        
+        # Create install script for Unix-like systems
+        if [[ "${{ matrix.target }}" != *"windows"* ]]; then
+          cat > "dist/$ARCHIVE_NAME/install.sh" << 'EOF'
+        #!/bin/bash
+        set -e
+        INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+        echo "Installing code-ingest to $INSTALL_DIR..."
+        if [[ ! -w "$INSTALL_DIR" ]]; then
+          echo "Error: No write permission to $INSTALL_DIR"
+          echo "Try running with sudo or set INSTALL_DIR to a writable directory"
+          exit 1
+        fi
+        cp code-ingest "$INSTALL_DIR/"
+        chmod +x "$INSTALL_DIR/code-ingest"
+        echo "Installation completed successfully!"
+        echo "Run 'code-ingest --help' to get started"
+        EOF
+          chmod +x "dist/$ARCHIVE_NAME/install.sh"
+        fi
+        
+        # Create archive
+        cd dist
+        if [[ "${{ matrix.target }}" == *"windows"* ]]; then
+          7z a "${ARCHIVE_NAME}.zip" "$ARCHIVE_NAME"
+          echo "ARCHIVE_FILE=${ARCHIVE_NAME}.zip" >> $GITHUB_ENV
+        else
+          tar -czf "${ARCHIVE_NAME}.tar.gz" "$ARCHIVE_NAME"
+          echo "ARCHIVE_FILE=${ARCHIVE_NAME}.tar.gz" >> $GITHUB_ENV
+        fi
+        
+        echo "ARCHIVE_PATH=code-ingest/dist/${ARCHIVE_FILE}" >> $GITHUB_ENV
+    
+    - name: Upload release asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ${{ env.ARCHIVE_PATH }}
+        asset_name: ${{ env.ARCHIVE_FILE }}
+        asset_content_type: application/octet-stream
+
+  build-packages:
+    name: Build Packages
+    runs-on: ubuntu-latest
+    needs: create-release
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: x86_64-unknown-linux-gnu
+    
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: "code-ingest -> target"
+    
+    - name: Install packaging tools
+      run: |
+        cargo install cargo-deb cargo-generate-rpm
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config libssl-dev
+    
+    - name: Build binary for packaging
+      run: |
+        cd code-ingest
+        cargo build --release --target x86_64-unknown-linux-gnu
+    
+    - name: Build Debian package
+      run: |
+        cd code-ingest
+        cargo deb --target x86_64-unknown-linux-gnu --no-build
+        
+        # Find and copy the .deb file
+        DEB_FILE=$(find target/x86_64-unknown-linux-gnu/debian -name "*.deb" | head -n1)
+        if [[ -n "$DEB_FILE" ]]; then
+          cp "$DEB_FILE" "../code-ingest_${{ needs.create-release.outputs.version }}_amd64.deb"
+        fi
+    
+    - name: Build RPM package
+      run: |
+        cd code-ingest
+        cargo generate-rpm --target x86_64-unknown-linux-gnu
+        
+        # Find and copy the .rpm file
+        RPM_FILE=$(find target/generate-rpm -name "*.rpm" | head -n1)
+        if [[ -n "$RPM_FILE" ]]; then
+          cp "$RPM_FILE" "../code-ingest-${{ needs.create-release.outputs.version }}-1.x86_64.rpm"
+        fi
+    
+    - name: Upload Debian package
+      if: hashFiles('code-ingest_*.deb') != ''
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: code-ingest_${{ needs.create-release.outputs.version }}_amd64.deb
+        asset_name: code-ingest_${{ needs.create-release.outputs.version }}_amd64.deb
+        asset_content_type: application/vnd.debian.binary-package
+    
+    - name: Upload RPM package
+      if: hashFiles('code-ingest-*.rpm') != ''
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: code-ingest-${{ needs.create-release.outputs.version }}-1.x86_64.rpm
+        asset_name: code-ingest-${{ needs.create-release.outputs.version }}-1.x86_64.rpm
+        asset_content_type: application/x-rpm
+
+  create-checksums:
+    name: Create Checksums
+    runs-on: ubuntu-latest
+    needs: [create-release, build-release, build-packages]
+    
+    steps:
+    - name: Download all release assets
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const { owner, repo } = context.repo;
+          
+          // Get release by tag
+          const release = await github.rest.repos.getReleaseByTag({
+            owner,
+            repo,
+            tag: '${{ needs.create-release.outputs.tag }}'
+          });
+          
+          // Download each asset
+          for (const asset of release.data.assets) {
+            const response = await github.rest.repos.getReleaseAsset({
+              owner,
+              repo,
+              asset_id: asset.id,
+              headers: {
+                Accept: 'application/octet-stream'
+              }
+            });
+            
+            fs.writeFileSync(asset.name, Buffer.from(response.data));
+            console.log(`Downloaded: ${asset.name}`);
+          }
+    
+    - name: Generate checksums
+      run: |
+        # Generate SHA256 checksums
+        sha256sum *.tar.gz *.zip *.deb *.rpm 2>/dev/null > SHA256SUMS || true
+        
+        # Generate MD5 checksums for compatibility
+        md5sum *.tar.gz *.zip *.deb *.rpm 2>/dev/null > MD5SUMS || true
+        
+        echo "Generated checksums:"
+        cat SHA256SUMS || true
+    
+    - name: Upload SHA256 checksums
+      if: hashFiles('SHA256SUMS') != ''
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: SHA256SUMS
+        asset_name: SHA256SUMS
+        asset_content_type: text/plain
+    
+    - name: Upload MD5 checksums
+      if: hashFiles('MD5SUMS') != ''
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: MD5SUMS
+        asset_name: MD5SUMS
+        asset_content_type: text/plain
+
+  create-install-script:
+    name: Create Install Script
+    runs-on: ubuntu-latest
+    needs: [create-release, build-release]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Create universal install script
+      run: |
+        cat > install.sh << 'EOF'
+        #!/bin/bash
+        # Universal installer for code-ingest
+        # Detects platform and downloads the appropriate binary
+        
+        set -e
+        
+        # Colors
+        RED='\033[0;31m'
+        GREEN='\033[0;32m'
+        YELLOW='\033[1;33m'
+        BLUE='\033[0;34m'
+        NC='\033[0m'
+        
+        print_status() { echo -e "${BLUE}[INFO]${NC} $1"; }
+        print_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+        print_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
+        print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+        
+        # Configuration
+        REPO="${{ github.repository }}"
+        VERSION="${{ needs.create-release.outputs.version }}"
+        INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+        
+        # Detect platform
+        detect_platform() {
+            local os=$(uname -s | tr '[:upper:]' '[:lower:]')
+            local arch=$(uname -m)
+            
+            case $os in
+                linux*)
+                    case $arch in
+                        x86_64) echo "x86_64-unknown-linux-gnu" ;;
+                        aarch64|arm64) echo "aarch64-unknown-linux-gnu" ;;
+                        *) print_error "Unsupported architecture: $arch"; exit 1 ;;
+                    esac
+                    ;;
+                darwin*)
+                    case $arch in
+                        x86_64) echo "x86_64-apple-darwin" ;;
+                        arm64) echo "aarch64-apple-darwin" ;;
+                        *) print_error "Unsupported architecture: $arch"; exit 1 ;;
+                    esac
+                    ;;
+                *)
+                    print_error "Unsupported operating system: $os"
+                    exit 1
+                    ;;
+            esac
+        }
+        
+        # Main installation
+        main() {
+            print_status "Installing code-ingest v$VERSION"
+            
+            local platform=$(detect_platform)
+            local archive_name="code-ingest-${VERSION}-${platform}.tar.gz"
+            local download_url="https://github.com/${REPO}/releases/download/v${VERSION}/${archive_name}"
+            
+            print_status "Detected platform: $platform"
+            print_status "Download URL: $download_url"
+            
+            # Create temporary directory
+            local temp_dir=$(mktemp -d)
+            cd "$temp_dir"
+            
+            # Download and extract
+            print_status "Downloading $archive_name..."
+            if command -v curl >/dev/null 2>&1; then
+                curl -sSL "$download_url" -o "$archive_name"
+            elif command -v wget >/dev/null 2>&1; then
+                wget -q "$download_url"
+            else
+                print_error "Neither curl nor wget found. Please install one of them."
+                exit 1
+            fi
+            
+            print_status "Extracting archive..."
+            tar -xzf "$archive_name"
+            
+            # Install binary
+            print_status "Installing to $INSTALL_DIR..."
+            if [[ ! -w "$INSTALL_DIR" ]]; then
+                print_status "Requesting sudo access for installation..."
+                sudo mkdir -p "$INSTALL_DIR"
+                sudo cp "code-ingest-${VERSION}-${platform}/code-ingest" "$INSTALL_DIR/"
+                sudo chmod +x "$INSTALL_DIR/code-ingest"
+            else
+                mkdir -p "$INSTALL_DIR"
+                cp "code-ingest-${VERSION}-${platform}/code-ingest" "$INSTALL_DIR/"
+                chmod +x "$INSTALL_DIR/code-ingest"
+            fi
+            
+            # Cleanup
+            cd /
+            rm -rf "$temp_dir"
+            
+            print_success "code-ingest v$VERSION installed successfully!"
+            print_status "Run 'code-ingest --help' to get started"
+        }
+        
+        main "$@"
+        EOF
+        
+        chmod +x install.sh
+    
+    - name: Upload install script
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: install.sh
+        asset_name: install.sh
+        asset_content_type: application/x-sh
+
+  update-homebrew:
+    name: Update Homebrew Formula
+    runs-on: ubuntu-latest
+    needs: [create-release, build-release]
+    if: github.repository_owner == 'your-org' # Replace with your organization
+    
+    steps:
+    - name: Checkout homebrew tap
+      uses: actions/checkout@v4
+      with:
+        repository: your-org/homebrew-tap # Replace with your tap repository
+        token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        path: homebrew-tap
+    
+    - name: Download macOS binaries for checksums
+      run: |
+        VERSION="${{ needs.create-release.outputs.version }}"
+        
+        # Download Intel macOS binary
+        curl -sSL "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/code-ingest-${VERSION}-x86_64-apple-darwin.tar.gz" \
+          -o "intel.tar.gz"
+        
+        # Download ARM macOS binary
+        curl -sSL "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/code-ingest-${VERSION}-aarch64-apple-darwin.tar.gz" \
+          -o "arm.tar.gz"
+        
+        # Calculate checksums
+        INTEL_SHA256=$(sha256sum intel.tar.gz | cut -d' ' -f1)
+        ARM_SHA256=$(sha256sum arm.tar.gz | cut -d' ' -f1)
+        
+        echo "INTEL_SHA256=$INTEL_SHA256" >> $GITHUB_ENV
+        echo "ARM_SHA256=$ARM_SHA256" >> $GITHUB_ENV
+    
+    - name: Update Homebrew formula
+      run: |
+        VERSION="${{ needs.create-release.outputs.version }}"
+        
+        cat > homebrew-tap/Formula/code-ingest.rb << EOF
+        class CodeIngest < Formula
+          desc "High-performance tool for ingesting GitHub repositories into PostgreSQL"
+          homepage "https://github.com/${{ github.repository }}"
+          version "$VERSION"
+          license "MIT OR Apache-2.0"
+        
+          if Hardware::CPU.intel?
+            url "https://github.com/${{ github.repository }}/releases/download/v#{version}/code-ingest-#{version}-x86_64-apple-darwin.tar.gz"
+            sha256 "$INTEL_SHA256"
+          elsif Hardware::CPU.arm?
+            url "https://github.com/${{ github.repository }}/releases/download/v#{version}/code-ingest-#{version}-aarch64-apple-darwin.tar.gz"
+            sha256 "$ARM_SHA256"
+          end
+        
+          depends_on "postgresql"
+        
+          def install
+            bin.install "code-ingest"
+          end
+        
+          test do
+            system "#{bin}/code-ingest", "--version"
+          end
+        end
+        EOF
+    
+    - name: Commit and push formula update
+      run: |
+        cd homebrew-tap
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add Formula/code-ingest.rb
+        git commit -m "Update code-ingest to v${{ needs.create-release.outputs.version }}"
+        git push

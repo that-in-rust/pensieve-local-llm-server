@@ -1,0 +1,165 @@
+[package]
+name = "code-ingest"
+version = "0.3.0"
+edition = "2021"
+authors = ["Code Ingest Team <team@code-ingest.dev>"]
+description = "A high-performance Rust tool for ingesting GitHub repositories into PostgreSQL databases for fast code analysis"
+homepage = "https://github.com/your-org/code-ingest"
+repository = "https://github.com/your-org/code-ingest"
+license = "MIT OR Apache-2.0"
+keywords = ["code-analysis", "github", "postgresql", "rust", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+readme = "README.md"
+exclude = [
+    "tests/fixtures/*",
+    "benches/test-data/*",
+    ".github/*",
+    "docs/images/*"
+]
+
+[[bin]]
+name = "code-ingest"
+path = "src/main.rs"
+
+[dependencies]
+# CLI argument parsing
+clap = { workspace = true }
+
+# Database operations
+sqlx = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Date/time handling
+chrono = { workspace = true }
+
+# UUID generation
+uuid = { workspace = true }
+
+# File system operations
+walkdir = { workspace = true }
+
+# Parallel processing
+rayon = { workspace = true }
+
+# Git operations
+git2 = "0.18"
+
+# Progress reporting
+indicatif = "0.17"
+
+# File type detection
+mime_guess = { workspace = true }
+
+# Content extraction
+encoding_rs = { workspace = true }
+
+# URL parsing
+url = { workspace = true }
+
+# Logging and tracing
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+
+# Gitignore pattern matching
+ignore = { workspace = true }
+
+# CPU detection for concurrency
+num_cpus = "1.16"
+
+# Async trait support
+async-trait = "0.1"
+
+# Cryptographic hashing
+sha2 = "0.10"
+
+# File chunking for large files
+txt-sectumsempra = { git = "https://github.com/that-in-rust/txt-sectumsempra.git" }
+
+# Streaming support
+futures = "0.3"
+tokio-stream = "0.1"
+
+# System monitoring
+sysinfo = "0.30"
+
+# Colored terminal output
+colored = "2.0"
+
+# Configuration file support
+toml = "0.8"
+dirs = "5.0"
+
+[dev-dependencies]
+tempfile = "3.8"
+tokio-test = "0.4"
+fastrand = "2.0"
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.4"
+mockall = "0.12"
+regex = "1.10"
+serial_test = "3.0"
+assert_cmd = "2.0"
+predicates = "3.0"
+
+# Release profile optimizations
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# Development profile with some optimizations for faster builds
+[profile.dev]
+opt-level = 0
+debug = true
+overflow-checks = true
+
+# Profile for benchmarks
+[profile.bench]
+opt-level = 3
+lto = true
+codegen-units = 1
+debug = false
+
+# Metadata for package managers
+[package.metadata.deb]
+maintainer = "Code Ingest Team <team@code-ingest.dev>"
+copyright = "2024, Code Ingest Team <team@code-ingest.dev>"
+license-file = ["LICENSE-MIT", "4"]
+extended-description = """\
+A high-performance Rust tool for ingesting GitHub repositories into PostgreSQL 
+databases for fast code analysis. Supports intelligent file classification, 
+content extraction, and provides SQL interfaces for code exploration."""
+depends = "$auto, postgresql-client"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/code-ingest", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/code-ingest/", "644"],
+    ["docs/CLI_REFERENCE.md", "usr/share/doc/code-ingest/", "644"],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/code-ingest", dest = "/usr/bin/code-ingest", mode = "755" },
+    { source = "README.md", dest = "/usr/share/doc/code-ingest/README.md", mode = "644" },
+    { source = "docs/CLI_REFERENCE.md", dest = "/usr/share/doc/code-ingest/CLI_REFERENCE.md", mode = "644" },
+]
+
+[package.metadata.wix]
+upgrade-guid = "12345678-1234-1234-1234-123456789012"
+path-guid = "87654321-4321-4321-4321-210987654321"
+license = false
+eula = false

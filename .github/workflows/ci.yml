@@ -1,0 +1,362 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: code_ingest_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+    
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: "code-ingest -> target"
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          postgresql-client \
+          poppler-utils \
+          pandoc \
+          python3-pip
+        
+        # Install additional conversion tools for testing
+        pip3 install --user openpyxl pandas
+    
+    - name: Setup test database
+      env:
+        PGPASSWORD: password
+      run: |
+        # Wait for PostgreSQL to be ready
+        until pg_isready -h localhost -p 5432 -U postgres; do
+          echo "Waiting for PostgreSQL..."
+          sleep 2
+        done
+        
+        # Create test database if it doesn't exist
+        psql -h localhost -U postgres -c "CREATE DATABASE code_ingest_test;" || true
+        
+        # Verify connection
+        psql -h localhost -U postgres -d code_ingest_test -c "SELECT version();"
+    
+    - name: Check code formatting
+      run: |
+        cd code-ingest
+        cargo fmt --all -- --check
+    
+    - name: Run Clippy lints
+      run: |
+        cd code-ingest
+        cargo clippy --all-targets --all-features -- -D warnings
+    
+    - name: Run unit tests
+      env:
+        TEST_DATABASE_URL: postgresql://postgres:password@localhost:5432/code_ingest_test
+      run: |
+        cd code-ingest
+        cargo test --lib --bins --tests unit_ -- --test-threads=1
+    
+    - name: Run integration tests
+      env:
+        TEST_DATABASE_URL: postgresql://postgres:password@localhost:5432/code_ingest_test
+      run: |
+        cd code-ingest
+        cargo test --tests integration_ -- --test-threads=1
+    
+    - name: Run end-to-end tests
+      env:
+        TEST_DATABASE_URL: postgresql://postgres:password@localhost:5432/code_ingest_test
+      run: |
+        cd code-ingest
+        cargo test --tests end_to_end_ -- --test-threads=1
+    
+    - name: Run property-based tests
+      env:
+        TEST_DATABASE_URL: postgresql://postgres:password@localhost:5432/code_ingest_test
+      run: |
+        cd code-ingest
+        cargo test --tests property_ -- --test-threads=1
+    
+    - name: Run CLI integration tests
+      env:
+        TEST_DATABASE_URL: postgresql://postgres:password@localhost:5432/code_ingest_test
+      run: |
+        cd code-ingest
+        cargo test --tests cli_ -- --test-threads=1
+
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: code_ingest_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: llvm-tools-preview
+    
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y postgresql-client poppler-utils pandoc
+    
+    - name: Install cargo-llvm-cov
+      uses: taiki-e/install-action@cargo-llvm-cov
+    
+    - name: Setup test database
+      env:
+        PGPASSWORD: password
+      run: |
+        until pg_isready -h localhost -p 5432 -U postgres; do
+          echo "Waiting for PostgreSQL..."
+          sleep 2
+        done
+        psql -h localhost -U postgres -c "CREATE DATABASE code_ingest_test;" || true
+    
+    - name: Generate code coverage
+      env:
+        TEST_DATABASE_URL: postgresql://postgres:password@localhost:5432/code_ingest_test
+      run: |
+        cd code-ingest
+        cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: code-ingest/lcov.info
+        fail_ci_if_error: true
+
+  benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: code_ingest_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y postgresql-client poppler-utils pandoc
+    
+    - name: Setup test database
+      env:
+        PGPASSWORD: password
+      run: |
+        until pg_isready -h localhost -p 5432 -U postgres; do
+          echo "Waiting for PostgreSQL..."
+          sleep 2
+        done
+        psql -h localhost -U postgres -c "CREATE DATABASE code_ingest_test;" || true
+    
+    - name: Run benchmarks
+      env:
+        TEST_DATABASE_URL: postgresql://postgres:password@localhost:5432/code_ingest_test
+      run: |
+        cd code-ingest
+        cargo bench --bench performance_benchmarks
+    
+    - name: Store benchmark results
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        tool: 'cargo'
+        output-file-path: code-ingest/target/criterion/reports/index.html
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+    
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+    
+    - name: Run security audit
+      run: |
+        cd code-ingest
+        cargo audit
+    
+    - name: Run cargo-deny
+      uses: EmbarkStudios/cargo-deny-action@v1
+      with:
+        manifest-path: code-ingest/Cargo.toml
+
+  build:
+    name: Build Check
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        rust: [stable, beta]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ matrix.rust }}
+    
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+    
+    - name: Build project
+      run: |
+        cd code-ingest
+        cargo build --release --all-features
+    
+    - name: Run basic tests (no database)
+      run: |
+        cd code-ingest
+        cargo test --lib unit_file_classifier_test -- --test-threads=1
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+    
+    - name: Build documentation
+      run: |
+        cd code-ingest
+        cargo doc --all-features --no-deps
+    
+    - name: Check for broken links in docs
+      run: |
+        cd code-ingest
+        cargo doc --all-features --no-deps 2>&1 | grep -i "warning\|error" && exit 1 || exit 0
+
+  release-check:
+    name: Release Readiness Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: [test, coverage, security, build]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+    
+    - name: Install release tools
+      run: |
+        cargo install cargo-deb cargo-generate-rpm
+    
+    - name: Test release build script
+      run: |
+        chmod +x scripts/build-release.sh
+        ./scripts/build-release.sh --target x86_64-unknown-linux-gnu
+    
+    - name: Verify version consistency
+      run: |
+        chmod +x scripts/version-bump.sh
+        CARGO_VERSION=$(./scripts/version-bump.sh current)
+        TAG_VERSION=${GITHUB_REF#refs/tags/v}
+        
+        if [[ "$CARGO_VERSION" != "$TAG_VERSION" ]]; then
+          echo "Version mismatch: Cargo.toml has $CARGO_VERSION, tag is $TAG_VERSION"
+          exit 1
+        fi
+        
+        echo "Version check passed: $CARGO_VERSION"
+    
+    - name: Upload release artifacts for testing
+      uses: actions/upload-artifact@v3
+      with:
+        name: release-test-artifacts
+        path: target/dist/*
