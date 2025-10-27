@@ -49,3 +49,8 @@ __pycache__/
 *.bak
 *.backup
 *.old
+
+# Research infrastructure - ignore reference repositories but track docs
+.doNotCommit/.refGitHubRepo/
+
+# Keep .doNotCommit/ itself tracked for Claude conversation storage
