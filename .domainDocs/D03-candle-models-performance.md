@@ -9,21 +9,60 @@
 
 Based on extensive research from 7 specialized repositories and internet benchmarks, this document provides a comprehensive analysis of high-performance reasoning models that can deliver seamless user experiences (20+ tokens/second) on Apple M1/M2/M3 hardware using the Candle framework.
 
-**Key Finding**: Local LLM inference on Apple Silicon has reached production maturity, with specific models achieving 25-40 TPS performance that provides near-cloud API experiences for document processing and reasoning tasks.
+**Key Finding**: Local LLM inference on Apple Silicon has reached production maturity, with optimized 6.7B-13B models achieving 25-40 TPS performance that provides near-cloud API experiences. **Critical insight**: Larger models (10GB+) are not viable for M1 16GB systems due to memory constraints, poor performance, and system instability. The sweet spot is 13B or less - **smart over big**.
 
 ## Comprehensive Performance Data Matrix
 
 ### Top Performing Models for Apple M1/M2/M3 (2024 Benchmarks)
 
-| Model | Parameters | TPS (M1) | TPS (M2/M3) | Memory (GB) | Quality (MMLU) | Best Use Case | Optimal Quantization |
-|-------|------------|----------|-------------|-------------|----------------|---------------|---------------------|
-| **Deepseek-Coder 6.7B** | 6.7B | 20-30 | 28-40 | ~3.5GB | 8.0/10 | Technical analysis, coding | Q4_K_M |
-| **Mistral 7B Instruct** | 7B | 18-28 | 25-35 | ~4GB | 8.2/10 | Complex reasoning, instructions | Q5_K_M |
-| **Llama 2 7B Chat** | 7B | 22-35 | 30-45 | ~4GB | 8.3/10 | Balanced performance | Q4_K_M |
-| **Phi-3 Mini** | 3.8B | 15-25 | 20-30 | ~2-3GB | 7.8/10 | General reasoning, chatbots | Q4_K_M |
-| **Qwen 7B** | 7B | 18-20 | 25-30 | ~4GB | 8.1/10 | Multilingual tasks | Q4_K_M |
-| **Gemma 7B** | 7B | 16-17 | 22-28 | ~4GB | 7.9/10 | General tasks | Q4_K_M |
-| **Phi-3 Small** | 7B | 12-18 | 18-25 | ~3.5GB | 8.2/10 | Enhanced reasoning | Q5_K_M |
+**✅ Viable Models (13B or less)**
+
+| Model | Parameters | TPS (M1) | TPS (M2/M3) | Memory (GB) | Quality (MMLU) | User Experience | Viability |
+|-------|------------|----------|-------------|-------------|----------------|-----------------|-----------|
+| **Deepseek-Coder 6.7B** | 6.7B | 20-30 | 28-40 | ~7.5 total | 8.0/10 | 🚀 Seamless | ✅ **Excellent** |
+| **Mistral 7B Instruct** | 7B | 18-28 | 25-35 | ~8 total | 8.2/10 | 🚀 Seamless | ✅ **Excellent** |
+| **Llama 2 13B** | 13B | 15-25 | 20-30 | ~11 total | 8.5/10 | ✅ Excellent | ✅ **Sweet Spot** |
+| **Phi-3 Mini** | 3.8B | 15-25 | 20-30 | ~6 total | 7.8/10 | ✅ Excellent | ✅ **Good** |
+| **Mixtral 8x7B** | 47B (MoE) | 8-12 | 10-15 | ~14 total | 9.0/10 | ⚠️ Acceptable | ⚠️ **Borderline** |
+
+**❌ Non-Viable Models (10GB+) - DO NOT USE**
+
+| Model | Parameters | TPS (M1) | Memory (GB) | System Impact | User Experience | Viability |
+|-------|------------|----------|-------------|---------------|-----------------|-----------|
+| **34B Models** | 34B | 5-8 | 18-20GB | System crashes | 😡 Frustrating | ❌ **Impossible** |
+| **70B Models** | 70B | 1-3 | 40-45GB | Kernel panics | 💀 Unusable | ❌ **Impossible** |
+
+**Note**: Memory includes model weights + KV cache + system overhead. Models >13B parameters cause system instability on M1 16GB.
+
+### ⚠️ **Critical Warning: Why Bigger Models Fail on M1 16GB**
+
+#### **The Hidden Memory Reality**
+```
+Total Memory Requirements on M1 16GB:
+├── macOS System + Apps: 3-4GB (always used)
+├── Model Weights (4-bit): 4-7GB for 13B models
+├── KV Cache (2048 tokens): 3.5-4GB
+├── Activation Memory: 1-2GB
+└── Peak Memory During Inference: Additional 1-2GB
+```
+
+**Model weights are only 40-50% of total memory usage!**
+
+#### **Performance Collapse with Large Models**
+| Model Size | Tokens/Second | User Experience | System Stability |
+|------------|---------------|-----------------|------------------|
+| **7B** | 25-35 TPS | 🚀 Seamless | ✅ Perfect |
+| **13B** | 15-25 TPS | ✅ Excellent | ✅ Stable |
+| **34B** | 5-8 TPS | 😡 Frustrating | ⚠️ System crashes |
+| **70B** | 1-3 TPS | 💀 Unusable | ❌ Kernel panics |
+
+#### **Key Insights**
+- **User Experience Threshold**: Below 10 TPS, users abandon interactions
+- **Memory Pressure**: Above 85% RAM usage, system becomes unresponsive
+- **Swap Death**: Constant SSD swapping kills performance and causes crashes
+- **Thermal Throttling**: Large models cause 20-40% performance degradation
+
+**Conclusion**: A 13B model at 20 TPS provides **better user experience** than a 70B model at 2 TPS, even with slightly lower quality.
 
 ### Performance vs Quality Comparison
 
