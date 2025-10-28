@@ -1,0 +1,28 @@
+[package]
+name = "pensieve-08_claude_core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Claude Code Local LLM - Core traits and dependency injection"
+categories = ["algorithms", "data-structures", "development-tools"]
+keywords = ["llm", "claude", "inference", "traits"]
+
+[dependencies]
+pensieve-07_core = { path = "../pensieve-07" }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+proptest = { workspace = true }
+
+[features]
+default = ["std"]
+std = []
+test-utils = []

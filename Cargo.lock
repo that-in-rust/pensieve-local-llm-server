@@ -2371,6 +2371,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "pensieve-08_claude_core"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures",
+ "pensieve-07_core",
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
