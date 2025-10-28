@@ -34,14 +34,11 @@ flowchart TD
 
     Step1 --> Step2[🚀 Single Command Setup<br/><code>cargo run -p pensieve-01 -- start</code>]
 
-    Step2 --> Subgraph1[" "]
-        direction LR
-        AutoModel[📥 Auto-Download Model<br/>Phi-3-mini-128k-instruct-4bit<br/>from Hugging Face]
-        AutoServer[🔧 Auto-Configure Server<br/>• MLX Acceleration<br/>• Metal GPU Support<br/>• Port 8080]
-        AutoModel --> AutoServer
-    end
+    Step2 --> AutoModel[📥 Auto-Download Model<br/>Phi-3-mini-128k-instruct-4bit<br/>from Hugging Face]
 
-    Subgraph1 --> Step3[✅ Server Running<br/>🌐 http://127.0.0.1:8080<br/>⚡ MLX + Metal Acceleration]
+    AutoModel --> AutoServer[🔧 Auto-Configure Server<br/>• MLX Acceleration<br/>• Metal GPU Support<br/>• Port 8080]
+
+    AutoServer --> Step3[✅ Server Running<br/>🌐 http://127.0.0.1:8080<br/>⚡ MLX + Metal Acceleration]
 
     Step3 --> Step4[⚙️ Configure Claude Code<br/><code>export ANTHROPIC_BASE_URL=http://127.0.0.1:8080</code><br/><code>export ANTHROPIC_API_KEY=pensieve-local-key</code>]
 
@@ -63,10 +60,9 @@ flowchart TD
     classDef decisionNode fill:#FFF8DC,stroke:#DAA520,stroke-width:2px
     classDef successNode fill:#98FB98,stroke:#228B22,stroke-width:2px
     classDef errorNode fill:#FFB6C1,stroke:#DC143C,stroke-width:2px
-    classDef subgraphNode fill:#F0F7FF,stroke:#4682B4,stroke-width:1px
 
     class Start startNode
-    class Step1,Step2,Step3,Step4,Step5,Advanced processNode
+    class Step1,Step2,Step3,Step4,Step5,Advanced,AutoModel,AutoServer processNode
     class Decision1,Decision2 decisionNode
     class Success successNode
     class Error1,End errorNode
