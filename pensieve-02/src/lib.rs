@@ -9,14 +9,13 @@
 //! Depends on all L1 and L2 crates, plus pensieve-03 for API models.
 
 use pensieve_07_core::CoreError;
-use pensieve_03::{anthropic::*, ApiError, ApiMessage, StreamingResponse as ApiStreamingResponse};
+use pensieve_03::{anthropic::*, ApiError, ApiMessage};
 use std::sync::Arc;
 use std::pin::Pin;
 use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 use warp::Filter;
 use futures::{Stream, StreamExt};
-use bytes::Bytes;
 use uuid::Uuid;
 
 /// Type alias for streaming responses
@@ -163,9 +162,7 @@ impl traits::RequestHandler for MockRequestHandler {
         // Validate request
         request.validate()?;
 
-        let delay = self.response_delay_ms;
-        let response_text = "Mock streaming response";
-        let chars: Vec<char> = response_text.chars().collect();
+        let _delay = self.response_delay_ms; // Simulate delay for realism
 
         // Create a simple mock stream for now
         let stream = futures::stream::iter(vec![
@@ -243,9 +240,9 @@ impl traits::ApiServer for HttpApiServer {
         info!("Starting server on {}", addr);
 
         let routes = self.routes();
-        let shutdown_signal = self.shutdown_signal.clone();
+        let _shutdown_signal = self.shutdown_signal.clone();
 
-        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+        let (_tx, rx) = tokio::sync::oneshot::channel::<()>();
         let server_handle = tokio::spawn(async move {
             let addr: std::net::SocketAddr = addr.parse().expect("Invalid address");
             let (_, fut) = warp::serve(routes).bind_with_graceful_shutdown(addr, async {

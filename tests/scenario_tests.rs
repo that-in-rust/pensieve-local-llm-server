@@ -85,7 +85,7 @@ impl RequestHandler for ScenarioRequestHandler {
         })
     }
 
-    async fn handle_stream(&self, request: CreateMessageRequest) -> Result<std::pin::Pin<Box<dyn std::future::Future<Output = Result<String, pensieve_02::error::ServerError>> + Send>>, pensieve_02::error::ServerError> {
+    async fn handle_stream(&self, request: CreateMessageRequest) -> pensieve_02::error::ServerResult<pensieve_02::StreamingResponse> {
         // Count requests
         self.request_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
