@@ -44,13 +44,7 @@ flowchart TD
 
     Step4 --> Step5[🎯 Launch Claude Code<br/>• Full 128k Context<br/>• 25-40 tokens/second<br/>• Local Privacy]
 
-    Step5 --> Decision2{Need<br/>Customization?}
-
-    Decision2 -- No --> Success[🎉 Success!<br/>Local LLM Experience<br/>Identical to Cloud Claude]
-
-    Decision2 -- Yes --> Advanced[🔧 Advanced Options<br/>• Custom Models<br/>• Port Configuration<br/>• Performance Tuning]
-
-    Advanced --> Success
+    Step5 --> Success[🎉 Success!<br/>Magical Local LLM Experience<br/>Identical to Cloud Claude]
 
     Success --> End
 
@@ -62,8 +56,8 @@ flowchart TD
     classDef errorNode fill:#FFB6C1,stroke:#DC143C,stroke-width:2px
 
     class Start startNode
-    class Step1,Step2,Step3,Step4,Step5,Advanced,AutoModel,AutoServer processNode
-    class Decision1,Decision2 decisionNode
+    class Step1,Step2,Step3,Step4,Step5,AutoModel,AutoServer processNode
+    class Decision1 decisionNode
     class Success successNode
     class Error1,End errorNode
 ```
@@ -95,13 +89,6 @@ flowchart TD
     - Experience identical to cloud-based Claude
     - Full 128k context window support
     - Fast generation speeds on Apple Silicon
-
-### Advanced Configuration (Optional)
-
-For users who want custom models or configurations:
-```bash
-cargo run -p pensieve-01 -- start --model <custom-model> --port <custom-port>
-```
 
 ## Key Benefits
 
