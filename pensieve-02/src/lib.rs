@@ -181,6 +181,7 @@ pub struct HttpApiServer {
     handler: Arc<dyn traits::RequestHandler>,
     shutdown_signal: Arc<RwLock<bool>>,
     server_handle: Arc<RwLock<Option<tokio::task::JoinHandle<()>>>>,
+    shutdown_tx: Arc<RwLock<Option<tokio::sync::oneshot::Sender<()>>>>,
 }
 
 impl std::fmt::Debug for HttpApiServer {
@@ -200,6 +201,7 @@ impl HttpApiServer {
             handler,
             shutdown_signal: Arc::new(RwLock::new(false)),
             server_handle: Arc::new(RwLock::new(None)),
+            shutdown_tx: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -242,7 +244,8 @@ impl traits::ApiServer for HttpApiServer {
         let routes = self.routes();
         let _shutdown_signal = self.shutdown_signal.clone();
 
-        let (_tx, rx) = tokio::sync::oneshot::channel::<()>();
+        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+        *self.shutdown_tx.write().await = Some(tx);
         let server_handle = tokio::spawn(async move {
             let addr: std::net::SocketAddr = addr.parse().expect("Invalid address");
             let (_, fut) = warp::serve(routes).bind_with_graceful_shutdown(addr, async {
@@ -261,6 +264,11 @@ impl traits::ApiServer for HttpApiServer {
     async fn shutdown(&self) -> error::ServerResult<()> {
         info!("Shutting down server");
         *self.shutdown_signal.write().await = true;
+
+        // Signal shutdown using stored sender
+        if let Some(tx) = self.shutdown_tx.write().await.take() {
+            let _ = tx.send(());
+        }
 
         if let Some(handle) = self.server_handle.write().await.take() {
             if let Err(e) = handle.await {
