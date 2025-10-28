@@ -1,5 +1,77 @@
 # User Journey for Pensieve Local LLM Server
 
+## Section 0: Complete User Journey Visualization
+
+```mermaid
+---
+title: Pensieve Local LLM Server - Complete User Journey
+accTitle: Pensieve User Journey Flowchart
+accDescr { A comprehensive flowchart showing the complete user journey from installation to Claude Code integration with the Pensieve Local LLM Server, including automatic model download, server startup, and configuration steps. }
+config:
+  flowchart:
+    defaultRenderer: "elk"
+  theme: "base"
+  themeVariables:
+    primaryColor: "#ECECFF"
+    primaryTextColor: "#363636"
+    primaryBorderColor: "#363636"
+    lineColor: "#363636"
+    secondaryColor: "#f8f8ff"
+    tertiaryColor: "#f0f7ff"
+    fontFamily: "system-ui, -apple-system, sans-serif"
+    fontSize: "14px"
+    nodeSpacing: 75
+    rankSpacing: 75
+    wrappingWidth: 150
+---
+flowchart TD
+    Start([User Starts Journey]) --> Decision1{Has<br/>Apple Silicon?}
+
+    Decision1 -- No --> Error1[⚠️ Unsupported Platform<br/>MLX requires Apple Silicon<br/>M1/M2/M3 Macs]
+    Error1 --> End[❌ Journey Ends]
+
+    Decision1 -- Yes --> Step1[📦 Install Dependencies<br/>• MLX Framework<br/>• Python 3.9+<br/>• Rust Toolchain]
+
+    Step1 --> Step2[🚀 Single Command Setup<br/><code>cargo run -p pensieve-01 -- start</code>]
+
+    Step2 --> Subgraph1[" "]
+        direction LR
+        AutoModel[📥 Auto-Download Model<br/>Phi-3-mini-128k-instruct-4bit<br/>from Hugging Face]
+        AutoServer[🔧 Auto-Configure Server<br/>• MLX Acceleration<br/>• Metal GPU Support<br/>• Port 8080]
+        AutoModel --> AutoServer
+    end
+
+    Subgraph1 --> Step3[✅ Server Running<br/>🌐 http://127.0.0.1:8080<br/>⚡ MLX + Metal Acceleration]
+
+    Step3 --> Step4[⚙️ Configure Claude Code<br/><code>export ANTHROPIC_BASE_URL=http://127.0.0.1:8080</code><br/><code>export ANTHROPIC_API_KEY=pensieve-local-key</code>]
+
+    Step4 --> Step5[🎯 Launch Claude Code<br/>• Full 128k Context<br/>• 25-40 tokens/second<br/>• Local Privacy]
+
+    Step5 --> Decision2{Need<br/>Customization?}
+
+    Decision2 -- No --> Success[🎉 Success!<br/>Local LLM Experience<br/>Identical to Cloud Claude]
+
+    Decision2 -- Yes --> Advanced[🔧 Advanced Options<br/>• Custom Models<br/>• Port Configuration<br/>• Performance Tuning]
+
+    Advanced --> Success
+
+    Success --> End
+
+    %% Styling for different node types
+    classDef startNode fill:#90EE90,stroke:#2E8B57,stroke-width:3px
+    classDef processNode fill:#ECECFF,stroke:#363636,stroke-width:2px
+    classDef decisionNode fill:#FFF8DC,stroke:#DAA520,stroke-width:2px
+    classDef successNode fill:#98FB98,stroke:#228B22,stroke-width:2px
+    classDef errorNode fill:#FFB6C1,stroke:#DC143C,stroke-width:2px
+    classDef subgraphNode fill:#F0F7FF,stroke:#4682B4,stroke-width:1px
+
+    class Start startNode
+    class Step1,Step2,Step3,Step4,Step5,Advanced processNode
+    class Decision1,Decision2 decisionNode
+    class Success successNode
+    class Error1,End errorNode
+```
+
 ## Architecture Decision: MLX-Powered
 
 **Framework**: Apple MLX (optimized for Apple Silicon)
