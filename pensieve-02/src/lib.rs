@@ -219,7 +219,6 @@ impl HttpApiServer {
 
         let messages = warp::path("v1")
             .and(warp::path("messages"))
-            .and(warp::path("create"))
             .and(warp::post())
             .and(warp::body::json())
             .and(warp::header::optional::<String>("x-stream"))
