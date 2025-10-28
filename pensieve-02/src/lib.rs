@@ -289,11 +289,11 @@ async fn handle_create_message(
     request: CreateMessageRequest,
     stream_header: Option<String>,
     handler: Arc<dyn traits::RequestHandler>,
-) -> std::result::Result<impl warp::Reply, warp::Rejection> {
+) -> std::result::Result<Box<dyn warp::Reply + Send>, warp::Rejection> {
     // Validate request
     if let Err(e) = request.validate() {
         error!("Invalid request: {}", e);
-        return Ok(warp::reply::with_status(
+        return Ok(Box::new(warp::reply::with_status(
             warp::reply::json(&serde_json::json!({
                 "error": {
                     "type": "invalid_request_error",
@@ -301,7 +301,7 @@ async fn handle_create_message(
                 }
             })),
             warp::http::StatusCode::BAD_REQUEST,
-        ));
+        )) as Box<dyn warp::Reply + Send>);
     }
 
     // Check if streaming is requested
@@ -310,17 +310,44 @@ async fn handle_create_message(
         .unwrap_or(request.stream.unwrap_or(false));
 
     if is_streaming {
-        // For now, treat streaming as regular requests
-        match handler.handle_message(request).await {
-            Ok(response) => {
-                Ok(warp::reply::with_status(
-                    warp::reply::json(&response),
-                    warp::http::StatusCode::OK,
-                ))
+        // FIXED: Use proper streaming handler with SSE response
+        match handler.handle_stream(request).await {
+            Ok(stream) => {
+                // Convert Stream<String> to SSE response with proper headers
+                use bytes::Bytes;
+                use futures::StreamExt;
+
+                let byte_stream = stream.map(|s| {
+                    Ok::<Bytes, std::convert::Infallible>(Bytes::from(s))
+                });
+
+                let body = warp::hyper::Body::wrap_stream(byte_stream);
+                let mut response = warp::http::Response::new(body);
+
+                // Set proper SSE headers
+                response.headers_mut().insert(
+                    warp::http::header::CONTENT_TYPE,
+                    warp::http::HeaderValue::from_static("text/event-stream"),
+                );
+                response.headers_mut().insert(
+                    warp::http::header::CACHE_CONTROL,
+                    warp::http::HeaderValue::from_static("no-cache"),
+                );
+                response.headers_mut().insert(
+                    warp::http::header::CONNECTION,
+                    warp::http::HeaderValue::from_static("keep-alive"),
+                );
+                response.headers_mut().insert(
+                    warp::http::header::ACCESS_CONTROL_ALLOW_ORIGIN,
+                    warp::http::HeaderValue::from_static("*"),
+                );
+
+                // Return the custom response directly - warp::http::Response implements warp::Reply
+                Ok(Box::new(response) as Box<dyn warp::Reply + Send>)
             }
             Err(e) => {
-                error!("Message handling error: {}", e);
-                Ok(warp::reply::with_status(
+                error!("Streaming error: {}", e);
+                Ok(Box::new(warp::reply::with_status(
                     warp::reply::json(&serde_json::json!({
                         "error": {
                             "type": "internal_error",
@@ -328,20 +355,20 @@ async fn handle_create_message(
                         }
                     })),
                     warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-                ))
+                )) as Box<dyn warp::Reply + Send>)
             }
         }
     } else {
         match handler.handle_message(request).await {
             Ok(response) => {
-                Ok(warp::reply::with_status(
+                Ok(Box::new(warp::reply::with_status(
                     warp::reply::json(&response),
                     warp::http::StatusCode::OK,
-                ))
+                )) as Box<dyn warp::Reply + Send>)
             }
             Err(e) => {
                 error!("Message handling error: {}", e);
-                Ok(warp::reply::with_status(
+                Ok(Box::new(warp::reply::with_status(
                     warp::reply::json(&serde_json::json!({
                         "error": {
                             "type": "internal_error",
@@ -349,7 +376,7 @@ async fn handle_create_message(
                         }
                     })),
                     warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-                ))
+                )) as Box<dyn warp::Reply + Send>)
             }
         }
     }
