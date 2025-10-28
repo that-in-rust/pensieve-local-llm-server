@@ -316,7 +316,7 @@ Recommended Grafana panels:
 
 CONCURRENT_REQUESTS=$1
 DURATION=${2:-60}  # Default 60 seconds
-ENDPOINT="http://127.0.0.1:8080/v1/messages"
+ENDPOINT="http://127.0.0.1:7777/v1/messages"
 
 echo "Starting performance test: $CONCURRENT_REQUESTS concurrent requests for ${DURATION}s"
 

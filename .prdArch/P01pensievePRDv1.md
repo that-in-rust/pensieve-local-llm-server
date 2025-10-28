@@ -36,11 +36,11 @@ flowchart TD
 
     Step2 --> AutoModel[📥 Auto-Download Model<br/>Phi-3-mini-128k-instruct-4bit<br/>from Hugging Face]
 
-    AutoModel --> AutoServer[🔧 Auto-Configure Server<br/>• MLX Acceleration<br/>• Metal GPU Support<br/>• Port 8080]
+    AutoModel --> AutoServer[🔧 Auto-Configure Server<br/>• MLX Acceleration<br/>• Metal GPU Support<br/>• Port 7777]
 
-    AutoServer --> Step3[✅ Server Running<br/>🌐 http://127.0.0.1:8080<br/>⚡ MLX + Metal Acceleration]
+    AutoServer --> Step3[✅ Server Running<br/>🌐 http://127.0.0.1:7777<br/>⚡ MLX + Metal Acceleration]
 
-    Step3 --> Step4[⚙️ Configure Claude Code<br/><code>export ANTHROPIC_BASE_URL=http://127.0.0.1:8080</code><br/><code>export ANTHROPIC_API_KEY=pensieve-local-key</code>]
+    Step3 --> Step4[⚙️ Configure Claude Code<br/><code>export ANTHROPIC_BASE_URL=http://127.0.0.1:7777</code><br/><code>export ANTHROPIC_API_KEY=pensieve-local-key</code>]
 
     Step4 --> Step5[🎯 Launch Claude Code<br/>• Full 128k Context<br/>• 25-40 tokens/second<br/>• Local Privacy]
 
@@ -83,12 +83,12 @@ flowchart TD
     cargo run -p pensieve-01 -- start
     ```
     - Pensieve automatically downloads and configures Phi-3-mini-128k-instruct-4bit model
-    - Server starts on default port 8080 with MLX acceleration
+    - Server starts on default port 7777 with MLX acceleration
     - Zero manual configuration required
 
 2. **User configures Claude Code**:
     ```bash
-    export ANTHROPIC_BASE_URL=http://127.0.0.1:8080
+    export ANTHROPIC_BASE_URL=http://127.0.0.1:7777
     export ANTHROPIC_API_KEY=pensieve-local-key
     ```
     - Opens Claude Code with local LLM backend

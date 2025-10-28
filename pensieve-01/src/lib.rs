@@ -89,7 +89,7 @@ impl Default for CliConfig {
         Self {
             server: ServerConfigFile {
                 host: "127.0.0.1".to_string(),
-                port: 8080,
+                port: 7777,
                 max_concurrent_requests: 100,
                 request_timeout_ms: 30000,
                 enable_cors: true,
@@ -202,7 +202,7 @@ pub enum Commands {
         host: String,
 
         /// Server port
-        #[arg(long, default_value = "8080")]
+        #[arg(long, default_value = "7777")]
         port: u16,
     },
 
@@ -213,7 +213,7 @@ pub enum Commands {
         host: String,
 
         /// Server port
-        #[arg(long, default_value = "8080")]
+        #[arg(long, default_value = "7777")]
         port: u16,
     },
 
@@ -502,7 +502,7 @@ mod tests {
     fn test_default_config() {
         let config = CliConfig::default();
         assert_eq!(config.server.host, "127.0.0.1");
-        assert_eq!(config.server.port, 8080);
+        assert_eq!(config.server.port, 7777);
         assert_eq!(config.logging.level, "info");
         assert_eq!(config.model.model_type, "llama");
     }
@@ -583,7 +583,7 @@ mod tests {
         let config = CliConfig {
             server: ServerConfigFile {
                 host: "127.0.0.1".to_string(),
-                port: 8080,
+                port: 7777,
                 max_concurrent_requests: 100,
                 request_timeout_ms: 30000,
                 enable_cors: true,

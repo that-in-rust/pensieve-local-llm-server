@@ -57,22 +57,22 @@ cargo build --workspace
 
 **Step 3: Start the Server**
 ```bash
-# Start the server on port 8080
-cargo run -p pensieve-01 -- start --model ./model.gguf --host 127.0.0.1 --port 8080
+# Start the server on port 7777
+cargo run -p pensieve-01 -- start --model ./model.gguf --host 127.0.0.1 --port 7777
 ```
 
 Expected output:
 ```
 Starting Pensieve server with MLX backend...
-Starting server on 127.0.0.1:8080
+Starting server on 127.0.0.1:7777
 MLX framework initialized for Apple Silicon
-Server started successfully on 127.0.0.1:8080
+Server started successfully on 127.0.0.1:7777
 Press Ctrl+C to stop the server
 ```
 
 **Step 4: Test Health Endpoint**
 ```bash
-curl http://127.0.0.1:8080/health
+curl http://127.0.0.1:7777/health
 ```
 
 Expected response:
@@ -94,7 +94,7 @@ Expected response:
 **Step 5: Test Authentication**
 ```bash
 # This should fail with 401 (no authentication)
-curl -X POST http://127.0.0.1:8080/v1/messages \
+curl -X POST http://127.0.0.1:7777/v1/messages \
   -H "Content-Type: application/json" \
   -d '{"model": "claude-3-sonnet-20240229", "max_tokens": 10, "messages": [{"role":"user","content":[{"type":"text","text":"Hello"}]}]}'
 ```
@@ -107,7 +107,7 @@ Missing request header "authorization"
 **Step 6: Test API with Authentication**
 ```bash
 # Use valid test token
-curl -X POST http://127.0.0.1:8080/v1/messages \
+curl -X POST http://127.0.0.1:7777/v1/messages \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer test-api-key-12345" \
   -d '{"model": "claude-3-sonnet-20240229", "max_tokens": 50, "messages": [{"role":"user","content":[{"type":"text","text":"Hello Pensieve"}]}]}'
@@ -130,7 +130,7 @@ Expected response:
 **Step 7: Test Streaming**
 ```bash
 # Test streaming with authentication
-curl -N -X POST http://127.0.0.1:8080/v1/messages \
+curl -N -X POST http://127.0.0.1:7777/v1/messages \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer sk-ant-api-test123" \
   -H "x-stream: true" \
@@ -160,7 +160,7 @@ The server requires Bearer token authentication via the `Authorization` header:
 
 **Request:**
 ```bash
-curl -X POST http://127.0.0.1:8080/v1/messages \
+curl -X POST http://127.0.0.1:7777/v1/messages \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer test-api-key-12345" \
   -d '{
@@ -184,7 +184,7 @@ curl -X POST http://127.0.0.1:8080/v1/messages \
 
 **Request:**
 ```bash
-curl -N -X POST http://127.0.0.1:8080/v1/messages \
+curl -N -X POST http://127.0.0.1:7777/v1/messages \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer test-api-key-12345" \
   -H "x-stream: true" \
@@ -209,7 +209,7 @@ curl -N -X POST http://127.0.0.1:8080/v1/messages \
 
 **Request:**
 ```bash
-curl http://127.0.0.1:8080/health
+curl http://127.0.0.1:7777/health
 ```
 
 ## 🏗️ Architecture
@@ -308,7 +308,7 @@ cargo test -p pensieve-02
 
 ```bash
 # Start server with custom configuration
-cargo run -p pensieve-01 -- start --model ./model.gguf --host 127.0.0.1 --port 8080
+cargo run -p pensieve-01 -- start --model ./model.gguf --host 127.0.0.1 --port 7777
 
 # Show help
 cargo run -p pensieve-01 -- --help

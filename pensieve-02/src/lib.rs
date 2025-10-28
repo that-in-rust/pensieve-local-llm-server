@@ -72,7 +72,7 @@ impl Default for ServerConfig {
     fn default() -> Self {
         Self {
             host: "127.0.0.1".to_string(),
-            port: 8080,
+            port: 7777,
             max_concurrent_requests: 100,
             request_timeout_ms: 30000,
             enable_cors: true,
@@ -431,7 +431,7 @@ mod tests {
     fn test_server_config_default() {
         let config = ServerConfig::default();
         assert_eq!(config.host, "127.0.0.1");
-        assert_eq!(config.port, 8080);
+        assert_eq!(config.port, 7777);
         assert_eq!(config.max_concurrent_requests, 100);
         assert_eq!(config.request_timeout_ms, 30000);
         assert!(config.enable_cors);
