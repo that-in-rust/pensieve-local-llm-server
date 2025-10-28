@@ -1281,8 +1281,11 @@ mod red_phase_tests {
         pub fn get_tensor(&mut self, shape: &[usize], dtype: candle_core::DType) -> CoreResult<candle_core::Tensor> {
             if let Some(mut tensor) = self.pool.pop_front() {
                 // Try to reuse existing tensor if shape and dtype match
-                if tensor.shape() == shape && tensor.dtype() == dtype {
-                    tensor.fill(0.0).map_err(|_| CoreError::Generic("tensor reset failed"))?;
+                if tensor.shape().dims() == shape && tensor.dtype() == dtype {
+                    // Re-allocate tensor with zeros instead of filling
+                  let _ = tensor;
+                  tensor = candle_core::Tensor::zeros(shape, dtype, &candle_core::Device::Cpu)
+                      .map_err(|e| CoreError::Generic(format!("tensor creation failed: {}", e)))?;
                     self.allocation_stats.reuses += 1;
                     return Ok(tensor);
                 }
@@ -1381,6 +1384,10 @@ mod red_phase_tests {
             if total > 0 {
                 self.hit_ratio = self.hits as f64 / total as f64;
             }
+        }
+
+        fn get_hit_ratio(&self) -> f64 {
+            self.hit_ratio
         }
 
         /// Clear all cached entries
@@ -1616,7 +1623,7 @@ mod red_phase_tests {
             &self,
             input: &str,
             config: GenerationConfig,
-        ) -> CoreResult<Pin<Box<dyn Stream<Item = CoreResult<StreamingTokenResponse>> + Send>>> {
+        ) -> CoreResult<Pin<Box<dyn Stream<Item = CoreResult<StreamingTokenResponse>> + Send + '_>>> {
             if !self.model_loaded {
                 return Err(CoreError::Unavailable("No model loaded"));
             }
@@ -1917,7 +1924,7 @@ mod red_phase_tests {
 
         async fn load_model(&mut self, model_path: &str) -> CoreResult<()> {
             // Phase 2.7: Optimized model loading
-            self.load_gguf_model(model_path).await
+            self.load_model(model_path).await
         }
 
         async fn generate_stream(
@@ -2008,7 +2015,7 @@ mod red_phase_tests {
 
             // Test tensor allocation
             let tensor1 = pool.get_tensor(&[2, 3], candle_core::DType::F32).unwrap();
-            assert_eq!(tensor1.shape(), &[2, 3]);
+            assert_eq!(tensor1.shape().dims(), &[2, 3]);
             assert_eq!(pool.get_stats().allocations, 1);
 
             // Return tensor to pool
@@ -2017,13 +2024,13 @@ mod red_phase_tests {
 
             // Test tensor reuse
             let tensor2 = pool.get_tensor(&[2, 3], candle_core::DType::F32).unwrap();
-            assert_eq!(tensor2.shape(), &[2, 3]);
+            assert_eq!(tensor2.shape().dims(), &[2, 3]);
             assert_eq!(pool.get_stats().reuses, 1);
 
             // Test shape mismatch (should allocate new)
             pool.return_tensor(tensor2);
             let tensor3 = pool.get_tensor(&[3, 4], candle_core::DType::F32).unwrap();
-            assert_eq!(tensor3.shape(), &[3, 4]);
+            assert_eq!(tensor3.shape().dims(), &[3, 4]);
             assert_eq!(pool.get_stats().allocations, 2); // New allocation for different shape
         }
 
@@ -2102,7 +2109,7 @@ mod red_phase_tests {
                 id: "1".to_string(),
                 input: "test1".to_string(),
                 config: GenerationConfig::default(),
-                response_sender: tokio::sync::mpsc::unbounded().0,
+                response_sender: tokio::sync::mpsc::unbounded_channel().0,
             };
 
             processor.add_request(request1);
@@ -2112,7 +2119,7 @@ mod red_phase_tests {
                 id: "2".to_string(),
                 input: "test2".to_string(),
                 config: GenerationConfig::default(),
-                response_sender: tokio::sync::mpsc::unbounded().0,
+                response_sender: tokio::sync::mpsc::unbounded_channel().0,
             };
 
             processor.add_request(request2);
@@ -2217,7 +2224,7 @@ mod red_phase_tests {
             let mut engine = OptimizedCandleInferenceEngine::new().expect("Failed to create optimized engine");
 
             // Simulate model loading
-            engine.load_gguf_model("/fake/path/model.gguf").await.ok();
+            engine.load_model("/fake/path/model.gguf").await.ok();
             engine.model_loaded = true;
             engine.ready = true;
 
