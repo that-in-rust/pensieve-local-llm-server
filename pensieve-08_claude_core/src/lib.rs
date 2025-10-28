@@ -40,6 +40,12 @@ pub mod error {
     /// Comprehensive error types for Claude operations
     #[derive(Error, Debug)]
     pub enum ClaudeError {
+        #[error("Authentication failed: {source}")]
+        AuthenticationError {
+            #[from]
+            source: AuthenticationError,
+        },
+
         #[error("Model loading failed: {source}")]
         ModelLoadError {
             #[from]
@@ -69,6 +75,31 @@ pub mod error {
 
         #[error("Core error: {0}")]
         Core(#[from] CoreError),
+    }
+
+    /// Authentication specific errors
+    #[derive(Error, Debug)]
+    pub enum AuthenticationError {
+        #[error("Missing API key: expected 'x-api-key' header")]
+        MissingApiKey,
+
+        #[error("Invalid API key format: {reason}")]
+        InvalidApiKeyFormat { reason: String },
+
+        #[error("API key validation failed: {reason}")]
+        ValidationFailed { reason: String },
+
+        #[error("Authentication header malformed: {header}")]
+        MalformedHeader { header: String },
+
+        #[error("Authentication method not supported: {method}")]
+        UnsupportedMethod { method: String },
+
+        #[error("Authentication service unavailable")]
+        ServiceUnavailable,
+
+        #[error("Authentication request timed out: {timeout_ms}ms")]
+        Timeout { timeout_ms: u64 },
     }
 
     /// Model loading specific errors
@@ -242,6 +273,28 @@ pub mod traits {
 
         /// Check if a service is registered
         fn has<T: 'static + Send + Sync>(&self) -> bool;
+    }
+
+    /// Trait for authentication providers
+    #[async_trait]
+    pub trait Authenticator: Send + Sync {
+        /// Authentication context containing request metadata
+        type AuthContext: Send + Sync;
+
+        /// Authentication result containing user information
+        type AuthResult: Send + Sync;
+
+        /// Authenticate a request based on headers
+        async fn authenticate(&self, headers: &[(String, String)]) -> ClaudeResult<Self::AuthResult>;
+
+        /// Validate API key format (for local use, accepts any non-empty key)
+        async fn validate_api_key(&self, api_key: &str) -> ClaudeResult<()>;
+
+        /// Check if authentication is required for this endpoint
+        fn is_authentication_required(&self, path: &str) -> bool;
+
+        /// Get authentication context from headers
+        fn extract_context(&self, headers: &[(String, String)]) -> ClaudeResult<Self::AuthContext>;
     }
 }
 
