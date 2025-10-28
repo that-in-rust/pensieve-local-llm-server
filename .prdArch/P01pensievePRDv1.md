@@ -6,7 +6,7 @@
 ---
 title: Pensieve Local LLM Server - Complete User Journey
 accTitle: Pensieve User Journey Flowchart
-accDescr { A comprehensive flowchart showing the complete user journey from installation to Claude Code integration with the Pensieve Local LLM Server, including automatic model download, server startup, and configuration steps. }
+accDescr: "A comprehensive flowchart showing the complete user journey from installation to Claude Code integration with the Pensieve Local LLM Server, including automatic model download, server startup, and configuration steps."
 config:
   flowchart:
     defaultRenderer: "elk"
