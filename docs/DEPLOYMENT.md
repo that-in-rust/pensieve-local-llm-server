@@ -62,7 +62,7 @@ Create a configuration file `config.json`:
 {
   "server": {
     "host": "0.0.0.0",
-    "port": 8080,
+    "port": 7777,
     "max_concurrent_requests": 100,
     "request_timeout_ms": 30000,
     "enable_cors": true
@@ -89,7 +89,7 @@ For production deployments, use these enhanced settings:
 {
   "server": {
     "host": "0.0.0.0",
-    "port": 8080,
+    "port": 7777,
     "max_concurrent_requests": 50,
     "request_timeout_ms": 60000,
     "enable_cors": false
@@ -213,7 +213,7 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /app/target/release/pensieve /usr/local/bin/
 RUN chmod +x /usr/local/bin/pensieve
 
-EXPOSE 8080
+EXPOSE 7777
 CMD ["pensieve", "start"]
 ```
 
@@ -224,7 +224,7 @@ docker build -t pensieve:latest .
 # Run container
 docker run -d \
   --name pensieve \
-  -p 8080:8080 \
+  -p 7777:7777 \
   -v $(pwd)/config.json:/config.json \
   -v $(pwd)/models:/models \
   pensieve:latest \
@@ -242,7 +242,7 @@ services:
   pensieve:
     build: .
     ports:
-      - "8080:8080"
+      - "7777:7777"
     volumes:
       - ./config.json:/config.json:ro
       - ./models:/models:ro
@@ -251,7 +251,7 @@ services:
       - RUST_LOG=info
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:7777/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -354,7 +354,7 @@ sha256sum llama-2-7b-chat.Q4_K_M.gguf
 ```bash
 # Allow only local network access
 sudo pfctl -e
-echo "block in all\npass in on en0 from 192.168.0.0/16 to any port 8080" | sudo pfctl -f -
+echo "block in all\npass in on en0 from 192.168.0.0/16 to any port 7777" | sudo pfctl -f -
 ```
 
 #### 2. Reverse Proxy with Nginx
@@ -372,7 +372,7 @@ server {
     location / {
         limit_req zone=api burst=20 nodelay;
 
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:7777;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -386,7 +386,7 @@ server {
 
     # Health check endpoint (no rate limiting)
     location /health {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:7777;
         access_log off;
     }
 }
@@ -447,7 +447,7 @@ Create `/opt/pensieve/scripts/health_check.sh`:
 ```bash
 #!/bin/bash
 
-HEALTH_URL="http://127.0.0.1:8080/health"
+HEALTH_URL="http://127.0.0.1:7777/health"
 RESPONSE=$(curl -s "$HEALTH_URL")
 
 if echo "$RESPONSE" | grep -q '"status":"healthy"'; then
@@ -466,10 +466,10 @@ fi
 ps aux | grep pensieve
 
 # Monitor network connections
-netstat -an | grep 8080
+netstat -an | grep 7777
 
 # Monitor response times
-curl -w "@curl-format.txt" -s -o /dev/null http://127.0.0.1:8080/health
+curl -w "@curl-format.txt" -s -o /dev/null http://127.0.0.1:7777/health
 ```
 
 Create `curl-format.txt`:
@@ -528,7 +528,7 @@ pensieve validate -c /opt/pensieve/config/config.json
 tail -f /var/log/pensieve/pensieve.err.log
 
 # Check port availability
-lsof -i :8080
+lsof -i :7777
 ```
 
 #### 2. Model Loading Issues
@@ -562,13 +562,13 @@ sudo powermetrics --samplers gpu_power
 
 ```bash
 # Test local connectivity
-curl -v http://127.0.0.1:8080/health
+curl -v http://127.0.0.1:7777/health
 
 # Check firewall rules
 sudo pfctl -s rules
 
 # Test from remote machine
-curl -v http://SERVER_IP:8080/health
+curl -v http://SERVER_IP:7777/health
 ```
 
 ### Debug Mode
@@ -589,7 +589,7 @@ For high-availability deployments:
 
 ```nginx
 upstream pensieve_backend {
-    server 127.0.0.1:8080;
+    server 127.0.0.1:7777;
     server 127.0.0.1:8081;
     server 127.0.0.1:8082;
 }

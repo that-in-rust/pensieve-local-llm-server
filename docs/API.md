@@ -9,7 +9,7 @@ Pensieve provides **full Anthropic API v1 compatibility**, enabling seamless int
 ## Base URL
 
 ```
-http://127.0.0.1:8080
+http://127.0.0.1:7777
 ```
 
 ## Authentication
@@ -191,7 +191,7 @@ import requests
 import json
 
 # Non-streaming request
-response = requests.post("http://127.0.0.1:8080/v1/messages",
+response = requests.post("http://127.0.0.1:7777/v1/messages",
     json={
         "model": "claude-3-sonnet-20240229",
         "max_tokens": 100,
@@ -205,7 +205,7 @@ result = response.json()
 print(result["content"][0]["text"])
 
 # Streaming request
-response = requests.post("http://127.0.0.1:8080/v1/messages",
+response = requests.post("http://127.0.0.1:7777/v1/messages",
     json={
         "model": "claude-3-sonnet-20240229",
         "max_tokens": 100,
@@ -229,7 +229,7 @@ for line in response.iter_lines():
 
 ```bash
 # Basic message request
-curl -X POST http://127.0.0.1:8080/v1/messages \
+curl -X POST http://127.0.0.1:7777/v1/messages \
   -H "Content-Type: application/json" \
   -d '{
     "model": "claude-3-sonnet-20240229",
@@ -243,7 +243,7 @@ curl -X POST http://127.0.0.1:8080/v1/messages \
   }'
 
 # Streaming request
-curl -X POST http://127.0.0.1:8080/v1/messages \
+curl -X POST http://127.0.0.1:7777/v1/messages \
   -H "Content-Type: application/json" \
   -d '{
     "model": "claude-3-sonnet-20240229",
@@ -258,7 +258,7 @@ curl -X POST http://127.0.0.1:8080/v1/messages \
   }'
 
 # Health check
-curl http://127.0.0.1:8080/health
+curl http://127.0.0.1:7777/health
 ```
 
 ### JavaScript Client
@@ -266,7 +266,7 @@ curl http://127.0.0.1:8080/health
 ```javascript
 // Non-streaming request
 async function sendMessage(message) {
-  const response = await fetch('http://127.0.0.1:8080/v1/messages', {
+  const response = await fetch('http://127.0.0.1:7777/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -286,7 +286,7 @@ async function sendMessage(message) {
 
 // Streaming request
 async function streamMessage(message) {
-  const response = await fetch('http://127.0.0.1:8080/v1/messages', {
+  const response = await fetch('http://127.0.0.1:7777/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -387,7 +387,7 @@ Pensieve is designed to work seamlessly with Claude Code:
 ```bash
 # Configure Claude Code to use Pensieve
 export ANTHROPIC_API_KEY="unused"
-export ANTHROPIC_BASE_URL="http://127.0.0.1:8080"
+export ANTHROPIC_BASE_URL="http://127.0.0.1:7777"
 
 # Start Pensieve server
 cargo run --bin pensieve -- start --model your-model.gguf
@@ -418,7 +418,7 @@ cargo run --bin pensieve -- --log-level debug start
 Regularly check the health endpoint:
 
 ```bash
-curl http://127.0.0.1:8080/health
+curl http://127.0.0.1:7777/health
 ```
 
 ## Version History
