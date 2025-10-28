@@ -3,26 +3,31 @@
 ## Executive Summary
 
 ### Architecture Vision
-The Pensieve Local LLM Server is a high-performance, Apple M1-optimized local server that provides Anthropic-compatible API endpoints for seamless Claude Code integration. Built exclusively with the Candle framework and Metal GPU acceleration, it delivers cloud-like performance with local privacy and reliability.
+The Pensieve Local LLM Server is a high-performance, Apple M1/M2/M3-optimized local server that provides Anthropic-compatible API endpoints for seamless Claude Code integration. Built exclusively with the MLX framework and Apple Silicon acceleration, it delivers cloud-like performance with local privacy and reliability.
 
 ### Design Principles
-1. **Candle-First Architecture**: Exclusive focus on Candle framework with Metal backend for optimal M1 performance
+1. **MLX-First Architecture**: Exclusive focus on MLX framework with Metal backend for optimal M1/M2/M3 performance
 2. **Anthropic Compatibility**: Native API compatibility for drop-in Claude Code integration
-3. **Memory Efficiency**: Quantized models and intelligent caching for 16GB M1 systems
+3. **Memory Efficiency**: Quantized models and intelligent caching for 16GB+ Apple systems
 4. **Production Ready**: Single binary deployment with comprehensive error handling
 5. **Extensible Foundation**: Modular crate architecture for future enhancements
 
 ### Key Technical Decisions & Trade-offs
 
-#### **Candle + Metal Stack** 
-- **Pros**: Native M1 performance, single binary, no Python dependencies
-- **Cons**: Limited to Apple Silicon, smaller ecosystem than Python alternatives
-- **Rationale**: Optimal performance for target hardware with simplified deployment
+#### **MLX + Apple Silicon Stack** 
+- **Pros**: Native Apple Silicon performance, single binary, optimized M-series GPU utilization
+- **Cons**: Limited to Apple Silicon ecosystem, requires MLX framework
+- **Rationale**: Optimal performance for target hardware with Apple-optimized deployment
 
-#### **GGUF Quantization**
-- **Pros**: 4-bit models reduce memory usage by 75%, fast loading, Metal-compatible
+#### **MLX Framework**
+- **Pros**: Apple-optimized, excellent M1/M2/M3 performance, native Metal backend, official Apple support
+- **Cons**: Apple ecosystem dependency only
+- **Rationale**: Superior Apple Silicon performance with framework-level Metal optimization and future-proofing
+
+#### **MLX Quantization**
+- **Pros**: 4-bit models reduce memory usage by 75%, fast loading, Metal-optimized, MLX-native format
 - **Cons**: Slight quality reduction vs full precision
-- **Rationale**: Essential for fitting 7B models in 16GB RAM while maintaining quality
+- **Rationale**: Essential for fitting Phi-3 models in 16GB RAM while maintaining quality with MLX optimization
 
 #### **Modular Crate Architecture**
 - **Pros**: Separation of concerns, independent development, testability
@@ -37,10 +42,10 @@ The Pensieve Local LLM Server is a high-performance, Apple M1-optimized local se
 ### Success Metrics & Performance Targets
 
 #### **Performance Benchmarks**
-- **First Token Time**: <500ms
-- **Token Throughput**: 15-30 tokens/second
+- **First Token Time**: <300ms
+- **Token Throughput**: 25-40 tokens/second
 - **Memory Usage**: <12GB peak (16GB constraint)
-- **Model Load Time**: <10 seconds (Mistral 7B GGUF)
+- **Model Load Time**: <8 seconds (MLX-optimized Phi-3 4-bit)
 - **Concurrent Requests**: 3-5 simultaneous users
 
 #### **Quality Metrics**
@@ -76,20 +81,20 @@ The Pensieve Local LLM Server is a high-performance, Apple M1-optimized local se
 │  - Token streaming types                                       │
 │  - Error response types                                        │
 ├─────────────────────────────────────────────────────────────────┤
-│  Candle Inference Engine (pensieve-04)                       │
-│  - Metal GPU backend                                           │
-│  - GGUF model loading                                          │
+│  MLX Inference Engine (pensieve-04)                          │
+│  - MLX framework with Metal backend                           │
+│  - Hugging Face model loading                                 │
 │  - Token generation with streaming                           │
 │  - Memory management                                           │
 ├─────────────────────────────────────────────────────────────────┤
 │  Model Management (pensieve-05)                               │
-│  - Quantized model loading (4-bit GGUF)                       │
+│  - Quantized model loading (4-bit MLX)                       │
 │  - KV-Cache optimization                                       │
 │  - Context window management                                   │
 │  - Model switching (future enhancement)                        │
 ├─────────────────────────────────────────────────────────────────┤
 │  Metal GPU Optimization (pensieve-06)                         │
-│  - Metal kernel optimization                                   │
+│  - MLX Metal backend optimization                             │
 │  - Memory pooling                                              │
 │  - Async computation streams                                   │
 │  - Performance profiling                                       │
@@ -109,12 +114,12 @@ The Pensieve Local LLM Server is a high-performance, Apple M1-optimized local se
 2. **HTTP Server**: Accepts requests on configurable port (default: 8000)
 3. **Model Validation**: Checks model file existence and compatibility
 4. **Inference Engine**: Loads model into Metal GPU memory if not cached
-5. **Token Generation**: Processes input through Candle + Metal
+5. **Token Generation**: Processes input through MLX + Metal
 6. **Streaming Response**: Returns tokens via Server-Sent Events
 7. **Logging**: Records request metrics and performance data
 
 #### **Memory Flow**
-1. **Model Loading**: GGUF → Candle tensors → Metal GPU memory
+1. **Model Loading**: HuggingFace → MLX tensors → Metal GPU memory
 2. **KV-Cache**: Allocation during inference, intelligent eviction
 3. **Token Buffer**: Circular buffer for streaming responses
 4. **Memory Pool**: Pre-allocated buffers for consistent performance
@@ -136,17 +141,18 @@ The Pensieve Local LLM Server is a high-performance, Apple M1-optimized local se
 - **Serialization**: Serde for JSON request/response handling
 - **CLI Parsing**: Clap for command-line interface
 
-#### **Candle Framework**
-- **Core**: `candle-core` for tensor operations and Metal backend
-- **Neural Networks**: `candle-nn` for model architecture
-- **Transformers**: `candle-transformers` for pre-trained models
-- **Quantization**: Native GGUF support with 4-bit precision
+#### **MLX Framework**
+- **Core**: `mlx` for tensor operations and Metal backend
+- **Neural Networks**: `mlx.nn` for model architecture
+- **Transformers**: `mlx-examples` for pre-trained models
+- **Quantization**: Native support with 4-bit precision
+- **Model Loading**: Hugging Face Hub integration
 
-#### **Apple M1 Optimization**
-- **Metal GPU**: Native Apple Silicon acceleration
+#### **Apple Silicon Optimization**
+- **MLX Metal**: Native Apple Silicon acceleration
 - **Unified Memory**: Efficient RAM-GPU memory sharing
 - **Async Compute**: Parallel processing streams
-- **Kernel Optimization**: Custom Metal kernels for attention mechanisms
+- **MLX Optimizations**: Framework-level optimization for M-series chips
 
 ## Detailed Component Design
 
@@ -205,7 +211,7 @@ impl CliConfig {
 ```rust
 // POST /v1/messages
 {
-  "model": "pensieve-mistral-7b",
+  "model": "pensieve-phi-3-mini",
   "max_tokens": 1024,
   "messages": [
     {
@@ -221,7 +227,7 @@ impl CliConfig {
 ```rust
 // POST /v1/chat/completions
 {
-  "model": "pensieve-mistral-7b",
+  "model": "pensieve-phi-3-mini",
   "messages": [...],
   "stream": true,
   "max_tokens": 1024
@@ -233,7 +239,7 @@ impl CliConfig {
 // GET /health
 {
   "status": "healthy",
-  "model": "pensieve-mistral-7b",
+  "model": "pensieve-phi-3-mini",
   "memory_usage": "4.2GB/16GB",
   "uptime": "2h 34m"
 }
@@ -354,26 +360,26 @@ pub struct ChatCompletionResponse {
 }
 ```
 
-### 4. Candle Inference Engine (pensieve-04)
+### 4. MLX Inference Engine (pensieve-04)
 
 #### **Core Architecture**
-- **Model Loading**: GGUF file parsing with Candle quantization support
+- **Model Loading**: HuggingFace model loading with MLX quantization support
 - **Tokenization**: HuggingFace tokenizer integration
-- **Inference**: Metal-accelerated forward pass
+- **Inference**: MLX-accelerated forward pass with Metal backend
 - **Streaming**: Async token generation with proper handling
 
 #### **Model Interface**
 ```rust
 pub struct ModelEngine {
-    model: candle_core::Module,
+    model: mlx::nn::Model,
     tokenizer: Tokenizer,
-    device: Device,
+    device: mlx::Device,
     config: ModelConfig,
 }
 
 impl ModelEngine {
     pub async fn load(model_path: &Path, device: Device) -> Result<Self> {
-        // Load GGUF model with Candle
+        // Load model with MLX
     }
     
     pub async fn generate(
@@ -404,7 +410,7 @@ impl Stream for StreamingResponse {
 
 #### **Memory Management**
 - **Tensor Allocation**: Pre-allocated buffers for consistent performance
-- **GPU Memory**: Metal texture and buffer management
+- **GPU Memory**: MLX variable management with Metal acceleration
 - **Garbage Collection**: Automatic cleanup of intermediate tensors
 - **Memory Pressure Monitoring**: Adaptive behavior under memory constraints
 
@@ -422,17 +428,17 @@ impl Stream for StreamingResponse {
 - **Pre-loading**: Option to load model at startup
 - **Hot Swapping**: Future support for model switching
 
-#### **GGUF Quantization Support**
+#### **MLX Quantization Support**
 - **4-bit Quantization**: Significant memory reduction (75%)
-- **Model Format**: GGUF with Metal-optimized kernels
+- **Model Format**: HuggingFace models with MLX quantization
 - **Memory Mapping**: Efficient large file handling
 - **Validation**: Pre-load model structure validation
 
 #### **KV-Cache Optimization**
 ```rust
 pub struct KVCache {
-    key_cache: Tensor,
-    value_cache: Tensor,
+    key_cache: mlx::core::Tensor,
+    value_cache: mlx::core::Tensor,
     max_seq_len: usize,
     current_len: usize,
 }
@@ -478,42 +484,42 @@ impl ModelConfig {
 
 ### 6. Metal GPU Optimization (pensieve-06)
 
-#### **Metal Backend Integration**
+#### **MLX Metal Backend Integration**
 - **Device Selection**: Optimal M-series GPU utilization
-- **Texture Management**: Efficient memory layout for Metal textures
-- **Command Buffers**: Async compute scheduling
-- **Kernel Compilation**: Just-in-time Metal shader compilation
+- **Variable Management**: Efficient memory layout for MLX variables
+- **Compute Operations**: MLX-optimized Metal operations
+- **Performance**: Framework-level Metal optimization
 
 #### **Memory Optimization**
 ```rust
 pub struct MemoryPool {
-    buffers: Vec<Buffer>,
+    variables: Vec<mlx::core::Variable>,
     allocated: usize,
     max_size: usize,
 }
 
 impl MemoryPool {
-    pub fn allocate(&mut self, size: usize) -> Result<&Buffer> {
+    pub fn allocate(&mut self, size: usize) -> Result<&mlx::core::Variable> {
         // Pool allocation with fragmentation avoidance
     }
     
-    pub fn deallocate(&mut self, buffer: &Buffer) {
-        // Return buffer to pool
+    pub fn deallocate(&mut self, variable: &mlx::core::Variable) {
+        // Return variable to pool
     }
 }
 ```
 
 #### **Async Compute Streams**
-- **Multiple Queues**: Parallel processing for different operations
+- **MLX Async**: Native async support in MLX framework
 - **Dependency Management**: Proper synchronization of GPU operations
 - **Load Balancing**: Optimal utilization of GPU cores
 - **Profiling**: Performance metrics collection
 
-#### **Kernel Optimization**
-- **Attention Kernels**: Custom Metal kernels for transformer attention
-- **Matrix Multiplication**: Optimized GEMM operations
-- **Quantization Kernels**: 4-bit matrix operations
-- **Memory Coalescing**: Optimized memory access patterns
+#### **MLX Optimization**
+- **Model Optimization**: MLX model compilation and optimization
+- **Quantization**: MLX-native 4-bit quantization
+- **Memory Layout**: Optimized variable allocation patterns
+- **Kernel Optimization**: Framework-level kernel optimization
 
 #### **Performance Profiling**
 ```rust
@@ -584,12 +590,12 @@ pub struct ContextError {
 
 ## Performance Architecture
 
-### Memory Management for 16GB M1 Systems
+### Memory Management for 16GB Apple Systems
 
 #### **Memory Allocation Strategy**
 ```rust
 pub struct MemoryManager {
-    total_ram: usize,           // 16GB available
+    total_ram: usize,           // 16GB+ available
     model_memory: usize,        // ~4-8GB for 7B model
     kv_cache_memory: usize,     // ~1-2GB for cache
     token_buffer_memory: usize,  // ~100MB for streaming
@@ -599,10 +605,10 @@ pub struct MemoryManager {
 ```
 
 #### **Model Memory Optimization**
-- **4-bit GGUF**: Reduces memory usage by 75%
-  - Mistral 7B: ~4GB (vs 14GB full precision)
-  - Phi-2: ~1.5GB (vs 6GB full precision)
-  - LLaMA 7B: ~4GB (vs 14GB full precision)
+- **4-bit MLX Quantization**: Reduces memory usage by 75%
+  - Phi-3 Mini 4-bit: ~1.5GB (vs 6GB full precision)
+  - Mistral 7B 4-bit: ~4GB (vs 14GB full precision)
+  - Deepseek Coder 4-bit: ~4-5GB (vs 15GB full precision)
 
 #### **KV-Cache Management**
 - **Dynamic Allocation**: Cache size grows with context length
@@ -611,23 +617,23 @@ pub struct MemoryManager {
 - **Batch Processing**: Efficient cache utilization for concurrent requests
 
 #### **Garbage Collection**
-- **Reference Counting**: Automatic cleanup of unused tensors
+- **Reference Counting**: Automatic cleanup of unused MLX variables
 - **Explicit Cleanup**: Manual cleanup of large temporary objects
 - **Memory Monitoring**: Continuous tracking of memory usage
 - **Emergency Procedures**: Graceful degradation under extreme memory pressure
 
-### Metal GPU Utilization Strategies
+### MLX GPU Utilization Strategies
 
 #### **GPU Memory Architecture**
 - **Unified Memory**: Shared CPU/GPU memory (no copying needed)
-- **Texture Optimization**: Efficient memory layout for Metal textures
+- **Variable Optimization**: Efficient memory layout for MLX variables
 - **Buffer Pooling**: Reused GPU buffers to avoid allocation overhead
 - **Async Transfers**: Background memory operations
 
 #### **Compute Optimization**
 ```rust
 pub struct ComputeScheduler {
-    command_queues: Vec<CommandQueue>,
+    command_queue: metal::CommandQueue,
     in_flight_operations: usize,
     max_concurrent: usize,
 }
@@ -642,11 +648,11 @@ impl ComputeScheduler {
 }
 ```
 
-#### **Kernel Optimization**
-- **Attention Kernels**: Custom Metal shaders for transformer attention
-- **Matrix Multiplication**: Optimized GEMM operations using Metal Performance Shaders
-- **Quantization Kernels**: 4-bit integer operations
+#### **MLX Optimization**
+- **Model Compilation**: MLX model compilation and optimization
+- **Quantization**: Native 4-bit quantization with MLX
 - **Memory Coalescing**: Optimized memory access patterns
+- **Metal Backend**: Native Metal backend for Apple Silicon
 
 #### **Parallel Processing**
 - **Multi-stream Processing**: Parallel execution of independent operations
@@ -656,9 +662,9 @@ impl ComputeScheduler {
 
 ### Quantization and Model Optimization Pipeline
 
-#### **GGUF Quantization Process**
-1. **Model Conversion**: PyTorch → GGUF format using Candle tools
-2. **Quantization**: 4-bit quantization with Metal kernel optimization
+#### **MLX Quantization Process**
+1. **Model Conversion**: HuggingFace → MLX format using MLX tools
+2. **Quantization**: 4-bit quantization with MLX optimization
 3. **Validation**: Quality and performance verification
 4. **Compression**: Optional additional compression for distribution
 
@@ -715,7 +721,7 @@ impl RequestDispatcher {
 # Claude Code configuration
 export ANTHROPIC_API_KEY="pensieve-local-key"
 export ANTHROPIC_BASE_URL="http://localhost:8000"
-export ANTHROPIC_MODEL="pensieve-mistral-7b"
+export ANTHROPIC_MODEL="pensieve-phi-3-mini"
 ```
 
 #### **API Compatibility**
@@ -738,7 +744,7 @@ POST /v1/messages
 Content-Type: application/json
 
 {
-  "model": "pensieve-mistral-7b",
+  "model": "pensieve-phi-3-mini",
   "max_tokens": 1024,
   "messages": [
     {
@@ -757,7 +763,7 @@ POST /v1/chat/completions
 Content-Type: application/json
 
 {
-  "model": "pensieve-mistral-7b",
+  "model": "pensieve-phi-3-mini",
   "messages": [...],
   "stream": true,
   "max_tokens": 1024
@@ -816,7 +822,7 @@ pub enum ErrorType {
 ```toml
 # pensieve.toml
 [model]
-path = "/path/to/model.gguf"
+path = "/path/to/phi-3-mlx-model"
 quantization = "4bit"
 context_length = 4096
 
@@ -847,9 +853,8 @@ build = "build.rs"
 # Core dependencies
 tokio = { version = "1.0", features = ["full"] }
 warp = "0.3"
-candle-core = { git = "https://github.com/huggingface/candle.git" }
-candle-nn = { git = "https://github.com/huggingface/candle.git" }
-candle-transformers = { git = "https://github.com/huggingface/candle.git" }
+mlx = { version = "0.2", features = ["metal"] }
+mlx-examples = { version = "0.2" }
 
 # Apple-specific
 metal = { version = "0.27", features = ["mps"], optional = true }
@@ -866,7 +871,7 @@ strip = true
 ```
 
 #### **Release Process**
-1. **Cross-Platform Builds**: macOS x86_64 and aarch64
+1. **Apple Silicon Builds**: macOS aarch64 (M1/M2/M3)
 2. **Static Linking**: No external runtime dependencies
 3. **Binary Size Optimization**: Remove debug symbols, strip binaries
 4. **Asset Bundling**: Include default configuration and documentation
@@ -955,7 +960,7 @@ pub struct LogEntry {
 ### Phase-wise Development Approach
 
 #### **Phase 1: Core Infrastructure (Week 1-2)**
-**Goal**: Establish working Candle + Metal foundation
+**Goal**: Establish working MLX + Apple Silicon foundation
 
 **Tasks**:
 1. **Setup Development Environment**
@@ -967,12 +972,12 @@ pub struct LogEntry {
    # Install Xcode command line tools
    xcode-select --install
    
-   # Verify Metal support
-   sysctl -n hw.perflevel0.physicalcpu
+   # Verify MLX support
+   python3 -c "import mlx; print('MLX available')"
    ```
 
 2. **Model Loading Implementation**
-   - Load GGUF models with Candle
+   - Load HuggingFace models with MLX
    - Basic Metal GPU acceleration
    - Tokenization with HuggingFace tokenizers
    - Simple inference loop
@@ -989,7 +994,7 @@ pub struct LogEntry {
    - Simple cache implementation
 
 **Success Criteria**:
-- ✅ Load Mistral 7B GGUF model successfully
+- ✅ Load Phi-3 Mini 4-bit model successfully
 - ✅ Generate first token in <2 seconds
 - ✅ Basic HTTP server running on localhost
 - ✅ No memory leaks during operation
@@ -1032,7 +1037,7 @@ pub struct LogEntry {
 
 **Tasks**:
 1. **Metal GPU Optimization**
-   - Custom kernel implementation
+   - MLX Metal backend optimization
    - Memory pooling and optimization
    - Async compute streams
    - Performance profiling
@@ -1057,7 +1062,7 @@ pub struct LogEntry {
 
 **Success Criteria**:
 - ✅ First token <500ms
-- ✅ 15+ tokens/second throughput
+- ✅ 25+ tokens/second throughput
 - ✅ <12GB memory usage peak
 - ✅ Background process working
 - ✅ Complete CLI interface
@@ -1100,9 +1105,9 @@ pub struct LogEntry {
 ### Key Milestones and Dependencies
 
 #### **Milestone 1: Working Prototype (End Week 2)**
-- **Dependencies**: Rust toolchain, Candle library, Metal SDK
+- **Dependencies**: Rust toolchain, MLX framework, Apple Silicon hardware
 - **Deliverables**: Basic model loading, simple API server
-- **Risk Factors**: Metal driver compatibility, model format issues
+- **Risk Factors**: MLX compatibility, model format issues
 
 #### **Milestone 2: API Compatibility (End Week 4)**
 - **Dependencies**: Milestone 1, Warp framework, tokenizers
@@ -1110,7 +1115,7 @@ pub struct LogEntry {
 - **Risk Factors**: API specification changes, streaming complexity
 
 #### **Milestone 3: Production Ready (End Week 6)**
-- **Dependencies**: Milestone 2, Metal optimization, memory management
+- **Dependencies**: Milestone 2, MLX optimization, memory management
 - **Deliverables**: Performance targets, background execution, CLI
 - **Risk Factors**: Performance optimization challenges, memory issues
 
@@ -1122,10 +1127,10 @@ pub struct LogEntry {
 ### Risk Mitigation Strategies
 
 #### **Technical Risks**
-1. **Metal GPU Compatibility**
-   - **Risk**: M-series chip variations, driver issues
-   - **Mitigation**: Test on multiple M1 generations, provide CPU fallback
-   - **Contingency**: Develop CPU-only version as backup
+1. **MLX Framework Compatibility**
+   - **Risk**: MLX version changes, Apple Silicon compatibility
+   - **Mitigation**: Test on multiple Apple generations, provide CPU fallback
+   - **Contingency**: Monitor MLX updates and maintain compatibility layer
 
 2. **Memory Constraints**
    - **Risk**: 16GB insufficient for larger models
@@ -1133,8 +1138,8 @@ pub struct LogEntry {
    - **Contingency**: Implement memory pressure handling and graceful degradation
 
 3. **Performance Targets**
-   - **Risk**: Unable to achieve 15+ tokens/second
-   - **Mitigation**: Metal kernel optimization, batch processing
+   - **Risk**: Unable to achieve 25+ tokens/second
+   - **Mitigation**: MLX optimization, batch processing
    - **Contingency**: Adjust targets based on actual hardware performance
 
 4. **API Compatibility**
@@ -1151,7 +1156,7 @@ pub struct LogEntry {
 2. **Resource Constraints**
    - **Risk**: Hardware limitations testing
    - **Mitigation**: Cloud-based testing, simulator usage
-   - **Contingency**: Partner with M1 hardware owners for testing
+   - **Contingency**: Partner with Apple Silicon hardware owners for testing
 
 3. **Technical Debt**
    - **Risk**: Rapid development leads to code quality issues
@@ -1186,7 +1191,7 @@ pub struct LogEntry {
 
 ## Conclusion
 
-The Pensieve Local LLM Server architecture provides a comprehensive, production-ready solution for running local LLM inference on Apple M1 hardware. By leveraging the Candle framework with Metal GPU acceleration, we achieve optimal performance while maintaining memory efficiency for 16GB systems.
+The Pensieve Local LLM Server architecture provides a comprehensive, production-ready solution for running local LLM inference on Apple Silicon hardware. By leveraging the MLX framework with Metal GPU acceleration, we achieve optimal performance while maintaining memory efficiency for 16GB+ systems.
 
 The modular crate architecture ensures maintainability and extensibility, while the Anthropic API compatibility guarantees seamless integration with Claude Code. The comprehensive performance optimization and error handling make this solution suitable for production deployment.
 
@@ -1194,8 +1199,16 @@ With the phased development approach and risk mitigation strategies, this archit
 
 **Next Steps**:
 1. Begin Phase 1 development with core infrastructure setup
-2. Clone and analyze reference Candle implementations
-3. Acquire and test quantized model files
+2. Clone and analyze reference MLX implementations
+3. Acquire and test MLX-optimized model files
 4. Establish performance benchmarks and monitoring
 
 The architecture is designed to be both immediately practical and extensible for future enhancements, ensuring long-term viability as the LLM ecosystem evolves.
+
+---
+
+**Document Version**: 1.0 (MLX Transition)
+**Last Updated**: October 28, 2025
+**Next Review**: Upon Phase 1 completion
+**Framework**: MLX for Apple Silicon
+**Target**: M1/M2/M3 16GB+ Systems
