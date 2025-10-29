@@ -142,16 +142,30 @@ impl MlxRequestHandler {
         for message in messages {
             match message.role {
                 pensieve_03::anthropic::Role::User => {
-                    for content in &message.content {
-                        if let pensieve_03::anthropic::Content::Text { text } = content {
+                    match &message.content {
+                        pensieve_03::anthropic::MessageContent::String(text) => {
                             prompt_parts.push(format!("User: {}", text));
+                        }
+                        pensieve_03::anthropic::MessageContent::Blocks(blocks) => {
+                            for content in blocks {
+                                if let pensieve_03::anthropic::Content::Text { text } = content {
+                                    prompt_parts.push(format!("User: {}", text));
+                                }
+                            }
                         }
                     }
                 }
                 pensieve_03::anthropic::Role::Assistant => {
-                    for content in &message.content {
-                        if let pensieve_03::anthropic::Content::Text { text } = content {
+                    match &message.content {
+                        pensieve_03::anthropic::MessageContent::String(text) => {
                             prompt_parts.push(format!("Assistant: {}", text));
+                        }
+                        pensieve_03::anthropic::MessageContent::Blocks(blocks) => {
+                            for content in blocks {
+                                if let pensieve_03::anthropic::Content::Text { text } = content {
+                                    prompt_parts.push(format!("Assistant: {}", text));
+                                }
+                            }
                         }
                     }
                 }
@@ -329,10 +343,16 @@ impl traits::RequestHandler for MockRequestHandler {
             content: vec![Content::Text {
                 text: format!("Mock response to: {}",
                     request.messages.first()
-                        .and_then(|m| m.content.first())
-                        .and_then(|c| match c {
-                            Content::Text { text } => Some(text.as_str()),
-                            _ => None,
+                        .and_then(|m| {
+                            match &m.content {
+                                pensieve_03::anthropic::MessageContent::String(s) => Some(s.as_str()),
+                                pensieve_03::anthropic::MessageContent::Blocks(blocks) => {
+                                    blocks.first().and_then(|c| match c {
+                                        Content::Text { text } => Some(text.as_str()),
+                                        _ => None,
+                                    })
+                                }
+                            }
                         })
                         .unwrap_or("no message")
                 ),
@@ -405,6 +425,23 @@ impl HttpApiServer {
                 }))
             });
 
+        let models = warp::path("v1")
+            .and(warp::path("models"))
+            .and(warp::get())
+            .map(|| {
+                warp::reply::json(&serde_json::json!({
+                    "object": "list",
+                    "data": [
+                        {
+                            "id": "phi-3-mini",
+                            "object": "model",
+                            "created": 1677610602,
+                            "owned_by": "microsoft"
+                        }
+                    ]
+                }))
+            });
+
         let messages = warp::path("v1")
             .and(warp::path("messages"))
             .and(warp::post())
@@ -415,7 +452,7 @@ impl HttpApiServer {
             .and_then(handle_create_message);
 
         // Simple routes without CORS for now
-        health.or(messages)
+        health.or(models).or(messages)
     }
 
     /// Add handler to warp filter
@@ -485,7 +522,9 @@ fn validate_api_key(auth_header: &str) -> bool {
     if let Some(token) = auth_header.strip_prefix("Bearer ") {
         // For now, accept a simple test token
         // In production, this should validate against environment variable or secure storage
-        token == "test-api-key-12345" || token.starts_with("sk-ant-api")
+        token == "test-api-key-12345"
+            || token == "pensieve-local-token"
+            || token.starts_with("sk-ant-api")
     } else {
         false
     }

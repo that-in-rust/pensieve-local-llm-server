@@ -101,6 +101,14 @@ pub mod anthropic {
         Image { source: ImageSource },
     }
 
+    /// System prompt can be either a string or an array of content blocks
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(untagged)]
+    pub enum SystemPrompt {
+        String(String),
+        Blocks(Vec<Content>),
+    }
+
     /// Image source for content
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     pub struct ImageSource {
@@ -110,17 +118,26 @@ pub mod anthropic {
         pub data: String, // base64 encoded
     }
 
+    /// Message content can be either a string or an array of content blocks
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(untagged)]
+    pub enum MessageContent {
+        String(String),
+        Blocks(Vec<Content>),
+    }
+
     /// Anthropic message format
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct Message {
         pub role: Role,
-        pub content: Vec<Content>,
+        pub content: MessageContent,
     }
 
     /// Anthropic API request
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct CreateMessageRequest {
         pub model: String,
+        #[serde(default = "default_max_tokens")]
         pub max_tokens: u32,
         pub messages: Vec<Message>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -130,7 +147,11 @@ pub mod anthropic {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub stream: Option<bool>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub system: Option<String>,
+        pub system: Option<SystemPrompt>,
+    }
+
+    fn default_max_tokens() -> u32 {
+        4096
     }
 
     impl ApiMessage for CreateMessageRequest {
@@ -145,8 +166,14 @@ pub mod anthropic {
                 return Err(ApiError::Validation("Messages cannot be empty".to_string()));
             }
             for message in &self.messages {
-                if message.content.is_empty() {
-                    return Err(ApiError::Validation("Message content cannot be empty".to_string()));
+                match &message.content {
+                    MessageContent::String(s) if s.is_empty() => {
+                        return Err(ApiError::Validation("Message content cannot be empty".to_string()));
+                    }
+                    MessageContent::Blocks(blocks) if blocks.is_empty() => {
+                        return Err(ApiError::Validation("Message content cannot be empty".to_string()));
+                    }
+                    _ => {}
                 }
             }
             Ok(())
