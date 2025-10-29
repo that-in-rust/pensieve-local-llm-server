@@ -48,6 +48,7 @@ safetensors = "0.4"
 
 # Testing dependencies
 proptest = "1.0"
+tempfile = "3.0"
 
 [profile.dev]
 debug = true
