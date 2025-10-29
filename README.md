@@ -23,107 +23,100 @@ Pensieve provides a working HTTP API server with real MLX framework integration 
 - ⚠️ **Architecture**: Mixed implementation (Candle in Rust, MLX in Python bridge)
 - ⚠️ **API Server**: Basic HTTP server functionality (implementation details not verified)
 
-## 🚨 FOR CLAUDE CODE USERS (IMPORTANT - ULTRATHINK VERIFIED)
+## 🚀 CLAUDE CODE INTEGRATION (EASY SETUP!)
 
-**⚠️ AUTH CONFLICT FIX REQUIRED FOR CLAUDE CODE**
+**NEW: Simplified wrapper scripts for seamless Claude Code integration** ✨
 
-If you're using Claude Code with existing Anthropic credentials, you MUST resolve the authentication conflict first:
+No more environment variable juggling! Use our wrapper scripts to run Claude Code sessions with isolated configurations.
 
-```bash
-# 🔥 CRITICAL: Fix auth conflict for Claude Code
-unset ANTHROPIC_AUTH_TOKEN
-export ANTHROPIC_API_KEY="test-api-key-12345"
-export ANTHROPIC_BASE_URL="http://127.0.0.1:7777"
-
-# ✅ Verify no conflicts
-echo "API Key: $ANTHROPIC_API_KEY"
-echo "Base URL: $ANTHROPIC_BASE_URL"
-```
-
-**Why this works:**
-- Claude Code may have `ANTHROPIC_AUTH_TOKEN` set (from login)
-- Your local server needs `ANTHROPIC_API_KEY`
-- Having both causes "Auth conflict" errors
-- `unset` removes the conflict for current session only
-
-## 🧹 COMPLETE CLAUDE CODE SETUP (ULTRATHINK VERIFIED)
-
-**CRITICAL: Claude Code Process Environment Issue**
-
-Claude Code inherits environment variables at startup. If you started Claude Code BEFORE cleaning your environment, you **must completely restart** for changes to take effect.
-
-### **Step 1: Clean Environment Variables**
+### ✅ **One-Time Installation (30 seconds)**
 
 ```bash
-# Remove ALL conflicting Anthropic variables
-unset ANTHROPIC_AUTH_TOKEN
-unset ANTHROPIC_API_KEY
-unset ANTHROPIC_BASE_URL
-unset ANTHROPIC_DEFAULT_OPUS_MODEL
-unset ANTHROPIC_DEFAULT_SONNET_MODEL
+cd /path/to/pensieve-local-llm-server
 
-# Set ONLY local server configuration
-export ANTHROPIC_API_KEY="test-api-key-12345"
-export ANTHROPIC_BASE_URL="http://127.0.0.1:7777"
+# Install wrapper scripts to ~/.local/bin
+./scripts/install.sh
 ```
 
-### **Step 2: Update Shell Configuration (Permanent)**
+This installs:
+- `pensieve-server` - Server management (start/stop/status/restart/logs)
+- `claude-local` - Launch Claude Code with local Pensieve server
+- `claude-cloud` - Launch Claude Code with Anthropic cloud API
+
+### 🎯 **Daily Usage (Super Simple)**
 
 ```bash
-# Add to ~/.profile for future sessions
-echo '# Local Pensieve Server Configuration' >> ~/.profile
-echo 'export ANTHROPIC_API_KEY="test-api-key-12345"' >> ~/.profile
-echo 'export ANTHROPIC_BASE_URL="http://127.0.0.1:7777"' >> ~/.profile
+# Option 1: Automatic (recommended)
+claude-local                    # Auto-starts server if needed, launches Claude
+
+# Option 2: Manual control
+pensieve-server start           # Start server once
+claude-local                    # Use Claude with local server
+pensieve-server status          # Check server health
+pensieve-server stop            # Stop when done
 ```
 
-### **Step 3: Start Pensieve Server (Full Path)**
+### 🌟 **Key Features**
+
+✅ **Zero configuration** - No editing of shell profiles or settings.json
+✅ **Auto-start server** - `claude-local` starts Pensieve if not running
+✅ **Session isolation** - Run local + cloud Claude simultaneously
+✅ **No conflicts** - Each session has independent configuration
+✅ **Easy server management** - Start/stop/restart/status commands
+✅ **Works instantly** - No Claude Code restart required
+
+### 💡 **Advanced: Run Multiple Sessions**
+
+Open multiple terminals simultaneously:
 
 ```bash
-# Navigate to project directory
-cd /Users/amuldotexe/Projects/pensieve-local-llm-server
+# Terminal 1: Local server (fast, private)
+claude-local
 
-# Start server with full path to model file
-./target/debug/pensieve start --model /Users/amuldotexe/Projects/pensieve-local-llm-server/models/Phi-3-mini-128k-instruct-4bit/model.safetensors
+# Terminal 2: Cloud API (latest models)
+claude-cloud
 
-# Expected output:
-# Starting Pensieve server...
-# Using MLX handler with model: models/Phi-3-mini-128k-instruct-4bit
-# Server started successfully on 127.0.0.1:7777
-# Press Ctrl+C to stop the server
+# Terminal 3: Server management
+pensieve-server status
+pensieve-server logs           # Watch live requests
 ```
 
-### **Step 4: COMPLETELY Restart Claude Code**
+Both sessions run independently without conflicts!
+
+### 🔧 **Server Management Commands**
 
 ```bash
-# IMPORTANT: Exit Claude Code completely
-exit
-
-# Start fresh terminal session, then:
-claude
+pensieve-server start          # Start the Pensieve server
+pensieve-server stop           # Stop the server (handles "port in use" errors)
+pensieve-server restart        # Restart the server
+pensieve-server status         # Check if running + health check
+pensieve-server logs           # Tail server logs in real-time
 ```
 
-**Why Complete Restart is Required:**
-- ❌ Environment changes don't affect already-running Claude Code processes
-- ✅ New Claude Code session picks up clean environment variables
-- ✅ Process inheritance means old session keeps old variables
+### 🐛 **Troubleshooting**
 
-### **Step 5: Verify Local Server Usage**
-
+**"Address already in use" error?**
 ```bash
-# Test server directly
-curl -X POST http://127.0.0.1:7777/v1/messages \
-  -H "Authorization: Bearer test-api-key-12345" \
-  -d '{"model": "claude-3-sonnet-20240229", "max_tokens": 10, "messages": [{"role":"user","content":[{"type":"text","text":"Hello from local server!"}]}]}'
-
-# Watch server logs for incoming requests from Claude Code
+pensieve-server stop           # Automatically finds and kills process on port 7777
+pensieve-server start          # Start fresh
 ```
 
-### **Troubleshooting: If Still Using External API**
+**Server not responding?**
+```bash
+pensieve-server status         # Check health
+pensieve-server logs           # View error logs
+pensieve-server restart        # Force restart
+```
 
-1. **Check environment**: `env | grep ANTHROPIC`
-2. **Verify server running**: `curl http://127.0.0.1:7777/health`
-3. **Check Claude Code settings**: `cat ~/.claude/settings.json`
-4. **RESTART Claude Code completely** (most common fix)
+**Want to verify which endpoint you're using?**
+```bash
+# In Claude session, ask: "What is 2+2?"
+# - Local (Phi-3): Responds with Phi-3's style
+# - Cloud (Claude): Responds with Claude's style
+
+# Or check server logs:
+pensieve-server logs           # See incoming requests in real-time
+```
 
 ## 🚀 Quick Start (Verified)
 
