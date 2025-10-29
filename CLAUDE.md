@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Pensieve is a local LLM server for Apple Silicon that provides Anthropic API compatibility. It uses MLX framework for Metal GPU acceleration and serves as a drop-in replacement for Anthropic's Claude API when working with Claude Code.
+Pensieve is a local LLM server for Apple Silicon that provides Anthropic API compatibility. It uses MLX framework for Metal GPU acceleration and exposes an HTTP API compatible with the Anthropic Messages API format.
 
-**Key Feature**: Run Claude Code against your local Mac instead of Anthropic's cloud, enabling private, cost-free AI assistance.
+**Key Feature**: Run LLM inference locally on your Mac with Metal GPU acceleration for privacy and zero API costs.
 
 ## Build Commands
 
@@ -66,31 +66,13 @@ python3 python_bridge/mlx_inference.py \
   --max-tokens 30 \
   --stream
 
-# Test HTTP API
+# Test HTTP API (authentication optional for local development)
 curl -X POST http://127.0.0.1:7777/v1/messages \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer test-api-key-12345" \
   -d '{"model": "claude-3-sonnet-20240229", "max_tokens": 50, "messages": [{"role":"user","content":[{"type":"text","text":"Hello!"}]}]}'
-```
 
-## Claude Code Integration Scripts
-
-```bash
-# Setup (run once)
-./scripts/setup-pensieve
-
-# Use local Pensieve server
-claude-local
-
-# Use Anthropic cloud
-claude-cloud
-
-# Server management
-pensieve-server status    # Check if running + health
-pensieve-server start     # Start manually
-pensieve-server stop      # Stop server (fixes "port in use")
-pensieve-server restart   # Quick restart
-pensieve-server logs      # View live logs
+# Health check
+curl http://127.0.0.1:7777/health
 ```
 
 ## Architecture
@@ -149,9 +131,9 @@ Pensieve uses a **layered 8-crate architecture** with strict dependency hierarch
 - ✅ Phi-3 Mini 4-bit model support
 - ✅ HTTP API server with Anthropic compatibility
 - ✅ CLI interface for server management
-- ✅ Claude Code integration scripts
 - ✅ Metal GPU acceleration
 - ✅ Project builds successfully (warnings only)
+- ✅ Optional authentication for local development
 
 ### Known Limitations
 - ⚠️ Performance: 16.85 TPS (below 25+ TPS target)
@@ -185,8 +167,31 @@ models/Phi-3-mini-128k-instruct-4bit/
 Pensieve implements the **Anthropic Messages API v1**:
 - Endpoint: `POST /v1/messages`
 - Streaming: Server-Sent Events (SSE) when `stream: true`
-- Authentication: Bearer token (currently accepts any token)
+- Authentication: Optional for local development (accepts requests with or without Bearer tokens)
 - Health: `GET /health`
+
+### Example Usage
+
+```bash
+# Basic request (no auth required for local dev)
+curl -X POST http://127.0.0.1:7777/v1/messages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-3-sonnet-20240229",
+    "max_tokens": 100,
+    "messages": [{"role":"user","content":[{"type":"text","text":"Hello!"}]}]
+  }'
+
+# With authentication (optional)
+curl -X POST http://127.0.0.1:7777/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer test-api-key-12345" \
+  -d '{
+    "model": "claude-3-sonnet-20240229",
+    "max_tokens": 100,
+    "messages": [{"role":"user","content":[{"type":"text","text":"Hello!"}]}]
+  }'
+```
 
 See `docs/API.md` for complete API documentation.
 
@@ -226,8 +231,8 @@ pkill -f pensieve
 
 ## Project Goals
 
-1. Provide privacy-first local LLM server for Claude Code users
-2. Maintain full Anthropic API compatibility
-3. Optimize for Apple Silicon (M1/M2/M3)
-4. Enable seamless switching between local and cloud Claude
+1. Provide privacy-first local LLM inference on Apple Silicon
+2. Maintain full Anthropic API compatibility for easy integration
+3. Optimize for Apple Silicon (M1/M2/M3) with Metal GPU acceleration
+4. Enable local AI development without cloud dependencies
 5. Achieve 25+ TPS performance with MLX optimization
