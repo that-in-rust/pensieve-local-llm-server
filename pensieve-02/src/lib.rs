@@ -15,8 +15,9 @@ use std::pin::Pin;
 use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 use warp::Filter;
-use futures::{Stream, StreamExt};
+use futures::Stream;
 use uuid::Uuid;
+use serde_json;
 
 /// Type alias for streaming responses
 pub type StreamingResponse = Pin<Box<dyn Stream<Item = String> + Send>>;
@@ -120,6 +121,194 @@ pub struct MockRequestHandler {
 impl MockRequestHandler {
     pub fn new(response_delay_ms: u64) -> Self {
         Self { response_delay_ms }
+    }
+}
+
+/// MLX request handler that calls Python MLX bridge
+#[derive(Debug, Clone)]
+pub struct MlxRequestHandler {
+    model_path: String,
+}
+
+impl MlxRequestHandler {
+    pub fn new(model_path: String) -> Self {
+        Self { model_path }
+    }
+
+    /// Extract the conversation text from messages
+    fn extract_prompt(&self, messages: &[pensieve_03::anthropic::Message]) -> String {
+        let mut prompt_parts = Vec::new();
+
+        for message in messages {
+            match message.role {
+                pensieve_03::anthropic::Role::User => {
+                    for content in &message.content {
+                        if let pensieve_03::anthropic::Content::Text { text } = content {
+                            prompt_parts.push(format!("User: {}", text));
+                        }
+                    }
+                }
+                pensieve_03::anthropic::Role::Assistant => {
+                    for content in &message.content {
+                        if let pensieve_03::anthropic::Content::Text { text } = content {
+                            prompt_parts.push(format!("Assistant: {}", text));
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // Add a final assistant prompt
+        prompt_parts.push("Assistant:".to_string());
+        prompt_parts.join("\n")
+    }
+
+    /// Call Python MLX bridge
+    async fn call_mlx_bridge(&self, prompt: &str, max_tokens: u32, temperature: f32, stream: bool) -> error::ServerResult<String> {
+        use tokio::process::Command;
+
+        let mut cmd = Command::new("python3");
+        cmd.arg("python_bridge/mlx_inference.py")
+            .arg("--model-path")
+            .arg(&self.model_path)
+            .arg("--prompt")
+            .arg(prompt)
+            .arg("--max-tokens")
+            .arg(max_tokens.to_string())
+            .arg("--temperature")
+            .arg(temperature.to_string());
+
+        if stream {
+            cmd.arg("--stream");
+        }
+
+        let output = cmd.output()
+            .await
+            .map_err(|e| error::ServerError::Internal(format!("Failed to execute MLX bridge: {}", e)))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(error::ServerError::Internal(format!("MLX bridge error: {}", stderr)));
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        Ok(stdout.to_string())
+    }
+
+    /// Parse JSON response from Python bridge
+    fn parse_mlx_response(&self, response: &str) -> error::ServerResult<String> {
+        use serde_json::Value;
+
+        // Parse each line of JSON output
+        for line in response.lines() {
+            if line.trim().is_empty() {
+                continue;
+            }
+
+            match serde_json::from_str::<Value>(line) {
+                Ok(json) => {
+                    if let Some(text) = json.get("text").and_then(|v| v.as_str()) {
+                        return Ok(text.to_string());
+                    } else if let Some(error) = json.get("error").and_then(|v| v.as_str()) {
+                        return Err(error::ServerError::Internal(format!("MLX inference error: {}", error)));
+                    }
+                }
+                Err(e) => {
+                    // Log parsing error but continue trying other lines
+                    warn!("Failed to parse MLX response line: {} - {}", line, e);
+                }
+            }
+        }
+
+        Err(error::ServerError::Internal("No valid response from MLX bridge".to_string()))
+    }
+}
+
+#[async_trait::async_trait]
+impl traits::RequestHandler for MlxRequestHandler {
+    async fn handle_message(&self, request: CreateMessageRequest) -> error::ServerResult<CreateMessageResponse> {
+        // Validate request
+        request.validate()?;
+
+        // Extract prompt from messages
+        let prompt = self.extract_prompt(&request.messages);
+
+        // Get generation parameters
+        let max_tokens = request.max_tokens;
+        let temperature = request.temperature.unwrap_or(0.7);
+
+        // Call MLX bridge
+        let response = self.call_mlx_bridge(&prompt, max_tokens, temperature, false).await?;
+        let generated_text = self.parse_mlx_response(&response)?;
+
+        // Calculate token counts before moving generated_text
+        let input_tokens = prompt.split_whitespace().count() as u32;
+        let output_tokens = generated_text.split_whitespace().count() as u32;
+
+        // Create response
+        Ok(CreateMessageResponse {
+            id: Uuid::new_v4().to_string(),
+            r#type: "message".to_string(),
+            role: Role::Assistant,
+            content: vec![Content::Text {
+                text: generated_text,
+            }],
+            model: request.model.clone(),
+            stop_reason: Some("end_turn".to_string()),
+            stop_sequence: None,
+            usage: Usage {
+                input_tokens,
+                output_tokens,
+            },
+        })
+    }
+
+    async fn handle_stream(&self, request: CreateMessageRequest) -> error::ServerResult<StreamingResponse> {
+        // Validate request
+        request.validate()?;
+
+        // Extract prompt from messages
+        let prompt = self.extract_prompt(&request.messages);
+
+        // Get generation parameters
+        let max_tokens = request.max_tokens;
+        let temperature = request.temperature.unwrap_or(0.7);
+
+        // Call MLX bridge for streaming
+        let response = self.call_mlx_bridge(&prompt, max_tokens, temperature, true).await?;
+
+        // Parse streaming JSON responses
+        let mut stream_events = Vec::new();
+
+        // Add message start event
+        stream_events.push("data: {\"type\": \"message_start\"}\n\n".to_string());
+
+        // Process each line of streaming response
+        for line in response.lines() {
+            if line.trim().is_empty() {
+                continue;
+            }
+
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
+                if let Some(text) = json.get("text").and_then(|v| v.as_str()) {
+                    let event = format!(
+                        "data: {{\"type\": \"content_block_delta\", \"delta\": {{\"text\": \"{}\"}}}}\n\n",
+                        text.escape_default()
+                    );
+                    stream_events.push(event);
+                } else if let Some(_error) = json.get("error") {
+                    return Err(error::ServerError::Internal("MLX streaming error".to_string()));
+                }
+            }
+        }
+
+        // Add message stop event
+        stream_events.push("data: {\"type\": \"message_stop\"}\n\n".to_string());
+
+        // Create streaming response
+        let stream = futures::stream::iter(stream_events);
+        Ok(Box::pin(stream))
     }
 }
 

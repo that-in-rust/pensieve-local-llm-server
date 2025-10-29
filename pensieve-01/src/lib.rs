@@ -9,11 +9,11 @@
 //! Depends on all L1 and L2 crates, plus pensieve-02 for server management.
 
 use pensieve_07_core::CoreError;
-use pensieve_02::{HttpApiServer, ServerConfig, traits::ApiServer, MockRequestHandler};
+use pensieve_02::{HttpApiServer, ServerConfig, traits::ApiServer, MockRequestHandler, MlxRequestHandler};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tokio::signal;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 /// CLI-specific error types
 pub mod error {
@@ -317,7 +317,19 @@ impl PensieveCli {
     /// Create server instance
     fn create_server(&self) -> error::CliResult<HttpApiServer> {
         let server_config = ServerConfig::from(self.config.clone());
-        let handler = std::sync::Arc::new(MockRequestHandler::new(100)); // Mock handler for now
+
+        // Use MLX handler if model is specified, otherwise use mock handler
+        let model_path = "models/Phi-3-mini-128k-instruct-4bit".to_string();
+
+        let handler: std::sync::Arc<dyn pensieve_02::traits::RequestHandler> =
+            if std::path::Path::new(&model_path).exists() {
+                info!("Using MLX handler with model: {}", model_path);
+                std::sync::Arc::new(MlxRequestHandler::new(model_path))
+            } else {
+                warn!("Model not found at {}, using mock handler", model_path);
+                std::sync::Arc::new(MockRequestHandler::new(100))
+            };
+
         Ok(HttpApiServer::new(server_config, handler))
     }
 }
