@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Pensieve MLX Inference Bridge
+Pensieve MLX Inference Bridge - REAL Implementation
 Provides MLX-powered text generation for the Pensieve Local LLM Server
 """
 
@@ -11,48 +11,41 @@ import argparse
 from pathlib import Path
 from typing import Iterator, Dict, Any, Optional
 
-# MLX imports
+# REAL MLX imports
 import mlx.core as mx
-from transformers import AutoTokenizer
+from mlx_lm import load, stream_generate, generate as mlx_generate
 
 # Model cache to avoid reloading
 _model_cache = {}
 
 def load_model(model_path: str):
-    """Load MLX model and tokenizer with caching"""
+    """Load REAL MLX model and tokenizer with caching"""
     global _model_cache
 
     if model_path in _model_cache:
         return _model_cache[model_path]
 
-    print(f"Loading model from: {model_path}", file=sys.stderr)
+    print(f"Loading REAL MLX model from: {model_path}", file=sys.stderr)
 
-    # Load tokenizer
     try:
-        tokenizer = AutoTokenizer.from_pretrained(model_path)
-        print("Tokenizer loaded successfully", file=sys.stderr)
+        # Use REAL MLX-LM loading (this handles Phi-3 automatically)
+        model, tokenizer = load(model_path)
+
+        print("REAL MLX model loaded successfully", file=sys.stderr)
+        print(f"Model device: {mx.default_device()}", file=sys.stderr)
+
+        _model_cache[model_path] = {
+            'model': model,
+            'tokenizer': tokenizer,
+            'mlx_path': model_path
+        }
+
+        return _model_cache[model_path]
+
     except Exception as e:
-        raise RuntimeError(f"Failed to load tokenizer: {e}")
+        raise RuntimeError(f"Failed to load REAL MLX model: {e}")
 
-    # Load MLX model weights
-    try:
-        model_weights = mx.load(str(Path(model_path) / "model.safetensors"))
-        print("Model weights loaded successfully", file=sys.stderr)
-    except Exception as e:
-        raise RuntimeError(f"Failed to load model weights: {e}")
-
-    # For now, we'll implement a simple text generation approach
-    # In a full implementation, we'd need the actual Phi-3 model architecture
-    # This is a simplified version for testing the bridge
-
-    _model_cache[model_path] = {
-        'tokenizer': tokenizer,
-        'weights': model_weights
-    }
-
-    return _model_cache[model_path]
-
-def simple_generate(
+def real_mlx_generate(
     model_data: Dict[str, Any],
     prompt: str,
     max_tokens: int = 100,
@@ -60,38 +53,37 @@ def simple_generate(
     stream: bool = False
 ) -> Iterator[str]:
     """
-    Simple text generation for testing the bridge
-    TODO: Replace with actual MLX Phi-3 model inference
+    REAL MLX generation using MLX-LM stream_generate
     """
+    model = model_data['model']
     tokenizer = model_data['tokenizer']
 
-    # For now, return a mock response to test the bridge
-    # This will be replaced with actual MLX inference
-    mock_response = f"This is a mock MLX response to: '{prompt[:50]}'. "
-    mock_response += f"Temperature: {temperature}, Max tokens: {max_tokens}. "
-    mock_response += "This will be replaced with real MLX inference soon."
+    # Skip chat template for now - it's returning token IDs instead of text
+    # TODO: Fix chat template handling later for better Phi-3 compatibility
+    # The basic prompt should work for initial testing
+
+    print(f"Starting REAL MLX generation with prompt length: {len(prompt.split())}", file=sys.stderr)
 
     if stream:
-        # Stream character by character
-        for char in mock_response:
-            yield char
-            time.sleep(0.01)  # Simulate generation delay
+        # Use REAL MLX-LM streaming
+        for response in stream_generate(
+            model,
+            tokenizer,
+            prompt,
+            max_tokens=max_tokens
+        ):
+            yield response.text
     else:
-        yield mock_response
-
-def real_generate(
-    model_data: Dict[str, Any],
-    prompt: str,
-    max_tokens: int = 100,
-    temperature: float = 0.7,
-    stream: bool = False
-) -> Iterator[str]:
-    """
-    Real MLX generation (to be implemented)
-    """
-    # TODO: Implement actual MLX Phi-3 inference
-    # This requires the model architecture implementation
-    for response in simple_generate(model_data, prompt, max_tokens, temperature, stream):
+        # Use REAL MLX-LM non-streaming
+        response = mlx_generate(
+            model,
+            tokenizer,
+            prompt,
+            max_tokens=max_tokens
+        )
+        # MLX-LM returns a string, not a list
+        if isinstance(response, list):
+            response = " ".join(response) if response else ""
         yield response
 
 def generate_text(
@@ -102,49 +94,71 @@ def generate_text(
     stream: bool = False
 ) -> Iterator[Dict[str, Any]]:
     """
-    Main generation function that yields JSON-formatted responses
+    Main generation function using REAL MLX inference
     """
     try:
-        # Load model
+        # Load model using REAL MLX
         model_data = load_model(model_path)
 
-        # Generate text
+        # Generate text using REAL MLX-LM
         if stream:
-            # Streaming generation
             accumulated_text = ""
-            for text_chunk in real_generate(
+            start_time = time.time()
+
+            for text_chunk in real_mlx_generate(
                 model_data, prompt, max_tokens, temperature, stream=True
             ):
                 accumulated_text += text_chunk
+
+                # Calculate performance metrics
+                elapsed = time.time() - start_time
+                # Handle both string and list responses from MLX-LM
+                token_count = len(accumulated_text.split()) if isinstance(accumulated_text, str) else len(accumulated_text)
+                tps = token_count / elapsed if elapsed > 0 else 0
+
                 yield {
                     "type": "text_chunk",
                     "text": text_chunk,
-                    "accumulated": accumulated_text
+                    "accumulated": accumulated_text,
+                    "tokens_per_second": round(tps, 2),
+                    "elapsed_ms": round(elapsed * 1000, 2)
                 }
         else:
-            # Non-streaming generation
+            # Non-streaming
+            start_time = time.time()
             full_response = ""
-            for text_chunk in real_generate(
+            for text_chunk in real_mlx_generate(
                 model_data, prompt, max_tokens, temperature, stream=False
             ):
                 full_response += text_chunk
 
+            elapsed = time.time() - start_time
+            # Handle both string and list responses from MLX-LM
+            token_count = len(full_response.split()) if isinstance(full_response, str) else len(full_response)
+            tps = token_count / elapsed if elapsed > 0 else 0
+
             yield {
                 "type": "complete",
                 "text": full_response,
-                "prompt_tokens": len(prompt.split()),  # Rough estimate
-                "completion_tokens": len(full_response.split())
+                "prompt_tokens": len(prompt.split()),
+                "completion_tokens": len(full_response.split()),
+                "total_tokens": len(prompt.split()) + len(full_response.split()),
+                "tokens_per_second": round(tps, 2),
+                "elapsed_ms": round(elapsed * 1000, 2),
+                "peak_memory_mb": mx.get_peak_memory() / 1e6 if hasattr(mx, 'get_peak_memory') else 0
             }
 
     except Exception as e:
+        import traceback
+        error_details = f"MLX inference error: {str(e)}\nTraceback: {traceback.format_exc()}"
         yield {
             "type": "error",
-            "error": str(e)
+            "error": error_details
         }
 
 def main():
     """Main CLI interface"""
-    parser = argparse.ArgumentParser(description="Pensieve MLX Inference Bridge")
+    parser = argparse.ArgumentParser(description="Pensieve MLX Inference Bridge - REAL")
     parser.add_argument("--model-path", required=True, help="Path to MLX model directory")
     parser.add_argument("--prompt", required=True, help="Input prompt for generation")
     parser.add_argument("--max-tokens", type=int, default=100, help="Maximum tokens to generate")
