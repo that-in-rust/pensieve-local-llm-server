@@ -5,7 +5,14 @@
 # Example: claude-local --continue
 # Example: claude-local "write me a hello world function"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve symlink to get actual script location
+if [ -L "${BASH_SOURCE[0]}" ]; then
+    SCRIPT_LINK=$(readlink "${BASH_SOURCE[0]}")
+    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_LINK")" && pwd)"
+else
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
+
 LOCAL_SETTINGS="$SCRIPT_DIR/settings-local.json"
 SERVER_SCRIPT="$SCRIPT_DIR/pensieve-server"
 

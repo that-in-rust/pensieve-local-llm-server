@@ -5,7 +5,14 @@
 # Example: claude-cloud --continue
 # Example: claude-cloud "analyze this complex architecture"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve symlink to get actual script location
+if [ -L "${BASH_SOURCE[0]}" ]; then
+    SCRIPT_LINK=$(readlink "${BASH_SOURCE[0]}")
+    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_LINK")" && pwd)"
+else
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
+
 CLOUD_SETTINGS="$SCRIPT_DIR/settings-cloud.json"
 
 echo "☁️  Launching Claude Code with CLOUD API (api.anthropic.com)"
