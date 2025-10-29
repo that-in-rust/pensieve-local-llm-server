@@ -2,15 +2,25 @@
 
 ## Executive Summary
 
-### Architecture Vision
-The Pensieve Local LLM Server is a high-performance, Apple M1/M2/M3-optimized local server that provides Anthropic-compatible API endpoints for seamless Claude Code integration. Built exclusively with the MLX framework and Apple Silicon acceleration, it delivers cloud-like performance with local privacy and reliability.
+### Current Status: Foundation Complete, MLX Integration In Progress
+The Pensieve Local LLM Server currently provides a **working HTTP API server foundation** with Anthropic-compatible endpoints and authentication. The system has a **complete modular architecture** (8 crates) and is **ready for MLX integration**. Currently using mock responses for testing while the MLX framework integration is being implemented.
 
-### Design Principles
-1. **MLX-First Architecture**: Exclusive focus on MLX framework with Metal backend for optimal M1/M2/M3 performance
+### Target Architecture Vision (To Be Implemented)
+The target architecture is a high-performance, Apple M1/M2/M3-optimized local server that provides Anthropic-compatible API endpoints for seamless Claude Code integration. It will be built with the MLX framework and Apple Silicon acceleration to deliver cloud-like performance with local privacy and reliability.
+
+### Current Design Principles (Implemented)
+1. **Modular Architecture**: 8-crate design with clean separation of concerns
 2. **Anthropic Compatibility**: Native API compatibility for drop-in Claude Code integration
-3. **Memory Efficiency**: Quantized models and intelligent caching for 16GB+ Apple systems
+3. **Robust Foundation**: HTTP server with authentication, streaming, and error handling
+4. **Extensible Design**: Clean interfaces ready for MLX integration
+5. **Mock-Based Testing**: Realistic responses for development and validation
+
+### Target Design Principles (To Be Implemented)
+1. **MLX-First Architecture**: Exclusive focus on MLX framework with Metal backend for optimal M1/M2/M3 performance
+2. **Memory Efficiency**: Quantized models and intelligent caching for 16GB+ Apple systems
+3. **Performance Optimized**: Target 25-40 TPS with MLX acceleration
 4. **Production Ready**: Single binary deployment with comprehensive error handling
-5. **Extensible Foundation**: Modular crate architecture for future enhancements
+5. **Automatic Model Management**: Built-in Hugging Face integration and setup
 
 ### Key Technical Decisions & Trade-offs
 

@@ -1,16 +1,20 @@
 # Arch02PensieveV1: Executable Architecture Specification
 
 **Project**: Pensieve Local LLM Server
-**Framework**: MLX + Apple Metal Optimization  
+**Current Framework**: HTTP Server + Mock Responses
+**Target Framework**: MLX + Apple Metal Optimization
 **Target**: Apple M1/M2/M3 16GB+ Systems
-**Performance**: 25-40 TPS (MLX-Optimized Targets)
+**Performance Target**: 25-40 TPS (Aspirational - To Be Measured)
 **Date**: October 28, 2025
-**Note**: Performance targets based on MLX framework advantages - definitively superior to alternative frameworks on Apple Silicon
+**Note**: Foundation complete with HTTP server, authentication, and streaming. MLX integration and performance targets are aspirational and need implementation and benchmarking.
 
 ## Executive Summary
 
-### Architecture Vision
-The Pensieve Local LLM Server is a **production-ready, high-performance modular system** designed exclusively for Apple Silicon, delivering cloud-like LLM inference experiences with local privacy and cost efficiency. Built with **idiomatic Rust patterns** and **executable specifications**, the system achieves **25-40 TPS performance** on Apple M1/M2/M3 hardware using MLX framework while maintaining strict memory constraints for 16GB+ systems.
+### Current Architecture Status
+The Pensieve Local LLM Server currently provides a **complete modular foundation** with HTTP API server, authentication, and streaming capabilities. Built with **idiomatic Rust patterns** and **clean separation of concerns**, the system has a **working 8-crate architecture** that is ready for MLX integration. Currently using mock responses for development and testing while the MLX framework integration is planned.
+
+### Target Architecture Vision (To Be Implemented)
+The target architecture is a **high-performance modular system** designed exclusively for Apple Silicon, delivering cloud-like LLM inference experiences with local privacy and cost efficiency. The goal is to achieve **25-40 TPS performance** on Apple M1/M2/M3 hardware using MLX framework while maintaining strict memory constraints for 16GB+ systems.
 
 ### Core Architectural Principles
 
