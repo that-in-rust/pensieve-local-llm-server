@@ -11,5 +11,12 @@
 /// Authentication handling
 pub mod auth;
 
+/// Request/Response translation
+pub mod translator;
+
 /// Re-export commonly used types
 pub use auth::{AuthError, AuthResult, validate_auth};
+pub use translator::{
+    MlxRequest, TranslationError, TranslationResult,
+    translate_anthropic_to_mlx, translate_mlx_to_anthropic,
+};
