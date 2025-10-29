@@ -23,100 +23,117 @@ Pensieve provides a working HTTP API server with real MLX framework integration 
 - ⚠️ **Architecture**: Mixed implementation (Candle in Rust, MLX in Python bridge)
 - ⚠️ **API Server**: Basic HTTP server functionality (implementation details not verified)
 
-## 🚀 CLAUDE CODE INTEGRATION (EASY SETUP!)
+## 🚀 CLAUDE CODE INTEGRATION - DEAD SIMPLE!
 
-**NEW: Simplified wrapper scripts for seamless Claude Code integration** ✨
+**NEW: One-command setup, zero hassle!** ✨
 
-No more environment variable juggling! Use our wrapper scripts to run Claude Code sessions with isolated configurations.
+### ⚡ 30-Second Setup
 
-### ✅ **One-Time Installation (30 seconds)**
+#### 1. Login to Claude Code (One Time Only)
+
+```bash
+claude
+# Select login method → Complete authentication → Type "exit"
+```
+
+#### 2. Run Setup Script
 
 ```bash
 cd /path/to/pensieve-local-llm-server
-
-# Install wrapper scripts to ~/.local/bin
-./scripts/install.sh
+./scripts/setup-pensieve
 ```
 
-This installs:
-- `pensieve-server` - Server management (start/stop/status/restart/logs)
-- `claude-local` - Launch Claude Code with local Pensieve server
-- `claude-cloud` - Launch Claude Code with Anthropic cloud API
-
-### 🎯 **Daily Usage (Super Simple)**
+#### 3. Done! Start Using:
 
 ```bash
-# Option 1: Automatic (recommended)
-claude-local                    # Auto-starts server if needed, launches Claude
-
-# Option 2: Manual control
-pensieve-server start           # Start server once
-claude-local                    # Use Claude with local server
-pensieve-server status          # Check server health
-pensieve-server stop            # Stop when done
+claude-local     # Chat with local Pensieve (private, free, your Mac)
+claude-cloud     # Chat with Anthropic cloud (latest models)
 ```
 
-### 🌟 **Key Features**
+That's it! Both commands work immediately, no configuration needed.
 
-✅ **Zero configuration** - No editing of shell profiles or settings.json
-✅ **Auto-start server** - `claude-local` starts Pensieve if not running
-✅ **Session isolation** - Run local + cloud Claude simultaneously
-✅ **No conflicts** - Each session has independent configuration
-✅ **Easy server management** - Start/stop/restart/status commands
-✅ **Works instantly** - No Claude Code restart required
+---
 
-### 💡 **Advanced: Run Multiple Sessions**
+### 🎯 Daily Usage
 
-Open multiple terminals simultaneously:
+After setup, it's this simple:
 
 ```bash
-# Terminal 1: Local server (fast, private)
+# Use local server (private, runs on your Mac)
 claude-local
 
-# Terminal 2: Cloud API (latest models)
+# Use cloud API (latest Claude models)
 claude-cloud
-
-# Terminal 3: Server management
-pensieve-server status
-pensieve-server logs           # Watch live requests
 ```
 
-Both sessions run independently without conflicts!
+**Each command:**
+- ✅ Auto-starts server if needed (local only)
+- ✅ Switches configuration automatically
+- ✅ Remembers your choice for next time
+- ✅ Works from any directory
+- ✅ Zero manual configuration
 
-### 🔧 **Server Management Commands**
+---
+
+### 🔧 Server Management
 
 ```bash
-pensieve-server start          # Start the Pensieve server
-pensieve-server stop           # Stop the server (handles "port in use" errors)
-pensieve-server restart        # Restart the server
-pensieve-server status         # Check if running + health check
-pensieve-server logs           # Tail server logs in real-time
+pensieve-server status         # Check if running + health
+pensieve-server start          # Start manually
+pensieve-server stop           # Stop server (fixes "port in use")
+pensieve-server restart        # Quick restart
+pensieve-server logs           # View live logs
 ```
 
-### 🐛 **Troubleshooting**
+---
 
-**"Address already in use" error?**
+### 💡 How It Works
+
+**`claude-local`:**
+1. Checks authentication
+2. Starts server if not running
+3. Updates `~/.claude/settings.json` to `127.0.0.1:7777`
+4. Launches Claude
+5. Done!
+
+**`claude-cloud`:**
+1. Checks authentication
+2. Restores cloud configuration
+3. Launches Claude
+4. Done!
+
+---
+
+### 🐛 Quick Troubleshooting
+
+**"Claude Code not logged in"**
 ```bash
-pensieve-server stop           # Automatically finds and kills process on port 7777
-pensieve-server start          # Start fresh
+claude          # Login once
+exit
+claude-local    # Try again
 ```
 
-**Server not responding?**
+**"Address already in use"**
 ```bash
-pensieve-server status         # Check health
-pensieve-server logs           # View error logs
-pensieve-server restart        # Force restart
+pensieve-server stop
+claude-local
 ```
 
-**Want to verify which endpoint you're using?**
+**Reset to defaults**
 ```bash
-# In Claude session, ask: "What is 2+2?"
-# - Local (Phi-3): Responds with Phi-3's style
-# - Cloud (Claude): Responds with Claude's style
-
-# Or check server logs:
-pensieve-server logs           # See incoming requests in real-time
+ls ~/.claude/settings.json.backup-*
+cp ~/.claude/settings.json.backup-<timestamp> ~/.claude/settings.json
 ```
+
+---
+
+### 📚 More Details
+
+See [scripts/README.md](scripts/README.md) for:
+- Detailed setup instructions
+- Advanced usage
+- Complete troubleshooting guide
+- How the scripts work internally
 
 ## 🚀 Quick Start (Verified)
 
