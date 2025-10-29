@@ -1,6 +1,0 @@
-{
-  "env": {
-    "_comment": "Cloud API - uses default Anthropic credentials from login"
-  },
-  "alwaysThinkingEnabled": true
-}

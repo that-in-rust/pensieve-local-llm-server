@@ -408,7 +408,7 @@ impl HttpApiServer {
         let messages = warp::path("v1")
             .and(warp::path("messages"))
             .and(warp::post())
-            .and(warp::header::<String>("authorization"))
+            .and(warp::header::optional::<String>("authorization"))
             .and(warp::body::json())
             .and(warp::header::optional::<String>("x-stream"))
             .and(self.with_handler())
@@ -493,24 +493,28 @@ fn validate_api_key(auth_header: &str) -> bool {
 
 /// HTTP request handler
 async fn handle_create_message(
-    auth_header: String,
+    auth_header: Option<String>,
     request: CreateMessageRequest,
     stream_header: Option<String>,
     handler: Arc<dyn traits::RequestHandler>,
 ) -> std::result::Result<Box<dyn warp::Reply + Send>, warp::Rejection> {
-    // Validate authentication
-    if !validate_api_key(&auth_header) {
-        error!("Invalid or missing authentication");
-        return Ok(Box::new(warp::reply::with_status(
-            warp::reply::json(&serde_json::json!({
-                "error": {
-                    "type": "authentication_error",
-                    "message": "Invalid API key"
-                }
-            })),
-            warp::http::StatusCode::UNAUTHORIZED,
-        )) as Box<dyn warp::Reply + Send>);
+    // Validate authentication if provided
+    // For local development, allow requests without auth header
+    if let Some(auth) = auth_header {
+        if !validate_api_key(&auth) {
+            error!("Invalid authentication");
+            return Ok(Box::new(warp::reply::with_status(
+                warp::reply::json(&serde_json::json!({
+                    "error": {
+                        "type": "authentication_error",
+                        "message": "Invalid API key"
+                    }
+                })),
+                warp::http::StatusCode::UNAUTHORIZED,
+            )) as Box<dyn warp::Reply + Send>);
+        }
     }
+    // If no auth header provided, allow (for local development)
 
     // Validate request
     if let Err(e) = request.validate() {

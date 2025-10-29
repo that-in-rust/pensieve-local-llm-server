@@ -23,118 +23,6 @@ Pensieve provides a working HTTP API server with real MLX framework integration 
 - ⚠️ **Architecture**: Mixed implementation (Candle in Rust, MLX in Python bridge)
 - ⚠️ **API Server**: Basic HTTP server functionality (implementation details not verified)
 
-## 🚀 CLAUDE CODE INTEGRATION - DEAD SIMPLE!
-
-**NEW: One-command setup, zero hassle!** ✨
-
-### ⚡ 30-Second Setup
-
-#### 1. Login to Claude Code (One Time Only)
-
-```bash
-claude
-# Select login method → Complete authentication → Type "exit"
-```
-
-#### 2. Run Setup Script
-
-```bash
-cd /path/to/pensieve-local-llm-server
-./scripts/setup-pensieve
-```
-
-#### 3. Done! Start Using:
-
-```bash
-claude-local     # Chat with local Pensieve (private, free, your Mac)
-claude-cloud     # Chat with Anthropic cloud (latest models)
-```
-
-That's it! Both commands work immediately, no configuration needed.
-
----
-
-### 🎯 Daily Usage
-
-After setup, it's this simple:
-
-```bash
-# Use local server (private, runs on your Mac)
-claude-local
-
-# Use cloud API (latest Claude models)
-claude-cloud
-```
-
-**Each command:**
-- ✅ Auto-starts server if needed (local only)
-- ✅ Switches configuration automatically
-- ✅ Remembers your choice for next time
-- ✅ Works from any directory
-- ✅ Zero manual configuration
-
----
-
-### 🔧 Server Management
-
-```bash
-pensieve-server status         # Check if running + health
-pensieve-server start          # Start manually
-pensieve-server stop           # Stop server (fixes "port in use")
-pensieve-server restart        # Quick restart
-pensieve-server logs           # View live logs
-```
-
----
-
-### 💡 How It Works
-
-**`claude-local`:**
-1. Checks authentication
-2. Starts server if not running
-3. Updates `~/.claude/settings.json` to `127.0.0.1:7777`
-4. Launches Claude
-5. Done!
-
-**`claude-cloud`:**
-1. Checks authentication
-2. Restores cloud configuration
-3. Launches Claude
-4. Done!
-
----
-
-### 🐛 Quick Troubleshooting
-
-**"Claude Code not logged in"**
-```bash
-claude          # Login once
-exit
-claude-local    # Try again
-```
-
-**"Address already in use"**
-```bash
-pensieve-server stop
-claude-local
-```
-
-**Reset to defaults**
-```bash
-ls ~/.claude/settings.json.backup-*
-cp ~/.claude/settings.json.backup-<timestamp> ~/.claude/settings.json
-```
-
----
-
-### 📚 More Details
-
-See [scripts/README.md](scripts/README.md) for:
-- Detailed setup instructions
-- Advanced usage
-- Complete troubleshooting guide
-- How the scripts work internally
-
 ## 🚀 Quick Start (Verified)
 
 ### Prerequisites
@@ -420,35 +308,23 @@ models/Phi-3-mini-128k-instruct-4bit/
 - **Configuration Management**: Enhanced settings and tuning
 - **Production Deployment**: Docker, monitoring, metrics collection
 
-## 🔧 Environment Setup for External Applications
+## 🔧 API Usage
 
-### Claude Code Integration (Terminal Session Override)
+The Pensieve server provides an Anthropic-compatible API endpoint at `http://127.0.0.1:7777/v1/messages`.
 
-To use your local Pensieve server with applications that expect Anthropic/OpenAI APIs:
+### Testing the API
 
 ```bash
-# For Anthropic-compatible applications
-export ANTHROPIC_API_KEY="test-api-key-12345"
-export ANTHROPIC_BASE_URL="http://127.0.0.1:7777"
+# Test with curl
+curl -X POST http://127.0.0.1:7777/v1/messages \
+  -H "Content-Type: application/json" \
+  -d '{"model":"claude-3-sonnet-20240229","max_tokens":50,"messages":[{"role":"user","content":[{"type":"text","text":"Hello!"}]}]}'
 
-# For OpenAI-compatible applications
-export OPENAI_API_KEY="test-api-key-12345"
-export OPENAI_API_BASE="http://127.0.0.1:7777/v1"
-
-# Generic API override (universal)
-export API_KEY="test-api-key-12345"
-export API_BASE="http://127.0.0.1:7777"
-
-# Verify environment variables are set
-echo $ANTHROPIC_BASE_URL
-echo $ANTHROPIC_API_KEY
+# Health check
+curl http://127.0.0.1:7777/health
 ```
 
-**Usage Notes:**
-- Server must be running first (see Step 4 above)
-- These exports work for the current terminal session only
-- Add to `~/.zshrc` or `~/.bashrc` for persistence
-- Compatible with any OpenAI/Anthropic-compatible client
+**Note:** Authentication is optional for local development. The server accepts requests with or without Bearer tokens.
 
 ## 🤝 Contributing
 
