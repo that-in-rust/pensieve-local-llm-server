@@ -23,6 +23,108 @@ Pensieve provides a working HTTP API server with real MLX framework integration 
 - ⚠️ **Architecture**: Mixed implementation (Candle in Rust, MLX in Python bridge)
 - ⚠️ **API Server**: Basic HTTP server functionality (implementation details not verified)
 
+## 🚨 FOR CLAUDE CODE USERS (IMPORTANT - ULTRATHINK VERIFIED)
+
+**⚠️ AUTH CONFLICT FIX REQUIRED FOR CLAUDE CODE**
+
+If you're using Claude Code with existing Anthropic credentials, you MUST resolve the authentication conflict first:
+
+```bash
+# 🔥 CRITICAL: Fix auth conflict for Claude Code
+unset ANTHROPIC_AUTH_TOKEN
+export ANTHROPIC_API_KEY="test-api-key-12345"
+export ANTHROPIC_BASE_URL="http://127.0.0.1:7777"
+
+# ✅ Verify no conflicts
+echo "API Key: $ANTHROPIC_API_KEY"
+echo "Base URL: $ANTHROPIC_BASE_URL"
+```
+
+**Why this works:**
+- Claude Code may have `ANTHROPIC_AUTH_TOKEN` set (from login)
+- Your local server needs `ANTHROPIC_API_KEY`
+- Having both causes "Auth conflict" errors
+- `unset` removes the conflict for current session only
+
+## 🧹 COMPLETE CLAUDE CODE SETUP (ULTRATHINK VERIFIED)
+
+**CRITICAL: Claude Code Process Environment Issue**
+
+Claude Code inherits environment variables at startup. If you started Claude Code BEFORE cleaning your environment, you **must completely restart** for changes to take effect.
+
+### **Step 1: Clean Environment Variables**
+
+```bash
+# Remove ALL conflicting Anthropic variables
+unset ANTHROPIC_AUTH_TOKEN
+unset ANTHROPIC_API_KEY
+unset ANTHROPIC_BASE_URL
+unset ANTHROPIC_DEFAULT_OPUS_MODEL
+unset ANTHROPIC_DEFAULT_SONNET_MODEL
+
+# Set ONLY local server configuration
+export ANTHROPIC_API_KEY="test-api-key-12345"
+export ANTHROPIC_BASE_URL="http://127.0.0.1:7777"
+```
+
+### **Step 2: Update Shell Configuration (Permanent)**
+
+```bash
+# Add to ~/.profile for future sessions
+echo '# Local Pensieve Server Configuration' >> ~/.profile
+echo 'export ANTHROPIC_API_KEY="test-api-key-12345"' >> ~/.profile
+echo 'export ANTHROPIC_BASE_URL="http://127.0.0.1:7777"' >> ~/.profile
+```
+
+### **Step 3: Start Pensieve Server (Full Path)**
+
+```bash
+# Navigate to project directory
+cd /Users/amuldotexe/Projects/pensieve-local-llm-server
+
+# Start server with full path to model file
+./target/debug/pensieve start --model /Users/amuldotexe/Projects/pensieve-local-llm-server/models/Phi-3-mini-128k-instruct-4bit/model.safetensors
+
+# Expected output:
+# Starting Pensieve server...
+# Using MLX handler with model: models/Phi-3-mini-128k-instruct-4bit
+# Server started successfully on 127.0.0.1:7777
+# Press Ctrl+C to stop the server
+```
+
+### **Step 4: COMPLETELY Restart Claude Code**
+
+```bash
+# IMPORTANT: Exit Claude Code completely
+exit
+
+# Start fresh terminal session, then:
+claude
+```
+
+**Why Complete Restart is Required:**
+- ❌ Environment changes don't affect already-running Claude Code processes
+- ✅ New Claude Code session picks up clean environment variables
+- ✅ Process inheritance means old session keeps old variables
+
+### **Step 5: Verify Local Server Usage**
+
+```bash
+# Test server directly
+curl -X POST http://127.0.0.1:7777/v1/messages \
+  -H "Authorization: Bearer test-api-key-12345" \
+  -d '{"model": "claude-3-sonnet-20240229", "max_tokens": 10, "messages": [{"role":"user","content":[{"type":"text","text":"Hello from local server!"}]}]}'
+
+# Watch server logs for incoming requests from Claude Code
+```
+
+### **Troubleshooting: If Still Using External API**
+
+1. **Check environment**: `env | grep ANTHROPIC`
+2. **Verify server running**: `curl http://127.0.0.1:7777/health`
+3. **Check Claude Code settings**: `cat ~/.claude/settings.json`
+4. **RESTART Claude Code completely** (most common fix)
+
 ## 🚀 Quick Start (Verified)
 
 ### Prerequisites
