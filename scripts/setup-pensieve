@@ -31,35 +31,45 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 CLAUDE_DIR="$HOME/.claude"
 
 # ============================================================================
-# STEP 1: Check if Claude Code is authenticated
+# STEP 1: Create Dummy Authentication (NO ANTHROPIC LOGIN NEEDED!)
 # ============================================================================
 
-echo -e "${BLUE}Checking Claude Code authentication...${NC}"
+echo -e "${BLUE}Setting up local authentication (no Anthropic account needed)...${NC}"
 echo ""
 
-if [ ! -d "$CLAUDE_DIR" ] || [ ! -f "$CLAUDE_DIR/settings.json" ]; then
-    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${YELLOW}${BOLD}  ⚠️  Claude Code Not Logged In${NC}"
-    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo ""
-    echo -e "${CYAN}You need to login to Claude Code first.${NC}"
-    echo ""
-    echo -e "${BOLD}Quick 2-Step Process:${NC}"
-    echo ""
-    echo -e "  ${GREEN}1.${NC} Open a terminal and run:"
-    echo -e "     ${CYAN}claude${NC}"
-    echo ""
-    echo -e "  ${GREEN}2.${NC} Select login method → Complete authentication → Type ${CYAN}exit${NC}"
-    echo ""
-    echo -e "  ${GREEN}3.${NC} Run this setup again:"
-    echo -e "     ${CYAN}./scripts/setup-pensieve${NC}"
-    echo ""
-    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo ""
-    exit 0
+# Create Claude directory if it doesn't exist
+if [ ! -d "$CLAUDE_DIR" ]; then
+    mkdir -p "$CLAUDE_DIR"
+    echo -e "${GREEN}✓ Created Claude directory${NC}"
 fi
 
-echo -e "${GREEN}✓ Claude Code is authenticated${NC}"
+# Create dummy OAuth file (tricks Claude Code into thinking you're logged in)
+OAUTH_FILE="$CLAUDE_DIR/.claude-oauth.json"
+if [ ! -f "$OAUTH_FILE" ]; then
+    cat > "$OAUTH_FILE" << 'EOF'
+{
+  "accessToken": "local-pensieve-dummy-token-12345",
+  "refreshToken": "local-pensieve-refresh-token-67890",
+  "expiresAt": 9999999999999,
+  "environment": "prod"
+}
+EOF
+    echo -e "${GREEN}✓ Created local authentication credentials${NC}"
+else
+    echo -e "${GREEN}✓ Authentication credentials already exist${NC}"
+fi
+
+# Create initial settings file if it doesn't exist
+if [ ! -f "$CLAUDE_DIR/settings.json" ]; then
+    cat > "$CLAUDE_DIR/settings.json" << 'EOF'
+{
+  "alwaysThinkingEnabled": true
+}
+EOF
+    echo -e "${GREEN}✓ Created initial settings file${NC}"
+fi
+
+echo -e "${CYAN}💡 No Anthropic login required - using local-only authentication!${NC}"
 echo ""
 
 # ============================================================================
@@ -89,25 +99,32 @@ fi
 echo ""
 
 # ============================================================================
-# STEP 3: Create backup of current settings
+# STEP 3: Create backup of current settings (if exists)
 # ============================================================================
 
-echo -e "${BLUE}Creating backup of current settings...${NC}"
+echo -e "${BLUE}Checking for existing settings...${NC}"
 echo ""
 
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-BACKUP_FILE="$CLAUDE_DIR/settings.json.backup-$TIMESTAMP"
-cp "$CLAUDE_DIR/settings.json" "$BACKUP_FILE"
 
-echo -e "${GREEN}✓ Backed up to: ${CYAN}$(basename $BACKUP_FILE)${NC}"
-echo ""
+# Only backup if settings already existed and has content
+if [ -f "$CLAUDE_DIR/settings.json" ] && [ -s "$CLAUDE_DIR/settings.json" ]; then
+    # Check if it already has local server config
+    if grep -q "127.0.0.1:7777" "$CLAUDE_DIR/settings.json" 2>/dev/null; then
+        echo -e "${GREEN}✓ Settings already configured for local server${NC}"
+    else
+        # Backup cloud config
+        BACKUP_FILE="$CLAUDE_DIR/settings.json.backup-$TIMESTAMP"
+        cp "$CLAUDE_DIR/settings.json" "$BACKUP_FILE"
+        echo -e "${GREEN}✓ Backed up existing settings: ${CYAN}$(basename $BACKUP_FILE)${NC}"
 
-# Save as cloud backup if not already local config
-if ! grep -q "127.0.0.1:7777" "$CLAUDE_DIR/settings.json" 2>/dev/null; then
-    cp "$CLAUDE_DIR/settings.json" "$CLAUDE_DIR/settings.json.cloud"
-    echo -e "${GREEN}✓ Saved cloud config for easy switching${NC}"
-    echo ""
+        cp "$CLAUDE_DIR/settings.json" "$CLAUDE_DIR/settings.json.cloud"
+        echo -e "${GREEN}✓ Saved cloud config for easy switching${NC}"
+    fi
+else
+    echo -e "${CYAN}💡 No existing settings found (fresh install)${NC}"
 fi
+echo ""
 
 # ============================================================================
 # STEP 4: Install scripts

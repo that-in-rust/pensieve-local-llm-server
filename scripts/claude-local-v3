@@ -22,22 +22,28 @@ else
 fi
 
 # ============================================================================
-# Check authentication
+# Ensure setup has been run
 # ============================================================================
 
-if [ ! -f "$SETTINGS_FILE" ]; then
+if [ ! -d "$CLAUDE_DIR" ]; then
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${YELLOW}  ⚠️  Claude Code not logged in${NC}"
+    echo -e "${YELLOW}  ⚠️  Pensieve setup not complete${NC}"
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    echo "Please login to Claude Code first:"
-    echo ""
-    echo "  1. Run: ${CYAN}claude${NC}"
-    echo "  2. Complete authentication"
-    echo "  3. Type: ${CYAN}exit${NC}"
-    echo "  4. Try ${CYAN}claude-local${NC} again"
+    echo "Please run setup first:"
+    echo "  ${CYAN}./scripts/setup-pensieve${NC}"
     echo ""
     exit 1
+fi
+
+# Create settings if they don't exist
+if [ ! -f "$SETTINGS_FILE" ]; then
+    mkdir -p "$CLAUDE_DIR"
+    cat > "$SETTINGS_FILE" << EOF
+{
+  "alwaysThinkingEnabled": true
+}
+EOF
 fi
 
 # ============================================================================
