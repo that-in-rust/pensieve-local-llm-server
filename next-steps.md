@@ -2,34 +2,43 @@
 
 ## Executive Summary
 
-**🔍 HONEST ASSESSMENT**: The Pensieve Local LLM Server has **excellent modular architecture** and **production-ready HTTP infrastructure**, but currently provides **mock responses only**. We have a solid foundation that needs **real model integration** and **authentication headers** to become functional.
+**🔍 CURRENT STATUS (October 29, 2025)**: Pensieve has **real MLX inference** (16.85 TPS), **working HTTP API**, and **Anthropic-compatible endpoints**. However, **Claude Code integration is non-functional** due to Anthropic SDK compatibility issues. Research into z.ai's successful approach reveals we need a **proxy/translation layer**, not just an API endpoint.
+
+**Key Finding**: Our API works great with curl, but Claude Code's Anthropic SDK requires additional compatibility layer.
 
 ---
 
-## Current Reality Check (As of October 28, 2025)
+## Current Reality Check (As of October 29, 2025)
 
 ### ✅ **What Actually Works - Verified**
 
-#### 1. **HTTP Server Infrastructure**
-- **Real Working Server**: Starts reliably on port 8000 ✅
-- **API Endpoints**: `/health`, `/v1/messages` functional ✅
-- **SSE Streaming**: Real Server-Sent Events implementation ✅
-- **Error Handling**: Proper JSON error responses ✅
-- **Build System**: All 8 crates compile successfully ✅
+#### 1. **Real MLX Inference** (NEW!)
+- **Python MLX Bridge**: Working inference at 16.85 TPS ✅
+- **Phi-3 Model**: 4-bit quantized model loaded and functional ✅
+- **Metal GPU**: Apple Silicon acceleration confirmed ✅
+- **Performance Monitoring**: TPS and memory tracking ✅
 
-#### 2. **CLI Interface**
+#### 2. **HTTP Server Infrastructure**
+- **Real Working Server**: Starts reliably on port 7777 ✅
+- **API Endpoints**: `/health`, `/v1/messages` functional ✅
+- **Anthropic Format**: Correct request/response models ✅
+- **Error Handling**: Proper JSON error responses ✅
+- **Build System**: All 8 crates compile successfully (warnings only) ✅
+
+#### 3. **CLI Interface**
 - **Complete CLI**: Start/stop/status/config commands ✅
-- **Configuration Management**: JSON config loading/saving ✅
+- **Model Loading**: Pass model.safetensors path ✅
 - **Server Lifecycle**: Can start and stop the server ✅
 
-#### 3. **Architecture Foundation**
+#### 4. **Architecture Foundation**
 - **8-Crate Design**: L1→L2→L3 modular architecture complete ✅
 - **Trait-Based Design**: Proper dependency injection ✅
-- **Test Infrastructure**: Comprehensive test suite ✅
+- **MLX Python Bridge**: Real inference integration ✅
 
-#### 4. **Mock Implementation**
-- **High-Quality Mocks**: Realistic token delays and streaming ✅
-- **Test Coverage**: All components thoroughly tested ✅
+#### 5. **API Testing**
+- **curl Requests**: Work perfectly ✅
+- **No Auth Required**: Optional authentication for local dev ✅
+- **Health Checks**: Server monitoring functional ✅
 
 ### ❌ **What Does NOT Work Yet - Critical Blockers**
 
@@ -132,108 +141,205 @@ impl CandleInferenceEngine {
 
 ---
 
-### **Phase 3: Performance Optimization (2-3 hours)**
-**Priority**: MEDIUM - Enhance user experience
-**Status**: Can be done incrementally
+### **Phase 3: Timeout & Configuration (Week 3)**
+**Goal**: Production-grade reliability matching z.ai
 
-#### **TDD Implementation Steps**:
-1. **RED**: Write performance test that fails current implementation
-2. **GREEN**: Implement basic optimizations
-3. **REFACTOR**: Add Metal GPU acceleration if needed
+#### **Implementation Steps**:
+1. **Add timeout configuration**: 50 minutes like z.ai
+   ```json
+   {
+     "env": {
+       "API_TIMEOUT_MS": "3000000"
+     }
+   }
+   ```
+2. **Settings file manager**: Use Node.js for safe JSON manipulation (like z.ai)
+3. **Error handling**: Proper Anthropic error format
+4. **Performance optimization**: First token < 1s
 
-#### **Validation Criteria**:
-- First token <1 second
-- Sustained 10+ TPS on small models
-- Stable under concurrent requests
-
-## 🎯 **Today's Action Plan (November 28, 2025)**
-
-### **IMMEDIATE NEXT 2 HOURS**:
-1. **Write failing authentication tests** (TDD RED phase)
-2. **Implement basic auth middleware** (TDD GREEN phase)
-3. **Test Claude Code connection** (Validation)
-
-### **THIS WEEK**:
-1. **Download small test model** (1-2GB for initial testing)
-2. **Implement real model loading** (Replace mock implementations)
-3. **Get first real inference working** (Milestone celebration)
-
-### **NEXT WEEK**:
-1. **Performance optimization** (Metal acceleration if needed)
-2. **End-to-end Claude Code integration** (Full workflow testing)
-3. **Documentation and cleanup** (Production readiness)
+#### **Success Criteria**:
+- ✅ Long conversations don't timeout
+- ✅ Error messages clear and actionable
+- ✅ Performance acceptable
+- ✅ Memory usage stable
 
 ---
 
-## 📊 **Updated Success Metrics (Realistic Targets)**
+### **Phase 4: Setup Script (Week 4)**
+**Goal**: One-command installation like z.ai
 
-### **Phase 1 Success** (This Week)
-- ✅ Claude Code can connect and authenticate
-- ✅ Real model loads and generates text
-- ✅ Basic performance working (5+ TPS)
+#### **Implementation Steps**:
+1. **Create `scripts/setup-claude-code.sh`**:
+   - Create `~/.claude.json` with onboarding flag
+   - Update `~/.claude/settings.json` with env vars
+   - Test connection to local server
+   - Display success message
 
-### **Phase 2 Success** (Next Week)
-- ✅ Performance optimized (15+ TPS)
-- ✅ Memory usage optimized (<8GB)
-- ✅ Stable under load
+2. **Test installation flow**:
+   ```bash
+   cd pensieve-local-llm-server
+   ./scripts/setup-claude-code.sh
+   # Should complete in < 30 seconds
+   claude --print "test"  # Should work immediately
+   ```
 
-### **Full Production Success** (2 Weeks)
-- ✅ Complete local LLM development environment
-- ✅ Comparable experience to cloud APIs
-- ✅ Zero external dependencies for operation
+#### **Success Criteria**:
+- ✅ One-command setup works
+- ✅ Fresh machine installation successful
+- ✅ No manual configuration needed
+- ✅ Clear error messages if issues
+
+---
+
+## 🎯 **Action Plan (Next 4 Weeks)**
+
+### **Week 1: Basic Proxy (IMMEDIATE)**
+**Goal**: Get Claude Code working with basic queries
+
+**Tasks**:
+1. Create `pensieve-09-anthropic-proxy` crate
+2. Implement request/response translation
+3. Add authentication handler
+4. Test with `claude --print "hello"`
+
+**Validation**:
+```bash
+export ANTHROPIC_AUTH_TOKEN="pensieve-local-token"
+export ANTHROPIC_BASE_URL="http://127.0.0.1:7777"
+claude --print "Say hello in 5 words"
+# Expected: "Hello! How can I help?"
+```
+
+### **Week 2: Streaming**
+**Goal**: Interactive mode working
+
+**Tasks**:
+1. Implement SSE event generator
+2. Test streaming translation
+3. Validate interactive mode
+
+**Validation**:
+```bash
+claude  # Interactive mode
+> Tell me a story
+# Should see tokens appearing in real-time
+```
+
+### **Week 3: Optimization**
+**Goal**: Production reliability
+
+**Tasks**:
+1. Add extended timeout support
+2. Optimize performance (< 1s first token)
+3. Error handling improvements
+4. Memory usage monitoring
+
+### **Week 4: Polish**
+**Goal**: Ready for release
+
+**Tasks**:
+1. Create setup script
+2. Write documentation
+3. Test on fresh machine
+4. Public release preparation
+
+---
+
+## 📊 **Success Metrics (4-Week Timeline)**
+
+### **Week 1 Success**
+- ✅ Claude Code connects without errors
+- ✅ Simple queries return real responses
+- ✅ Authentication working
+- ✅ No 400/404 errors
+
+### **Week 2 Success**
+- ✅ Streaming works in real-time
+- ✅ Interactive mode functional
+- ✅ Multi-turn conversations
+- ✅ Proper event formatting
+
+### **Week 3 Success**
+- ✅ Extended timeouts (50 minutes)
+- ✅ Performance < 1s first token
+- ✅ Error handling production-ready
+- ✅ Memory usage stable
+
+### **Week 4 Success**
+- ✅ One-command setup works
+- ✅ Documentation complete
+- ✅ Fresh machine testing passed
+- ✅ Ready for public release
 
 ---
 
 ## 🔧 **Technical Implementation Strategy**
 
-### **TDD-First Development** (Mandatory Approach)
-1. **ALWAYS write failing test first**
-2. **Implement minimal working solution**
-3. **Refactor while maintaining functionality**
-4. **Validate with real integration tests**
+### **Follow z.ai's Proven Approach**
+1. **Proxy pattern** - Translation layer, not just endpoint
+2. **Extended timeouts** - 50 minutes for local inference
+3. **Settings injection** - Use Node.js for safe JSON manipulation
+4. **Authentication** - Support ANTHROPIC_AUTH_TOKEN
+5. **Model mapping** - Accept any claude-* model name
 
-### **Reference Materials Available**
-- **Candle ML Framework**: `.doNotCommit/.refGitHubRepo/candle/` - Complete reference implementation
-- **Claude Code Integration**: `.doNotCommit/.refGitHubRepo/claude-code/` - Authentication patterns
-- **Performance Research**: `.domainDocs/` - Apple Silicon optimization studies
-- **Architecture Specs**: `.prdArch/Arch02PensieveV1.md` - Complete technical requirements
+### **Reference Materials**
+- **z.ai Research**: `.domainDocs/D10-claude-code-zai-integration-research.md` - Complete analysis
+- **z.ai Script**: `1753683755292-30b3431f487b4cc1863e57a81d78e289.sh` - Installation reference
+- **Anthropic SDK**: https://github.com/anthropics/anthropic-sdk-typescript - Official SDK
+- **MLX Integration**: `.domainDocs/D05-mlx-architecture-guide.md` - Current implementation
+- **Performance**: `.domainDocs/D08-MVP-queries.md` - Optimization research
 
-### **Risk Mitigation**
-- **Start Small**: Use 1.5B parameter model initially
-- **Incremental**: Add complexity gradually
-- **Test Everything**: No assumptions without verification
-- **Real Performance**: Measure actual vs claimed performance
-
----
-
-## 🎯 **Summary: Where We Actually Are**
-
-### **✅ SOLID ACHIEVEMENTS** (No false claims)
-1. **Production-ready HTTP server** with real SSE streaming
-2. **Excellent 8-crate modular architecture** that's building and compiling
-3. **Comprehensive test infrastructure** with TDD approach
-4. **Complete CLI interface** for server management
-5. **High-quality mock framework** that simulates real behavior
-
-### **🔧 IMMEDIATE NEXT ACTIONS** (No ambiguity)
-1. **TODAY**: Implement authentication headers (2-3 hours using TDD)
-2. **THIS WEEK**: Add real model loading and inference (6-8 hours)
-3. **NEXT WEEK**: Performance optimization and Claude Code integration
-
-### **📊 REALISTIC TIMELINE** (Based on actual analysis)
-- **Week 1**: Authentication + basic real inference
-- **Week 2**: Performance optimization + full integration
-- **Week 3**: Polish and documentation
-
-### **🎉 THE VISION** (Unchanged but realistic)
-We're building a **local AI development platform** that will enable developers to work completely offline with powerful AI capabilities. The foundation is excellent - we just need to connect the final pieces.
+### **Implementation Approach**
+- **Week 1**: Build minimal proxy to get basic queries working
+- **Week 2**: Add streaming to match full Claude Code experience
+- **Week 3**: Polish with timeouts, errors, performance
+- **Week 4**: Create setup script and documentation
 
 ---
 
-**Current Status: 85% Complete - Ready for Authentication Implementation** 🔧
-**Next Action: TDD Authentication Implementation (Immediate Priority)** ⚡
+## 🎯 **Summary: Current Reality**
+
+### **✅ VERIFIED WORKING** (Real achievements)
+1. **Real MLX Inference**: 16.85 TPS with Phi-3 on Metal GPU
+2. **HTTP API Server**: Works perfectly with curl
+3. **Anthropic-Compatible Endpoints**: Correct request/response format
+4. **8-Crate Architecture**: Clean modular design, compiles successfully
+5. **Python MLX Bridge**: Production-grade inference integration
+
+### **❌ BLOCKING ISSUE** (Known gap)
+1. **Claude Code Integration**: Non-functional
+   - Anthropic SDK expects proxy behavior, not just API endpoint
+   - Current implementation is close but not SDK-compatible
+   - Need translation layer like z.ai uses
+
+### **✅ SOLUTION IDENTIFIED** (z.ai research)
+1. **Build Anthropic proxy layer**: Accept SDK requests, translate to/from MLX
+2. **Extended timeouts**: 50 minutes like z.ai
+3. **Proper authentication**: ANTHROPIC_AUTH_TOKEN support
+4. **Setup script**: One-command installation
+
+### **📊 IMPLEMENTATION TIMELINE** (4 weeks to production)
+- **Week 1**: Basic proxy - get Claude Code working
+- **Week 2**: Streaming support - interactive mode
+- **Week 3**: Optimization - timeouts, performance, errors
+- **Week 4**: Setup script - one-command installation
+
+### **🎯 COMPETITIVE ADVANTAGE**
+vs z.ai:
+- ✅ **100% local** (true privacy vs cloud)
+- ✅ **Zero cost** (free vs $3-15/month)
+- ✅ **No signup** (local tokens vs z.ai account)
+- ✅ **Offline** (no internet required)
+- ✅ **Open source** (full control)
 
 ---
 
-*Last Updated: October 28, 2025*
-*Real Assessment: Foundation excellent, needs authentication and real model integration*
+**Current Status: Core Working, Claude Code Integration Needs Proxy Layer** 🔧
+**Next Action: Build pensieve-09-anthropic-proxy crate (Week 1 Priority)** ⚡
+**Research Complete**: See `.domainDocs/D10-claude-code-zai-integration-research.md` 📚
+
+---
+
+*Last Updated: October 29, 2025*
+*Assessment: API works, need Anthropic SDK-compatible proxy for Claude Code*
+*Reference: z.ai successful integration validates our approach*
