@@ -7,7 +7,7 @@ members = [
     "pensieve-05",
     "pensieve-06",
     "pensieve-07",
-    "pensieve-08_claude_core",
+    "pensieve-08_claude_core", "pensieve-09-anthropic-proxy",
 ]
 resolver = "2"
 
