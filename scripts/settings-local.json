@@ -1,0 +1,7 @@
+{
+  "env": {
+    "ANTHROPIC_API_KEY": "test-api-key-12345",
+    "ANTHROPIC_BASE_URL": "http://127.0.0.1:7777"
+  },
+  "alwaysThinkingEnabled": true
+}
