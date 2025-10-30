@@ -34,3 +34,4 @@ pensieve-03 = { path = "../pensieve-03" }
 
 [dev-dependencies]
 tokio-test = "0.4"
+reqwest = { version = "0.11", features = ["json"] }
