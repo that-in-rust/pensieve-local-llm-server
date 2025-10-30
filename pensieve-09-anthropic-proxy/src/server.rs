@@ -28,7 +28,7 @@ impl Default for ServerConfig {
             host: "127.0.0.1".to_string(),
             port: 7777,
             python_bridge_path: "python_bridge/mlx_inference.py".to_string(),
-            model_path: "models/Phi-3-mini-128k-instruct-4bit/model.safetensors".to_string(),
+            model_path: "models/Phi-3-mini-128k-instruct-4bit".to_string(), // Directory, not file
         }
     }
 }
