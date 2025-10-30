@@ -38,3 +38,8 @@ pensieve-03 = { path = "../pensieve-03" }
 [dev-dependencies]
 tokio-test = "0.4"
 reqwest = { version = "0.11", features = ["json"] }
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "memory_overhead"
+harness = false
