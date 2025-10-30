@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use warp::{Filter, Reply};
 use serde_json::json;
-use tracing::{info, error};
+use tracing::{info, error, warn};
 
 /// Server configuration
 #[derive(Debug, Clone)]
@@ -255,6 +255,92 @@ async fn handle_messages(
     )))
 }
 
+/// Streaming MLX output structure
+#[derive(Debug)]
+struct StreamingMlxOutput {
+    tokens: Vec<String>,
+    full_text: String,
+}
+
+/// Call Python MLX bridge for streaming inference
+async fn call_mlx_bridge_streaming(
+    mlx_request: &crate::translator::MlxRequest,
+    config: &ServerConfig,
+) -> Result<StreamingMlxOutput, ServerError> {
+    use tokio::process::Command;
+    use tokio::io::{AsyncBufReadExt, BufReader};
+
+    info!("Calling MLX bridge (streaming): {}", config.python_bridge_path);
+
+    let mut cmd = Command::new("python3")
+        .arg(&config.python_bridge_path)
+        .arg("--model-path")
+        .arg(&config.model_path)
+        .arg("--prompt")
+        .arg(&mlx_request.prompt)
+        .arg("--max-tokens")
+        .arg(mlx_request.max_tokens.to_string())
+        .arg("--temperature")
+        .arg(mlx_request.temperature.to_string())
+        .arg("--stream")  // Enable streaming mode
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| ServerError::Internal(format!("Failed to spawn Python process: {}", e)))?;
+
+    let stdout = cmd.stdout.take()
+        .ok_or_else(|| ServerError::Internal("Failed to capture stdout".to_string()))?;
+
+    let mut reader = BufReader::new(stdout).lines();
+    let mut tokens = Vec::new();
+    let mut full_text = String::new();
+
+    // Read line-by-line JSON output
+    while let Some(line) = reader.next_line().await
+        .map_err(|e| ServerError::Internal(format!("Failed to read line: {}", e)))? {
+
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        // Parse JSON line
+        match serde_json::from_str::<serde_json::Value>(&line) {
+            Ok(json) => {
+                if json["type"] == "text_chunk" {
+                    if let Some(text) = json["text"].as_str() {
+                        tokens.push(text.to_string());
+                        full_text.push_str(text);
+                    }
+                } else if json["type"] == "error" {
+                    let error_msg = json["error"].as_str().unwrap_or("Unknown error");
+                    return Err(ServerError::Internal(format!("MLX error: {}", error_msg)));
+                }
+            }
+            Err(e) => {
+                warn!("Failed to parse JSON line: {} - Error: {}", line, e);
+                // Continue processing other lines
+            }
+        }
+    }
+
+    // Wait for process to complete
+    let status = cmd.wait().await
+        .map_err(|e| ServerError::Internal(format!("Failed to wait for process: {}", e)))?;
+
+    if !status.success() {
+        return Err(ServerError::Internal(format!("Python bridge exited with status: {}", status)));
+    }
+
+    if tokens.is_empty() {
+        return Err(ServerError::Internal("No tokens generated".to_string()));
+    }
+
+    Ok(StreamingMlxOutput {
+        tokens,
+        full_text,
+    })
+}
+
 /// Call Python MLX bridge for inference
 async fn call_mlx_bridge(
     config: &ServerConfig,
@@ -311,27 +397,94 @@ async fn call_mlx_bridge(
 /// Handle streaming /v1/messages endpoint (SSE)
 async fn handle_messages_streaming(
     _auth_header: Option<String>,
-    _request: CreateMessageRequest,
-    _config: ServerConfig,
+    request: CreateMessageRequest,
+    config: ServerConfig,
 ) -> Result<Box<dyn Reply>, warp::Rejection> {
-    // TODO: Implement streaming handler
-    // 1. Auth already validated by handle_messages
-    // 2. Translate request to MLX format
-    // 3. Call Python bridge with --stream flag
-    // 4. Parse streaming output
-    // 5. Generate SSE events using streaming::generate_sse_stream()
-    // 6. Return with proper SSE headers
+    use crate::streaming::generate_sse_stream;
 
-    // For now, return error indicating streaming not yet implemented
-    Ok(Box::new(warp::reply::with_status(
-        warp::reply::json(&json!({
-            "error": {
-                "type": "not_implemented",
-                "message": "Streaming not yet implemented"
-            }
-        })),
-        warp::http::StatusCode::NOT_IMPLEMENTED,
-    )))
+    // Step 1: Auth already validated by handle_messages
+
+    // Step 2: Translate request to MLX format
+    let mlx_request = match translate_anthropic_to_mlx(&request) {
+        Ok(req) => req,
+        Err(e) => {
+            error!("Request translation failed: {:?}", e);
+            return Ok(Box::new(warp::reply::with_status(
+                warp::reply::json(&json!({
+                    "error": {
+                        "type": "internal_error",
+                        "message": format!("Translation error: {}", e)
+                    }
+                })),
+                warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+            )));
+        }
+    };
+
+    // Step 3: Call Python bridge with --stream flag
+    let mlx_output = match call_mlx_bridge_streaming(&mlx_request, &config).await {
+        Ok(output) => output,
+        Err(e) => {
+            error!("MLX inference failed: {:?}", e);
+            return Ok(Box::new(warp::reply::with_status(
+                warp::reply::json(&json!({
+                    "error": {
+                        "type": "internal_error",
+                        "message": format!("Inference error: {}", e)
+                    }
+                })),
+                warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+            )));
+        }
+    };
+
+    // Step 4 & 5: Generate SSE events using streaming module
+    let message_id = format!("msg_{}", uuid::Uuid::new_v4().to_string().replace("-", ""));
+    let model = request.model.clone();
+
+    // Calculate input tokens (rough estimate based on prompt)
+    let input_tokens = mlx_request.prompt.split_whitespace().count() as u32;
+
+    let events = match generate_sse_stream(
+        mlx_output.tokens,
+        message_id,
+        model,
+        input_tokens,
+    ).await {
+        Ok(events) => events,
+        Err(e) => {
+            error!("SSE generation failed: {:?}", e);
+            return Ok(Box::new(warp::reply::with_status(
+                warp::reply::json(&json!({
+                    "error": {
+                        "type": "internal_error",
+                        "message": format!("SSE generation error: {}", e)
+                    }
+                })),
+                warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+            )));
+        }
+    };
+
+    // Step 6: Return with proper SSE headers
+    // Combine all events into a single string
+    let sse_body = events.join("");
+
+    Ok(Box::new(
+        warp::reply::with_header(
+            warp::reply::with_header(
+                warp::reply::with_header(
+                    sse_body,
+                    "Content-Type",
+                    "text/event-stream"
+                ),
+                "Cache-Control",
+                "no-cache"
+            ),
+            "Connection",
+            "keep-alive"
+        )
+    ))
 }
 
 #[cfg(test)]
