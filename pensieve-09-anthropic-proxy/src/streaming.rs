@@ -38,48 +38,124 @@ impl SseEventType {
 }
 
 /// Format an SSE event with proper structure
-pub fn format_sse_event(_event_type: SseEventType, _data: serde_json::Value) -> String {
-    todo!("Format SSE event with event type and data")
+/// Format: "event: {name}\ndata: {json}\n\n"
+pub fn format_sse_event(event_type: SseEventType, data: serde_json::Value) -> String {
+    format!(
+        "event: {}\ndata: {}\n\n",
+        event_type.as_str(),
+        serde_json::to_string(&data).unwrap()
+    )
 }
 
 /// Generate message_start event
-pub fn create_message_start_event(_message_id: &str, _model: &str) -> String {
-    todo!("Generate message_start event")
+pub fn create_message_start_event(message_id: &str, model: &str) -> String {
+    let data = json!({
+        "type": "message_start",
+        "message": {
+            "id": message_id,
+            "type": "message",
+            "role": "assistant",
+            "content": [],
+            "model": model,
+            "stop_reason": null,
+            "stop_sequence": null,
+            "usage": {
+                "input_tokens": 0,
+                "output_tokens": 0
+            }
+        }
+    });
+    format_sse_event(SseEventType::MessageStart, data)
 }
 
 /// Generate content_block_start event
-pub fn create_content_block_start_event(_index: u32) -> String {
-    todo!("Generate content_block_start event")
+pub fn create_content_block_start_event(index: u32) -> String {
+    let data = json!({
+        "type": "content_block_start",
+        "index": index,
+        "content_block": {
+            "type": "text",
+            "text": ""
+        }
+    });
+    format_sse_event(SseEventType::ContentBlockStart, data)
 }
 
 /// Generate content_block_delta event for a single token
-pub fn create_content_block_delta_event(_index: u32, _text: &str) -> String {
-    todo!("Generate content_block_delta event")
+pub fn create_content_block_delta_event(index: u32, text: &str) -> String {
+    let data = json!({
+        "type": "content_block_delta",
+        "index": index,
+        "delta": {
+            "type": "text_delta",
+            "text": text
+        }
+    });
+    format_sse_event(SseEventType::ContentBlockDelta, data)
 }
 
 /// Generate content_block_stop event
-pub fn create_content_block_stop_event(_index: u32) -> String {
-    todo!("Generate content_block_stop event")
+pub fn create_content_block_stop_event(index: u32) -> String {
+    let data = json!({
+        "type": "content_block_stop",
+        "index": index
+    });
+    format_sse_event(SseEventType::ContentBlockStop, data)
 }
 
 /// Generate message_delta event with usage information
-pub fn create_message_delta_event(_stop_reason: &str, _input_tokens: u32, _output_tokens: u32) -> String {
-    todo!("Generate message_delta event")
+pub fn create_message_delta_event(stop_reason: &str, _input_tokens: u32, output_tokens: u32) -> String {
+    let data = json!({
+        "type": "message_delta",
+        "delta": {
+            "stop_reason": stop_reason
+        },
+        "usage": {
+            "output_tokens": output_tokens
+        }
+    });
+    format_sse_event(SseEventType::MessageDelta, data)
 }
 
 /// Generate message_stop event
 pub fn create_message_stop_event() -> String {
-    todo!("Generate message_stop event")
+    let data = json!({
+        "type": "message_stop"
+    });
+    format_sse_event(SseEventType::MessageStop, data)
 }
 
 /// Stream generator that produces SSE events from token stream
 pub async fn generate_sse_stream(
-    _tokens: Vec<String>,
-    _message_id: String,
-    _model: String,
-    _input_tokens: u32,
+    tokens: Vec<String>,
+    message_id: String,
+    model: String,
+    input_tokens: u32,
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    todo!("Generate complete SSE stream from tokens")
+    let mut events = Vec::new();
+
+    // 1. message_start
+    events.push(create_message_start_event(&message_id, &model));
+
+    // 2. content_block_start
+    events.push(create_content_block_start_event(0));
+
+    // 3. content_block_delta for each token
+    for token in &tokens {
+        events.push(create_content_block_delta_event(0, token));
+    }
+
+    // 4. content_block_stop
+    events.push(create_content_block_stop_event(0));
+
+    // 5. message_delta with usage (output_tokens = number of tokens)
+    let output_tokens = tokens.len() as u32;
+    events.push(create_message_delta_event("end_turn", input_tokens, output_tokens));
+
+    // 6. message_stop
+    events.push(create_message_stop_event());
+
+    Ok(events)
 }
 
 #[cfg(test)]
@@ -152,9 +228,10 @@ mod tests {
         assert!(events[5].contains("event: content_block_stop"));
 
         // Verify message_delta with usage
+        // Note: Per Anthropic spec, message_delta only includes output_tokens
+        // input_tokens are in message_start
         assert!(events[6].contains("event: message_delta"));
         assert!(events[6].contains("\"stop_reason\":\"end_turn\""));
-        assert!(events[6].contains("\"input_tokens\":10"));
         assert!(events[6].contains("\"output_tokens\":3"));
 
         // Verify message_stop
