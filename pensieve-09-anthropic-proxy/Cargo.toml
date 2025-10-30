@@ -29,6 +29,9 @@ uuid = { version = "1.11", features = ["v4"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# System monitoring
+sysinfo = "0.30"
+
 # Dependencies on other pensieve crates
 pensieve-03 = { path = "../pensieve-03" }
 

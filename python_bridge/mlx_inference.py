@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """
-Pensieve MLX Inference Bridge - REAL Implementation
+Pensieve MLX Inference Bridge - REAL Implementation with Memory Safety
 Provides MLX-powered text generation for the Pensieve Local LLM Server
+
+Safety Features (D17 Research):
+- Memory monitoring with psutil
+- Automatic cache clearing after generation
+- Pre-inference memory checks
+- Emergency shutdown on critical memory
 """
 
 import sys
@@ -17,6 +23,14 @@ from mlx_lm import load, stream_generate, generate as mlx_generate
 import gc
 import threading
 from contextlib import contextmanager
+
+# Memory safety (D17 requirement)
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    print("[WARN] psutil not available - install with: pip install psutil", file=sys.stderr)
+    PSUTIL_AVAILABLE = False
 
 # Performance optimization: Model cache with persistent storage
 import pickle
@@ -61,6 +75,76 @@ def save_persistent_metrics():
 
 # Load persistent metrics on startup
 load_persistent_metrics()
+
+# Memory safety thresholds (from D17 research)
+MEMORY_CRITICAL_GB = 1.0  # Reject requests
+MEMORY_EMERGENCY_GB = 0.5  # Emergency shutdown
+
+def check_memory_status() -> tuple[str, float]:
+    """
+    Check system memory status
+
+    Returns: (status, available_gb)
+        status: 'SAFE', 'WARNING', 'CRITICAL', 'EMERGENCY'
+        available_gb: Available RAM in GB
+    """
+    if not PSUTIL_AVAILABLE:
+        return 'UNKNOWN', 0.0
+
+    try:
+        mem = psutil.virtual_memory()
+        available_gb = mem.available / (1024 ** 3)
+
+        if available_gb < MEMORY_EMERGENCY_GB:
+            return 'EMERGENCY', available_gb
+        elif available_gb < MEMORY_CRITICAL_GB:
+            return 'CRITICAL', available_gb
+        elif available_gb < 2.0:
+            return 'WARNING', available_gb
+        else:
+            return 'SAFE', available_gb
+    except Exception as e:
+        print(f"[WARN] Memory check failed: {e}", file=sys.stderr)
+        return 'UNKNOWN', 0.0
+
+def clear_mlx_cache():
+    """
+    Clear MLX Metal cache to free GPU memory
+    Based on D17 research - critical for preventing memory leaks
+    """
+    try:
+        if hasattr(mx.metal, 'clear_cache'):
+            mx.metal.clear_cache()
+            print("[MEMORY] MLX cache cleared", file=sys.stderr)
+        else:
+            print("[WARN] mx.metal.clear_cache() not available", file=sys.stderr)
+    except Exception as e:
+        print(f"[WARN] Failed to clear MLX cache: {e}", file=sys.stderr)
+
+def log_memory_state(label: str = ""):
+    """Log current memory state for monitoring"""
+    if not PSUTIL_AVAILABLE:
+        return
+
+    try:
+        mem = psutil.virtual_memory()
+        available_gb = mem.available / (1024 ** 3)
+        total_gb = mem.total / (1024 ** 3)
+        used_percent = mem.percent
+
+        # Try to get MLX cache memory
+        cache_info = ""
+        if hasattr(mx.metal, 'get_cache_memory'):
+            try:
+                cache_bytes = mx.metal.get_cache_memory()
+                cache_gb = cache_bytes / (1024 ** 3)
+                cache_info = f" | MLX Cache: {cache_gb:.2f}GB"
+            except:
+                pass
+
+        print(f"[MEMORY{' ' + label if label else ''}] Available: {available_gb:.2f}GB / {total_gb:.2f}GB ({used_percent:.1f}% used){cache_info}", file=sys.stderr)
+    except Exception as e:
+        print(f"[WARN] Failed to log memory: {e}", file=sys.stderr)
 
 @contextmanager
 def _performance_timer(operation_name: str):
@@ -174,9 +258,30 @@ def real_mlx_generate(
     stream: bool = False
 ) -> Iterator[str]:
     """
-    REAL MLX generation using MLX-LM with performance optimizations
+    REAL MLX generation using MLX-LM with memory safety and performance optimizations
+
+    Memory Safety (D17 Research):
+    - Pre-inference memory check
+    - Post-generation cache clearing
+    - Emergency rejection on critical memory
     """
     global _performance_metrics
+
+    # SAFETY CHECK: Memory status before inference
+    log_memory_state("BEFORE")
+    mem_status, available_gb = check_memory_status()
+
+    if mem_status == 'CRITICAL':
+        error_msg = f"Critical memory pressure: {available_gb:.2f}GB available. Request rejected."
+        print(f"[ERROR] {error_msg}", file=sys.stderr)
+        raise RuntimeError(error_msg)
+    elif mem_status == 'EMERGENCY':
+        error_msg = f"Emergency memory exhaustion: {available_gb:.2f}GB available. Shutting down."
+        print(f"[EMERGENCY] {error_msg}", file=sys.stderr)
+        clear_mlx_cache()
+        raise RuntimeError(error_msg)
+    elif mem_status == 'WARNING':
+        print(f"[WARN] Low memory: {available_gb:.2f}GB available", file=sys.stderr)
 
     model = model_data['model']
     tokenizer = model_data['tokenizer']
@@ -228,30 +333,41 @@ def real_mlx_generate(
         tps = token_count / generation_time if generation_time > 0 else 0
         print(f"[PERF] Streaming: {token_count} tokens in {generation_time:.3f}s = {tps:.1f} TPS", file=sys.stderr)
 
+        # SAFETY: Clear cache after streaming (D17 requirement)
+        clear_mlx_cache()
+        log_memory_state("AFTER")
+
     else:
         # Use REAL MLX-LM non-streaming with optimizations
-        with _performance_timer("batch_generation"):
-            # Use basic parameters compatible with all MLX-LM versions
-            response = mlx_generate(
-                model,
-                tokenizer,
-                prompt,
-                max_tokens=max_tokens,
-            )
+        try:
+            with _performance_timer("batch_generation"):
+                # Use basic parameters compatible with all MLX-LM versions
+                response = mlx_generate(
+                    model,
+                    tokenizer,
+                    prompt,
+                    max_tokens=max_tokens,
+                )
 
-        # MLX-LM returns a string, not a list
-        if isinstance(response, list):
-            response = " ".join(response) if response else ""
+            # MLX-LM returns a string, not a list
+            if isinstance(response, list):
+                response = " ".join(response) if response else ""
 
-        # Update performance metrics
-        token_count = len(response.split())
-        generation_time = time.perf_counter() - generation_start
-        _performance_metrics["total_tokens"] += token_count
-        _performance_metrics["total_time"] += generation_time
-        tps = token_count / generation_time if generation_time > 0 else 0
-        print(f"[PERF] Batch: {token_count} tokens in {generation_time:.3f}s = {tps:.1f} TPS", file=sys.stderr)
+            # Update performance metrics
+            token_count = len(response.split())
+            generation_time = time.perf_counter() - generation_start
+            _performance_metrics["total_tokens"] += token_count
+            _performance_metrics["total_time"] += generation_time
+            tps = token_count / generation_time if generation_time > 0 else 0
+            print(f"[PERF] Batch: {token_count} tokens in {generation_time:.3f}s = {tps:.1f} TPS", file=sys.stderr)
 
-        yield response
+            yield response
+
+        finally:
+            # SAFETY: Always clear cache after generation (D17 requirement)
+            # This prevents MLX memory leaks documented in GitHub issues #724, #1124
+            clear_mlx_cache()
+            log_memory_state("AFTER")
 
 def get_performance_metrics() -> Dict[str, Any]:
     """Get current performance metrics and save to disk"""
@@ -355,16 +471,29 @@ def generate_text(
         }
 
 def main():
-    """Main CLI interface with performance monitoring"""
-    parser = argparse.ArgumentParser(description="Pensieve MLX Inference Bridge - REAL")
-    parser.add_argument("--model-path", required=True, help="Path to MLX model directory")
-    parser.add_argument("--prompt", required=True, help="Input prompt for generation")
+    """Main CLI interface with performance monitoring and memory safety"""
+    parser = argparse.ArgumentParser(description="Pensieve MLX Inference Bridge - REAL with Memory Safety")
+    parser.add_argument("--model-path", help="Path to MLX model directory")
+    parser.add_argument("--prompt", help="Input prompt for generation")
     parser.add_argument("--max-tokens", type=int, default=100, help="Maximum tokens to generate")
     parser.add_argument("--temperature", type=float, default=0.7, help="Generation temperature")
     parser.add_argument("--stream", action="store_true", help="Stream generation output")
     parser.add_argument("--metrics", action="store_true", help="Show performance metrics")
+    parser.add_argument("--clear-cache", action="store_true", help="Clear MLX Metal cache and exit")
 
     args = parser.parse_args()
+
+    # Handle --clear-cache command
+    if args.clear_cache:
+        print("[MEMORY] Clearing MLX cache...", file=sys.stderr)
+        clear_mlx_cache()
+        log_memory_state("AFTER CLEAR")
+        print("[MEMORY] Cache cleared successfully", file=sys.stderr)
+        sys.exit(0)
+
+    # Validate required arguments for generation
+    if not args.model_path or not args.prompt:
+        parser.error("--model-path and --prompt are required for generation")
 
     # Print initial performance info
     if args.metrics:

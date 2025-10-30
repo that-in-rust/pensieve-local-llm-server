@@ -20,6 +20,9 @@ pub mod server;
 /// SSE streaming support
 pub mod streaming;
 
+/// Memory monitoring and safety
+pub mod memory;
+
 /// Re-export commonly used types
 pub use auth::{AuthError, AuthResult, validate_auth};
 pub use translator::{
