@@ -2296,6 +2296,7 @@ dependencies = [
  "pensieve-05_models",
  "pensieve-06_metal",
  "pensieve-07_core",
+ "pensieve-09-anthropic-proxy",
  "proptest",
  "serde",
  "serde_json",
