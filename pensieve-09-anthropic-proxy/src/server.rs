@@ -170,13 +170,13 @@ async fn handle_messages(
     auth_header: Option<String>,
     request: CreateMessageRequest,
     config: ServerConfig,
-) -> Result<impl Reply, warp::Rejection> {
+) -> Result<Box<dyn Reply>, warp::Rejection> {
     // Step 1: Validate authentication
-    let token = auth_header.and_then(|h| h.strip_prefix("Bearer ").map(String::from));
+    let token = auth_header.clone().and_then(|h| h.strip_prefix("Bearer ").map(String::from));
 
     if let Err(auth_error) = validate_auth(token.as_deref()) {
         error!("Authentication failed: {:?}", auth_error);
-        return Ok(warp::reply::with_status(
+        return Ok(Box::new(warp::reply::with_status(
             warp::reply::json(&json!({
                 "error": {
                     "type": "authentication_error",
@@ -184,13 +184,13 @@ async fn handle_messages(
                 }
             })),
             warp::http::StatusCode::UNAUTHORIZED,
-        ));
+        )));
     }
 
     // Step 2: Validate request
     if let Err(e) = request.validate() {
         error!("Request validation failed: {:?}", e);
-        return Ok(warp::reply::with_status(
+        return Ok(Box::new(warp::reply::with_status(
             warp::reply::json(&json!({
                 "error": {
                     "type": "invalid_request_error",
@@ -198,7 +198,13 @@ async fn handle_messages(
                 }
             })),
             warp::http::StatusCode::BAD_REQUEST,
-        ));
+        )));
+    }
+
+    // Step 2.5: Check if streaming is requested
+    if request.stream.unwrap_or(false) {
+        info!("Streaming request detected, delegating to streaming handler");
+        return handle_messages_streaming(auth_header, request, config).await;
     }
 
     // Step 3: Translate Anthropic request to MLX format
@@ -206,7 +212,7 @@ async fn handle_messages(
         Ok(req) => req,
         Err(e) => {
             error!("Request translation failed: {:?}", e);
-            return Ok(warp::reply::with_status(
+            return Ok(Box::new(warp::reply::with_status(
                 warp::reply::json(&json!({
                     "error": {
                         "type": "internal_error",
@@ -214,7 +220,7 @@ async fn handle_messages(
                     }
                 })),
                 warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-            ));
+            )));
         }
     };
 
@@ -223,7 +229,7 @@ async fn handle_messages(
         Ok(output) => output,
         Err(e) => {
             error!("MLX inference failed: {:?}", e);
-            return Ok(warp::reply::with_status(
+            return Ok(Box::new(warp::reply::with_status(
                 warp::reply::json(&json!({
                     "error": {
                         "type": "internal_error",
@@ -231,7 +237,7 @@ async fn handle_messages(
                     }
                 })),
                 warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-            ));
+            )));
         }
     };
 
@@ -243,10 +249,10 @@ async fn handle_messages(
     let response = translate_mlx_to_anthropic(&mlx_output, input_tokens, output_tokens);
 
     // Step 7: Return response
-    Ok(warp::reply::with_status(
+    Ok(Box::new(warp::reply::with_status(
         warp::reply::json(&response),
         warp::http::StatusCode::OK,
-    ))
+    )))
 }
 
 /// Call Python MLX bridge for inference
@@ -300,6 +306,32 @@ async fn call_mlx_bridge(
     }
 
     Err(ServerError::Internal("No valid response from MLX bridge".to_string()))
+}
+
+/// Handle streaming /v1/messages endpoint (SSE)
+async fn handle_messages_streaming(
+    _auth_header: Option<String>,
+    _request: CreateMessageRequest,
+    _config: ServerConfig,
+) -> Result<Box<dyn Reply>, warp::Rejection> {
+    // TODO: Implement streaming handler
+    // 1. Auth already validated by handle_messages
+    // 2. Translate request to MLX format
+    // 3. Call Python bridge with --stream flag
+    // 4. Parse streaming output
+    // 5. Generate SSE events using streaming::generate_sse_stream()
+    // 6. Return with proper SSE headers
+
+    // For now, return error indicating streaming not yet implemented
+    Ok(Box::new(warp::reply::with_status(
+        warp::reply::json(&json!({
+            "error": {
+                "type": "not_implemented",
+                "message": "Streaming not yet implemented"
+            }
+        })),
+        warp::http::StatusCode::NOT_IMPLEMENTED,
+    )))
 }
 
 #[cfg(test)]
