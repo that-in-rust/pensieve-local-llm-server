@@ -17,6 +17,9 @@ pub mod translator;
 /// HTTP server integration
 pub mod server;
 
+/// SSE streaming support
+pub mod streaming;
+
 /// Re-export commonly used types
 pub use auth::{AuthError, AuthResult, validate_auth};
 pub use translator::{
