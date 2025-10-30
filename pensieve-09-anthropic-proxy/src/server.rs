@@ -1,9 +1,16 @@
-//! HTTP Server Integration
+//! HTTP Server Integration with Memory Safety
 //!
-//! Integrates auth and translator modules into a Warp-based HTTP server
-//! that provides Anthropic API compatibility.
+//! Integrates auth, translator, and memory monitoring into a Warp-based HTTP server
+//! that provides Anthropic API compatibility with safety guarantees.
+//!
+//! Memory Safety Features:
+//! - Pre-request memory checking
+//! - Request rejection at Critical/Emergency levels
+//! - Memory status in response headers
+//! - Health endpoint with memory information
 
 use crate::auth::{validate_auth, AuthError};
+use crate::memory::{MemoryMonitor, MemoryStatus, SystemMemoryMonitor};
 use crate::translator::{translate_anthropic_to_mlx, translate_mlx_to_anthropic};
 use pensieve_03::anthropic::{CreateMessageRequest, CreateMessageResponse};
 use pensieve_03::ApiMessage; // Import trait for validate() method
@@ -33,17 +40,25 @@ impl Default for ServerConfig {
     }
 }
 
-/// HTTP API Server
+/// HTTP API Server with Memory Safety
 pub struct AnthropicProxyServer {
     config: ServerConfig,
+    memory_monitor: Arc<dyn MemoryMonitor>,
     shutdown_tx: Arc<RwLock<Option<tokio::sync::oneshot::Sender<()>>>>,
     server_handle: Arc<RwLock<Option<tokio::task::JoinHandle<()>>>>,
 }
 
 impl AnthropicProxyServer {
+    /// Create new server with default system memory monitor
     pub fn new(config: ServerConfig) -> Self {
+        Self::with_memory_monitor(config, Arc::new(SystemMemoryMonitor::new()))
+    }
+
+    /// Create server with custom memory monitor (for testing)
+    pub fn with_memory_monitor(config: ServerConfig, memory_monitor: Arc<dyn MemoryMonitor>) -> Self {
         Self {
             config,
+            memory_monitor,
             shutdown_tx: Arc::new(RwLock::new(None)),
             server_handle: Arc::new(RwLock::new(None)),
         }
@@ -119,27 +134,44 @@ impl AnthropicProxyServer {
         health.or(messages)
     }
 
-    /// Health check route
+    /// Health check route with memory information
     fn health_route(&self) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
+        let memory_monitor = self.memory_monitor.clone();
+
         warp::path("health")
             .and(warp::get())
-            .map(|| {
+            .map(move || {
+                let status = memory_monitor.check_status();
+                let available_gb = memory_monitor.available_gb();
+
+                let health_status = match status {
+                    MemoryStatus::Critical | MemoryStatus::Emergency => "unhealthy",
+                    _ => "healthy",
+                };
+
                 warp::reply::json(&json!({
-                    "status": "healthy",
-                    "service": "pensieve-anthropic-proxy"
+                    "status": health_status,
+                    "service": "pensieve-anthropic-proxy",
+                    "memory": {
+                        "status": format!("{:?}", status),
+                        "available_gb": format!("{:.2}", available_gb),
+                        "accepting_requests": status.accepts_requests()
+                    }
                 }))
             })
     }
 
-    /// Messages route with auth and translation
+    /// Messages route with auth, translation, and memory checking
     fn messages_route(&self) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
         let config = self.config.clone();
+        let memory_monitor = self.memory_monitor.clone();
 
         warp::path!("v1" / "messages")
             .and(warp::post())
             .and(warp::header::optional::<String>("authorization"))
             .and(warp::body::json())
             .and(warp::any().map(move || config.clone()))
+            .and(warp::any().map(move || memory_monitor.clone()))
             .and_then(handle_messages)
     }
 }
@@ -161,16 +193,84 @@ pub enum ServerError {
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("Critical memory pressure: {available_gb:.2}GB available")]
+    MemoryCritical {
+        available_gb: f64,
+    },
+
+    #[error("Emergency memory exhaustion: {available_gb:.2}GB available")]
+    MemoryEmergency {
+        available_gb: f64,
+    },
 }
 
 pub type ServerResult<T> = Result<T, ServerError>;
 
-/// Handle /v1/messages endpoint
+/// Handle /v1/messages endpoint with memory safety
 async fn handle_messages(
     auth_header: Option<String>,
     request: CreateMessageRequest,
     config: ServerConfig,
+    memory_monitor: Arc<dyn MemoryMonitor>,
 ) -> Result<Box<dyn Reply>, warp::Rejection> {
+    // Step 0: Check memory status BEFORE processing
+    let mem_status = memory_monitor.check_status();
+    let available_gb = memory_monitor.available_gb();
+
+    // Log memory status
+    match mem_status {
+        MemoryStatus::Safe => {
+            info!("Memory status: Safe ({:.2}GB available)", available_gb);
+        }
+        MemoryStatus::Caution => {
+            info!("Memory status: Caution ({:.2}GB available)", available_gb);
+        }
+        MemoryStatus::Warning => {
+            warn!("Memory status: Warning ({:.2}GB available)", available_gb);
+        }
+        MemoryStatus::Critical => {
+            error!("Memory status: Critical ({:.2}GB available) - rejecting request", available_gb);
+            return Ok(Box::new(warp::reply::with_status(
+                warp::reply::with_header(
+                    warp::reply::with_header(
+                        warp::reply::json(&json!({
+                            "error": {
+                                "type": "overloaded_error",
+                                "message": format!("Server is under critical memory pressure: {:.2}GB available", available_gb)
+                            }
+                        })),
+                        "x-memory-status",
+                        "Critical",
+                    ),
+                    "x-available-memory-gb",
+                    format!("{:.2}", available_gb),
+                ),
+                warp::http::StatusCode::SERVICE_UNAVAILABLE,
+            )));
+        }
+        MemoryStatus::Emergency => {
+            error!("Memory status: Emergency ({:.2}GB available) - rejecting request and logging emergency", available_gb);
+            return Ok(Box::new(warp::reply::with_status(
+                warp::reply::with_header(
+                    warp::reply::with_header(
+                        warp::reply::json(&json!({
+                            "error": {
+                                "type": "overloaded_error",
+                                "message": format!("Server is under emergency memory exhaustion: {:.2}GB available. Server may shutdown soon.", available_gb)
+                            }
+                        })),
+                        "x-memory-status",
+                        "Emergency",
+                    ),
+                    "x-available-memory-gb",
+                    format!("{:.2}", available_gb),
+                ),
+                warp::http::StatusCode::SERVICE_UNAVAILABLE,
+            )));
+        }
+    }
+
     // Step 1: Validate authentication
     let token = auth_header.clone().and_then(|h| h.strip_prefix("Bearer ").map(String::from));
 
@@ -204,7 +304,7 @@ async fn handle_messages(
     // Step 2.5: Check if streaming is requested
     if request.stream.unwrap_or(false) {
         info!("Streaming request detected, delegating to streaming handler");
-        return handle_messages_streaming(auth_header, request, config).await;
+        return handle_messages_streaming(auth_header, request, config, memory_monitor).await;
     }
 
     // Step 3: Translate Anthropic request to MLX format
@@ -399,10 +499,11 @@ async fn handle_messages_streaming(
     _auth_header: Option<String>,
     request: CreateMessageRequest,
     config: ServerConfig,
+    _memory_monitor: Arc<dyn MemoryMonitor>,
 ) -> Result<Box<dyn Reply>, warp::Rejection> {
     use crate::streaming::generate_sse_stream;
 
-    // Step 1: Auth already validated by handle_messages
+    // Step 1: Auth and memory already validated by handle_messages
 
     // Step 2: Translate request to MLX format
     let mlx_request = match translate_anthropic_to_mlx(&request) {
