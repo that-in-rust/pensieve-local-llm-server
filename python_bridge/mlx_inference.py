@@ -178,8 +178,8 @@ def load_model(model_path: str):
                 print("[PERF] Applied stream optimization", file=sys.stderr)
 
             if hasattr(mx.metal, 'set_cache_limit'):
-                mx.metal.set_cache_limit(1024 * 1024 * 1024)  # 1GB cache
-                print("[PERF] Applied Metal cache optimization", file=sys.stderr)
+                mx.metal.set_cache_limit(256 * 1024 * 1024)  # 256MB cache (optimized)
+                print("[PERF] Applied Metal cache optimization (256MB)", file=sys.stderr)
 
             # Use REAL MLX-LM loading (this handles Phi-3 automatically)
             model, tokenizer = load(model_path)
@@ -228,11 +228,11 @@ def optimize_mlx_performance():
         mx.set_stream(mx.default_stream())
         optimizations_applied.append("Stream optimization")
 
-    # Cache optimizations
+    # Cache optimizations (reduced to 256MB for better memory profile)
     if hasattr(mx.metal, 'set_cache_limit'):
         try:
-            mx.metal.set_cache_limit(1024 * 1024 * 1024)  # 1GB cache
-            optimizations_applied.append("Metal cache")
+            mx.metal.set_cache_limit(256 * 1024 * 1024)  # 256MB cache (optimized)
+            optimizations_applied.append("Metal cache (256MB)")
         except:
             pass  # Ignore if cache limit setting fails
 
@@ -333,8 +333,12 @@ def real_mlx_generate(
         tps = token_count / generation_time if generation_time > 0 else 0
         print(f"[PERF] Streaming: {token_count} tokens in {generation_time:.3f}s = {tps:.1f} TPS", file=sys.stderr)
 
-        # SAFETY: Clear cache after streaming (D17 requirement)
-        clear_mlx_cache()
+        # SAFETY: Only clear cache if memory is under pressure (CRITICAL or worse)
+        # Keeping cache warm improves performance
+        final_mem_status, final_available = check_memory_status()
+        if final_mem_status in ['CRITICAL', 'EMERGENCY']:
+            print(f"[MEMORY] Clearing cache due to memory pressure: {final_mem_status}", file=sys.stderr)
+            clear_mlx_cache()
         log_memory_state("AFTER")
 
     else:
@@ -364,9 +368,12 @@ def real_mlx_generate(
             yield response
 
         finally:
-            # SAFETY: Always clear cache after generation (D17 requirement)
-            # This prevents MLX memory leaks documented in GitHub issues #724, #1124
-            clear_mlx_cache()
+            # SAFETY: Only clear cache if memory is under pressure
+            # Keeping cache warm improves performance and reduces model reload overhead
+            final_mem_status, final_available = check_memory_status()
+            if final_mem_status in ['CRITICAL', 'EMERGENCY']:
+                print(f"[MEMORY] Clearing cache due to memory pressure: {final_mem_status}", file=sys.stderr)
+                clear_mlx_cache()
             log_memory_state("AFTER")
 
 def get_performance_metrics() -> Dict[str, Any]:

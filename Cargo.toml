@@ -50,6 +50,9 @@ safetensors = "0.4"
 proptest = "1.0"
 tempfile = "3.0"
 
+# System utilities
+sysinfo = "0.30"
+
 [profile.dev]
 debug = true
 opt-level = 0

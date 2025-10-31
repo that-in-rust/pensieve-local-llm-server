@@ -124,15 +124,57 @@ impl MockRequestHandler {
     }
 }
 
-/// MLX request handler that calls Python MLX bridge
-#[derive(Debug, Clone)]
+/// MLX request handler that calls persistent Python MLX HTTP server
+#[derive(Clone)]
 pub struct MlxRequestHandler {
     model_path: String,
+    mlx_server_url: String,
+    http_client: reqwest::Client,
+    /// Semaphore to limit concurrent inference requests
+    /// This prevents memory spikes from multiple simultaneous model activations
+    inference_semaphore: Arc<tokio::sync::Semaphore>,
+    /// Memory monitor for request gating
+    memory_monitor: Arc<pensieve_09_anthropic_proxy::memory::SystemMemoryMonitor>,
+}
+
+impl std::fmt::Debug for MlxRequestHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MlxRequestHandler")
+            .field("model_path", &self.model_path)
+            .field("mlx_server_url", &self.mlx_server_url)
+            .finish()
+    }
 }
 
 impl MlxRequestHandler {
+    /// Create a new MLX request handler
+    ///
+    /// Args:
+    ///   - model_path: Path to the MLX model (for reference only, server loads it)
+    ///   - mlx_server_url: URL of the persistent MLX server (default: http://127.0.0.1:8765)
+    ///   - max_concurrent: Maximum concurrent inference requests (default: 2)
     pub fn new(model_path: String) -> Self {
-        Self { model_path }
+        Self::with_config(
+            model_path,
+            "http://127.0.0.1:8765".to_string(),
+            2, // Safe default for Apple Silicon
+        )
+    }
+
+    pub fn with_config(
+        model_path: String,
+        mlx_server_url: String,
+        max_concurrent: usize,
+    ) -> Self {
+        info!("Initializing MLX handler - Server: {}, Max concurrent: {}", mlx_server_url, max_concurrent);
+
+        Self {
+            model_path,
+            mlx_server_url,
+            http_client: reqwest::Client::new(),
+            inference_semaphore: Arc::new(tokio::sync::Semaphore::new(max_concurrent)),
+            memory_monitor: Arc::new(pensieve_09_anthropic_proxy::memory::SystemMemoryMonitor::new()),
+        }
     }
 
     /// Extract the conversation text from messages
@@ -178,36 +220,95 @@ impl MlxRequestHandler {
         prompt_parts.join("\n")
     }
 
-    /// Call Python MLX bridge
-    async fn call_mlx_bridge(&self, prompt: &str, max_tokens: u32, temperature: f32, stream: bool) -> error::ServerResult<String> {
-        use tokio::process::Command;
-
-        let mut cmd = Command::new("python3");
-        cmd.arg("python_bridge/mlx_inference.py")
-            .arg("--model-path")
-            .arg(&self.model_path)
-            .arg("--prompt")
-            .arg(prompt)
-            .arg("--max-tokens")
-            .arg(max_tokens.to_string())
-            .arg("--temperature")
-            .arg(temperature.to_string());
-
-        if stream {
-            cmd.arg("--stream");
+    /// Call persistent Python MLX HTTP server for non-streaming generation
+    ///
+    /// This replaces the old process-per-request approach with HTTP calls to a
+    /// persistent server. The model stays loaded in the server's memory, avoiding
+    /// repeated multi-GB model loads.
+    async fn call_mlx_server(&self, prompt: &str, max_tokens: u32, temperature: f32) -> error::ServerResult<String> {
+        #[derive(serde::Serialize)]
+        struct GenerateRequest {
+            prompt: String,
+            max_tokens: u32,
+            temperature: f32,
+            stream: bool,
         }
 
-        let output = cmd.output()
+        #[derive(serde::Deserialize)]
+        struct GenerateResponse {
+            text: String,
+        }
+
+        let request_body = GenerateRequest {
+            prompt: prompt.to_string(),
+            max_tokens,
+            temperature,
+            stream: false,
+        };
+
+        let url = format!("{}/generate", self.mlx_server_url);
+
+        let response = self.http_client
+            .post(&url)
+            .json(&request_body)
+            .timeout(std::time::Duration::from_secs(60))
+            .send()
             .await
-            .map_err(|e| error::ServerError::Internal(format!("Failed to execute MLX bridge: {}", e)))?;
+            .map_err(|e| error::ServerError::Internal(format!("MLX server request failed: {}. Is the server running? Start with: python3 python_bridge/mlx_server.py --model-path {}", e, self.model_path)))?;
 
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(error::ServerError::Internal(format!("MLX bridge error: {}", stderr)));
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(error::ServerError::Internal(format!("MLX server error ({}): {}", status, error_text)));
         }
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        Ok(stdout.to_string())
+        let result: GenerateResponse = response.json().await
+            .map_err(|e| error::ServerError::Internal(format!("Failed to parse MLX server response: {}", e)))?;
+
+        Ok(result.text)
+    }
+
+    /// Call persistent Python MLX HTTP server for streaming generation
+    ///
+    /// Returns a byte stream from the server as Vec<u8> chunks.
+    async fn call_mlx_server_streaming(
+        &self,
+        prompt: &str,
+        max_tokens: u32,
+        temperature: f32,
+    ) -> error::ServerResult<reqwest::Response> {
+        #[derive(serde::Serialize)]
+        struct GenerateRequest {
+            prompt: String,
+            max_tokens: u32,
+            temperature: f32,
+            stream: bool,
+        }
+
+        let request_body = GenerateRequest {
+            prompt: prompt.to_string(),
+            max_tokens,
+            temperature,
+            stream: true,
+        };
+
+        let url = format!("{}/generate", self.mlx_server_url);
+
+        let response = self.http_client
+            .post(&url)
+            .json(&request_body)
+            .timeout(std::time::Duration::from_secs(120))
+            .send()
+            .await
+            .map_err(|e| error::ServerError::Internal(format!("MLX streaming request failed: {}. Is the server running?", e)))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(error::ServerError::Internal(format!("MLX streaming error ({}): {}", status, error_text)));
+        }
+
+        Ok(response)
     }
 
     /// Parse JSON response from Python bridge
@@ -242,8 +343,28 @@ impl MlxRequestHandler {
 #[async_trait::async_trait]
 impl traits::RequestHandler for MlxRequestHandler {
     async fn handle_message(&self, request: CreateMessageRequest) -> error::ServerResult<CreateMessageResponse> {
+        use pensieve_09_anthropic_proxy::memory::MemoryMonitor;
+
         // Validate request
         request.validate()?;
+
+        // MEMORY GATING: Check memory BEFORE acquiring semaphore
+        let mem_status = self.memory_monitor.check_status();
+        if !mem_status.accepts_requests() {
+            let available = self.memory_monitor.available_gb();
+            warn!("Request rejected - memory status: {:?}, available: {:.2}GB", mem_status, available);
+            return Err(error::ServerError::Internal(format!(
+                "Insufficient memory for inference. Status: {:?}, Available: {:.2}GB",
+                mem_status, available
+            )));
+        }
+
+        // CONCURRENCY LIMITING: Acquire semaphore permit
+        // This ensures only N requests can run simultaneously, preventing memory spikes
+        let _permit = self.inference_semaphore.acquire().await
+            .map_err(|e| error::ServerError::Internal(format!("Semaphore error: {}", e)))?;
+
+        info!("Processing inference request (memory status: {:?})", mem_status);
 
         // Extract prompt from messages
         let prompt = self.extract_prompt(&request.messages);
@@ -252,11 +373,10 @@ impl traits::RequestHandler for MlxRequestHandler {
         let max_tokens = request.max_tokens;
         let temperature = request.temperature.unwrap_or(0.7);
 
-        // Call MLX bridge
-        let response = self.call_mlx_bridge(&prompt, max_tokens, temperature, false).await?;
-        let generated_text = self.parse_mlx_response(&response)?;
+        // Call persistent MLX HTTP server (model already loaded!)
+        let generated_text = self.call_mlx_server(&prompt, max_tokens, temperature).await?;
 
-        // Calculate token counts before moving generated_text
+        // Calculate token counts
         let input_tokens = prompt.split_whitespace().count() as u32;
         let output_tokens = generated_text.split_whitespace().count() as u32;
 
@@ -279,8 +399,30 @@ impl traits::RequestHandler for MlxRequestHandler {
     }
 
     async fn handle_stream(&self, request: CreateMessageRequest) -> error::ServerResult<StreamingResponse> {
+        use pensieve_09_anthropic_proxy::memory::MemoryMonitor;
+        use futures::StreamExt;
+        use tokio_util::codec::{FramedRead, LinesCodec};
+
         // Validate request
         request.validate()?;
+
+        // MEMORY GATING: Check memory BEFORE acquiring semaphore
+        let mem_status = self.memory_monitor.check_status();
+        if !mem_status.accepts_requests() {
+            let available = self.memory_monitor.available_gb();
+            warn!("Streaming request rejected - memory status: {:?}, available: {:.2}GB", mem_status, available);
+            return Err(error::ServerError::Internal(format!(
+                "Insufficient memory for streaming. Status: {:?}, Available: {:.2}GB",
+                mem_status, available
+            )));
+        }
+
+        // CONCURRENCY LIMITING: Acquire semaphore permit
+        // Keep it alive for the duration of streaming
+        let permit = self.inference_semaphore.clone().acquire_owned().await
+            .map_err(|e| error::ServerError::Internal(format!("Semaphore error: {}", e)))?;
+
+        info!("Processing streaming request (memory status: {:?})", mem_status);
 
         // Extract prompt from messages
         let prompt = self.extract_prompt(&request.messages);
@@ -289,39 +431,66 @@ impl traits::RequestHandler for MlxRequestHandler {
         let max_tokens = request.max_tokens;
         let temperature = request.temperature.unwrap_or(0.7);
 
-        // Call MLX bridge for streaming
-        let response = self.call_mlx_bridge(&prompt, max_tokens, temperature, true).await?;
+        // Call persistent MLX HTTP server for streaming
+        let response = self.call_mlx_server_streaming(&prompt, max_tokens, temperature).await?;
 
-        // Parse streaming JSON responses
-        let mut stream_events = Vec::new();
+        // Convert byte stream to SSE events
+        // This is TRUE STREAMING - no buffering!
+        let stream = async_stream::stream! {
+            // Send message start event
+            yield "data: {\"type\": \"message_start\"}\n\n".to_string();
 
-        // Add message start event
-        stream_events.push("data: {\"type\": \"message_start\"}\n\n".to_string());
+            // Process chunks as they arrive
+            let mut byte_stream = response.bytes_stream();
+            let mut buffer = bytes::BytesMut::new();
 
-        // Process each line of streaming response
-        for line in response.lines() {
-            if line.trim().is_empty() {
-                continue;
-            }
+            while let Some(chunk_result) = byte_stream.next().await {
+                match chunk_result {
+                    Ok(chunk) => {
+                        buffer.extend_from_slice(&chunk);
 
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
-                if let Some(text) = json.get("text").and_then(|v| v.as_str()) {
-                    let event = format!(
-                        "data: {{\"type\": \"content_block_delta\", \"delta\": {{\"text\": \"{}\"}}}}\n\n",
-                        text.escape_default()
-                    );
-                    stream_events.push(event);
-                } else if let Some(_error) = json.get("error") {
-                    return Err(error::ServerError::Internal("MLX streaming error".to_string()));
+                        // Process complete lines from buffer
+                        while let Some(newline_pos) = buffer.iter().position(|&b| b == b'\n') {
+                            let line_bytes = buffer.split_to(newline_pos + 1);
+                            let line = String::from_utf8_lossy(&line_bytes);
+
+                            if line.trim().is_empty() {
+                                continue;
+                            }
+
+                            // Parse JSON chunk from MLX server
+                            if let Ok(json) = serde_json::from_str::<serde_json::Value>(line.trim()) {
+                                if let Some(text) = json.get("text").and_then(|v| v.as_str()) {
+                                    // Convert to Anthropic SSE format
+                                    let event = format!(
+                                        "data: {{\"type\": \"content_block_delta\", \"delta\": {{\"text\": \"{}\"}}}}\n\n",
+                                        text.escape_default()
+                                    );
+                                    yield event;
+                                } else if json.get("type").and_then(|v| v.as_str()) == Some("complete") {
+                                    // Streaming complete
+                                    break;
+                                } else if let Some(error) = json.get("error").and_then(|v| v.as_str()) {
+                                    error!("Streaming error from MLX server: {}", error);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("Stream error: {}", e);
+                        break;
+                    }
                 }
             }
-        }
 
-        // Add message stop event
-        stream_events.push("data: {\"type\": \"message_stop\"}\n\n".to_string());
+            // Send message stop event
+            yield "data: {\"type\": \"message_stop\"}\n\n".to_string();
 
-        // Create streaming response
-        let stream = futures::stream::iter(stream_events);
+            // Permit is dropped here, releasing semaphore
+            drop(permit);
+        };
+
         Ok(Box::pin(stream))
     }
 }
