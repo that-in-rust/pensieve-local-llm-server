@@ -1,0 +1,152 @@
+# Pensieve ISG Analysis - Overview
+
+**Generated**: 2025-11-04
+**Tool**: Parseltongue ISG Explorer
+**Codebase**: Pensieve Local LLM Server
+
+## Analysis Summary
+
+This directory contains a comprehensive Interface Signature Graph (ISG) analysis of the Pensieve codebase using Parseltongue. The analysis provides deep insights into the codebase structure, dependencies, and architecture.
+
+### Analysis Artifacts
+
+1. **ISGLevel00-edges.json** (160 MB)
+   - Pure edge list for dependency graph visualization
+   - 708,143 total edges across all analyzed code
+   - Optimized for graph visualization tools
+
+2. **ISGLevel01-entities.json** (148 MB)
+   - Entity catalog with ISG keys and temporal state
+   - 180,320 total entities indexed
+   - Includes forward/reverse dependency information
+
+3. **ISGLevel02-types.json** (161 MB)
+   - Full type system information
+   - Includes return types, parameters, trait implementations
+   - Tracks async/unsafe modifiers
+
+4. **pensieve-isg.db/** (RocksDB)
+   - Persistent CozoDB database with full analysis state
+   - Query-able for custom analysis
+
+5. **analysis-summary.json**
+   - High-level statistics and insights
+   - Crate-level dependency mapping
+
+### Pensieve Codebase Statistics
+
+- **Total entities**: 1,137 Rust/Python entities
+- **Crates analyzed**: 10 workspace crates
+- **Indexing duration**: 181 seconds
+- **Files processed**: 16,249 files
+- **Entities created**: 180,320 (including dependencies)
+
+### Crate Inventory
+
+| Crate | Entities | Functions | Methods | Structs | Description |
+|-------|----------|-----------|---------|---------|-------------|
+| **pensieve-01** | 54 | 15 | 16 | 7 | CLI interface |
+| **pensieve-02** | 60 | 17 | 21 | 7 | HTTP API server |
+| **pensieve-03** | 41 | 15 | 6 | 6 | API models |
+| **pensieve-04** | 217 | 41 | 93 | 26 | Engine layer |
+| **pensieve-05** | 339 | 41 | 184 | 33 | Model handling (largest) |
+| **pensieve-06** | 167 | 19 | 85 | 14 | Metal GPU layer |
+| **pensieve-07** | 25 | 4 | 7 | - | Core traits |
+| **pensieve-08_claude_core** | 49 | 11 | 14 | 6 | Claude integration |
+| **pensieve-09-anthropic-proxy** | 139 | 71 | 30 | 8 | Proxy layer |
+| **python_bridge** | 46 | 35 | 3 | 8 | MLX integration |
+
+### Analysis Documents
+
+1. **[01-module-dependencies.md](./01-module-dependencies.md)**
+   - Crate-level dependency graph
+   - Layer violation detection
+   - Import analysis
+
+2. **[02-data-flow.md](./02-data-flow.md)**
+   - Request flow through the system
+   - Data transformation pipeline
+   - Error propagation paths
+
+3. **[03-public-api-surface.md](./03-public-api-surface.md)**
+   - Public interface catalog
+   - API stability analysis
+   - Breaking change detection
+
+4. **[04-architectural-layers.md](./04-architectural-layers.md)**
+   - Layer architecture visualization
+   - Dependency rule compliance
+   - Architectural patterns
+
+## Key Insights
+
+### Architecture Health
+
+**Largest Crate**: `pensieve-05` (339 entities) - Model handling layer
+**Most Complex**: `pensieve-04` (217 entities) - Engine abstractions
+**Smallest**: `pensieve-07` (25 entities) - Core foundation traits
+
+### Complexity Distribution
+
+```
+Layer 1 (Core):         25 entities (pensieve-07)
+Layer 2 (Engine):      723 entities (pensieve-04, 05, 06)
+Layer 3 (Application): 294 entities (pensieve-01, 02, 03)
+External (Python):      46 entities (python_bridge)
+Other:                 188 entities (pensieve-08, 09)
+```
+
+## How to Use This Analysis
+
+### For Code Navigation
+
+Use `ISGLevel01-entities.json` to find entities by type, visibility, or name patterns.
+
+### For Dependency Analysis
+
+Use `ISGLevel00-edges.json` to trace dependencies between modules and detect circular dependencies.
+
+### For Refactoring
+
+Use `ISGLevel02-types.json` to understand type relationships and find all uses of a trait or interface.
+
+### For Custom Queries
+
+Connect to `pensieve-isg.db/` with CozoDB queries:
+```bash
+./parseltongue # Use custom query tools
+```
+
+## Next Steps
+
+1. Review architectural layers in `04-architectural-layers.md`
+2. Validate dependency rules in `01-module-dependencies.md`
+3. Assess public API stability in `03-public-api-surface.md`
+4. Trace request flow in `02-data-flow.md`
+
+## Regenerating Analysis
+
+To regenerate this analysis:
+
+```bash
+# Ingest codebase
+./parseltongue pt01-folder-to-cozodb-streamer . \
+  --db rocksdb:ultrathink-isg-analysis/pensieve-isg.db
+
+# Export all levels
+./parseltongue pt02-level00 --where-clause "ALL" \
+  --db rocksdb:ultrathink-isg-analysis/pensieve-isg.db \
+  --output ultrathink-isg-analysis/ISGLevel00-edges.json
+
+./parseltongue pt02-level01 --include-code 0 --where-clause "ALL" \
+  --db rocksdb:ultrathink-isg-analysis/pensieve-isg.db \
+  --output ultrathink-isg-analysis/ISGLevel01-entities.json
+
+./parseltongue pt02-level02 --include-code 0 --where-clause "ALL" \
+  --db rocksdb:ultrathink-isg-analysis/pensieve-isg.db \
+  --output ultrathink-isg-analysis/ISGLevel02-types.json
+```
+
+---
+
+*Generated by Parseltongue ISG Explorer - Interface Signature Graph Analysis*
