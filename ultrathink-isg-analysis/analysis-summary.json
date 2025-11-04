@@ -1,0 +1,132 @@
+{
+  "crate_stats": {
+    "python_bridge": {
+      "total": 46,
+      "public": 0,
+      "types": {
+        "class": 8,
+        "function": 35,
+        "method": 3
+      }
+    },
+    "pensieve-05": {
+      "total": 339,
+      "public": 0,
+      "types": {
+        "enum": 5,
+        "function": 41,
+        "impl": 63,
+        "method": 184,
+        "module": 9,
+        "struct": 33,
+        "trait": 4
+      }
+    },
+    "pensieve-03": {
+      "total": 41,
+      "public": 0,
+      "types": {
+        "enum": 5,
+        "function": 15,
+        "impl": 3,
+        "method": 6,
+        "module": 4,
+        "struct": 6,
+        "trait": 2
+      }
+    },
+    "pensieve-09-anthropic-proxy": {
+      "total": 139,
+      "public": 0,
+      "types": {
+        "enum": 5,
+        "function": 71,
+        "impl": 14,
+        "method": 30,
+        "module": 10,
+        "struct": 8,
+        "trait": 1
+      }
+    },
+    "pensieve-08_claude_core": {
+      "total": 49,
+      "public": 0,
+      "types": {
+        "enum": 7,
+        "function": 11,
+        "impl": 3,
+        "method": 14,
+        "module": 7,
+        "struct": 6,
+        "trait": 1
+      }
+    },
+    "pensieve-06": {
+      "total": 167,
+      "public": 0,
+      "types": {
+        "enum": 4,
+        "function": 19,
+        "impl": 35,
+        "method": 85,
+        "module": 6,
+        "struct": 14,
+        "trait": 4
+      }
+    },
+    "pensieve-01": {
+      "total": 54,
+      "public": 0,
+      "types": {
+        "enum": 4,
+        "function": 15,
+        "impl": 7,
+        "method": 16,
+        "module": 3,
+        "struct": 7,
+        "trait": 2
+      }
+    },
+    "pensieve-07": {
+      "total": 25,
+      "public": 0,
+      "types": {
+        "enum": 1,
+        "function": 4,
+        "impl": 6,
+        "method": 7,
+        "module": 3,
+        "struct": 1,
+        "trait": 3
+      }
+    },
+    "pensieve-04": {
+      "total": 217,
+      "public": 0,
+      "types": {
+        "enum": 1,
+        "function": 41,
+        "impl": 39,
+        "method": 93,
+        "module": 8,
+        "struct": 26,
+        "trait": 9
+      }
+    },
+    "pensieve-02": {
+      "total": 60,
+      "public": 0,
+      "types": {
+        "enum": 1,
+        "function": 17,
+        "impl": 9,
+        "method": 21,
+        "module": 3,
+        "struct": 7,
+        "trait": 2
+      }
+    }
+  },
+  "crate_deps": {},
+  "public_api": {}
+}
