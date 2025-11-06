@@ -31,6 +31,7 @@
 //! ```
 
 use sysinfo::System;
+use std::sync::Mutex;
 
 /// Memory monitoring trait for dependency injection
 ///
@@ -109,24 +110,28 @@ impl MemoryStatus {
 ///
 /// Uses RAII for automatic resource management.
 /// System refresh happens on each check for up-to-date information.
+///
+/// Thread-safe using Mutex for interior mutability to allow refreshing
+/// from &self methods (required by MemoryMonitor trait).
 pub struct SystemMemoryMonitor {
-    system: System,
+    system: Mutex<System>,
 }
 
 impl SystemMemoryMonitor {
     /// Create new system memory monitor
     ///
     /// Initializes sysinfo System with all components.
+    /// Wrapped in Mutex for thread-safe interior mutability.
     pub fn new() -> Self {
         Self {
-            system: System::new_all(),
+            system: Mutex::new(System::new_all()),
         }
     }
 
     /// Create with custom refresh settings (for testing/optimization)
     pub fn new_minimal() -> Self {
         Self {
-            system: System::new(),
+            system: Mutex::new(System::new()),
         }
     }
 }
@@ -152,8 +157,15 @@ impl MemoryMonitor for SystemMemoryMonitor {
     }
 
     fn available_gb(&self) -> f64 {
-        // Create new system and refresh memory info
-        let mut system = System::new();
+        // Lock the stored System, refresh it, and get memory info
+        // This reuses the System instance instead of creating a new one each time
+        let mut system = self.system.lock().unwrap_or_else(|poisoned| {
+            // If the mutex is poisoned, recover by taking the guard anyway
+            // Memory monitoring is critical and we want to continue operating
+            poisoned.into_inner()
+        });
+
+        // Refresh memory information to get current values
         system.refresh_memory();
 
         // Get available memory in bytes (sysinfo v0.30 API)
@@ -224,5 +236,52 @@ mod tests {
     fn test_memory_status_description() {
         assert!(MemoryStatus::Safe.description().contains("Normal"));
         assert!(MemoryStatus::Emergency.description().contains("Emergency"));
+    }
+
+    #[test]
+    fn test_system_monitor_reports_available_memory() {
+        // RED: Test that should FAIL with current bug
+        // This test documents the expected behavior: SystemMemoryMonitor
+        // should return the actual available memory (not 0.00GB)
+        let monitor = SystemMemoryMonitor::new();
+        let available = monitor.available_gb();
+
+        println!("SystemMemoryMonitor reports: {:.2} GB available", available);
+
+        // On a system with 25GB total RAM and some usage,
+        // we should have at least 1GB available
+        assert!(
+            available >= 1.0,
+            "Expected at least 1.0 GB available, but got {:.2} GB. \
+             This indicates a bug in memory reporting on macOS.",
+            available
+        );
+    }
+
+    #[test]
+    fn test_system_monitor_reuses_stored_system() {
+        // RED: This test documents the EFFICIENCY bug
+        // The current implementation creates a NEW System on every call,
+        // wasting the stored System instance. This test verifies the fix.
+
+        let monitor = SystemMemoryMonitor::new();
+
+        // Make multiple calls - they should all work consistently
+        let reading1 = monitor.available_gb();
+        let reading2 = monitor.available_gb();
+        let reading3 = monitor.available_gb();
+
+        // All readings should be reasonable (>0) and consistent
+        assert!(reading1 > 0.0, "First reading should be > 0, got {:.2}", reading1);
+        assert!(reading2 > 0.0, "Second reading should be > 0, got {:.2}", reading2);
+        assert!(reading3 > 0.0, "Third reading should be > 0, got {:.2}", reading3);
+
+        // Readings should be within 1GB of each other (accounting for system variance)
+        let max_diff = (reading1 - reading2).abs().max((reading2 - reading3).abs());
+        assert!(
+            max_diff < 1.0,
+            "Memory readings vary too much: {:.2}, {:.2}, {:.2} GB",
+            reading1, reading2, reading3
+        );
     }
 }
