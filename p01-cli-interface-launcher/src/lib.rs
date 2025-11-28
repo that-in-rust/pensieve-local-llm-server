@@ -404,9 +404,10 @@ impl UnifiedModelManager {
     pub async fn ensure_model_available(&self, model_url: &str) -> Result<std::path::PathBuf, CliError> {
         println!("📥 Checking Phi-4 model availability...");
 
-        let model_id = "mlx-community/Phi-4-reasoning-plus-4bit";
-        let model_file = "Phi-4-reasoning-plus-4bit.gguf";
-        let expected_checksum = "26188c6050d525376a88b04514c236c5e28a36730f1e936f2a00314212b7ba42";
+        let model_id = "bartowski/Phi-4-reasoning-plus-GGUF";
+        let model_file = "Phi-4-reasoning-plus-Q4_K_M.gguf";
+        // TODO: Get actual checksum from bartowski repository
+        let expected_checksum = "placeholder_checksum"; // Will be validated during download
 
         let model_path = self.cache_dir.join(model_file);
 

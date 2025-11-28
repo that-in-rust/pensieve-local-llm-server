@@ -11,8 +11,8 @@ use clap::Parser;
 #[command(name = "pensieve-local-llm-server")]
 #[command(about = "Zero-config local LLM server powered by Phi-4 reasoning model", long_about = None)]
 struct BakedCliArgs {
-    /// Baked-in: Phi-4-reasoning-plus-4bit model (ignored, always uses Phi-4)
-    #[arg(long, default_value = "mlx-community/Phi-4-reasoning-plus-4bit")]
+    /// Baked-in: Phi-4-reasoning-plus-GGUF model (ignored, always uses Phi-4)
+    #[arg(long, default_value = "bartowski/Phi-4-reasoning-plus-GGUF")]
     model_url: String,
 
     /// Baked-in: Fixed port 528491 (ignored, always uses 528491)
@@ -111,7 +111,7 @@ fn parse_baked_cli_arguments_with_defaults() -> Result<BakedCliArgs, CliError> {
 
     // PRD01: Enforce fixed configuration regardless of input
     let enforced_args = BakedCliArgs {
-        model_url: "mlx-community/Phi-4-reasoning-plus-4bit".to_string(),
+        model_url: "bartowski/Phi-4-reasoning-plus-GGUF".to_string(),
         port: 528491, // Fixed per PRD01
         cache_dir: args.cache_dir, // Allow cache directory override
         max_concurrent: 2,
