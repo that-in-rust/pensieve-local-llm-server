@@ -1,0 +1,36 @@
+[package]
+name = "pensieve-06_metal"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Metal GPU implementations for the Pensieve LLM server"
+categories = ["hardware-support", "api-bindings"]
+keywords = ["llm", "metal", "gpu", "macos", "acceleration"]
+
+[dependencies]
+# L1 core crate
+pensieve-07_core = { path = "../pensieve-07", package = "pensieve-07_core" }
+# L2 engine crate for inference interfaces
+pensieve-04_engine = { path = "../pensieve-04", package = "pensieve-04_engine" }
+
+# Candle ML framework dependencies
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+
+[dev-dependencies]
+# Testing dependencies
+proptest = { workspace = true }
+
+[features]
+default = ["std"]
+std = ["pensieve-07_core/std", "pensieve-04_engine/std"]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Metal framework bindings - only available on macOS
+metal = "0.27"
+objc = "0.2"
+cocoa = "0.25"
+core-graphics = "0.23"
+

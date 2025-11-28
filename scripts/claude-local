@@ -1,0 +1,71 @@
+#!/bin/bash
+#
+# claude-local - Isolated Claude Code wrapper for Pensieve Local LLM Server
+#
+# Purpose: Run Claude Code with local Pensieve server WITHOUT modifying global config
+#
+# Usage:
+#   ./scripts/claude-local --print "test"
+#   ./scripts/claude-local  # Interactive mode
+#   PENSIEVE_PORT=8888 ./scripts/claude-local  # Custom port
+#
+# Features:
+# - Environment variable isolation (no ~/.claude/settings.json changes)
+# - Multiple instances supported (different terminals, different ports)
+# - Health check before running
+# - Clear error messages
+#
+# Following D18 specifications and S01 steering docs
+
+set -e
+
+# Configuration (can be overridden by env vars)
+PENSIEVE_PORT=${PENSIEVE_PORT:-8765}
+PENSIEVE_TOKEN=${PENSIEVE_TOKEN:-pensieve-local-token}
+PENSIEVE_HOST=${PENSIEVE_HOST:-127.0.0.1}
+
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Check if claude command exists
+if ! command -v claude &> /dev/null; then
+    echo -e "${RED}❌ Error: 'claude' command not found${NC}" >&2
+    echo -e "${YELLOW}   Install Claude Code from: https://claude.com/code${NC}" >&2
+    exit 1
+fi
+
+# Health check - verify server is running
+HEALTH_URL="http://${PENSIEVE_HOST}:${PENSIEVE_PORT}/health"
+
+if ! curl -s -f "${HEALTH_URL}" > /dev/null 2>&1; then
+    echo -e "${RED}❌ Error: Pensieve server not responding on port ${PENSIEVE_PORT}${NC}" >&2
+    echo "" >&2
+    echo -e "${YELLOW}Start the server with:${NC}" >&2
+    echo -e "  ${BLUE}cargo run --bin pensieve-proxy --release${NC}" >&2
+    echo "" >&2
+    echo -e "${YELLOW}Or check if it's running on a different port${NC}" >&2
+    exit 1
+fi
+
+# Show configuration
+echo -e "${GREEN}🔧 Using Pensieve Local LLM Server${NC}" >&2
+echo -e "   ${BLUE}URL:${NC} http://${PENSIEVE_HOST}:${PENSIEVE_PORT}" >&2
+echo -e "   ${BLUE}Token:${NC} ${PENSIEVE_TOKEN}" >&2
+echo "" >&2
+
+# Set environment variables for THIS PROCESS ONLY
+# These do NOT modify ~/.claude/settings.json
+# Other terminals remain unaffected
+export ANTHROPIC_BASE_URL="http://${PENSIEVE_HOST}:${PENSIEVE_PORT}"
+export ANTHROPIC_API_KEY="${PENSIEVE_TOKEN}"
+
+# Optional: Set longer timeout for local inference
+export API_TIMEOUT_MS=${API_TIMEOUT_MS:-3000000}  # 50 minutes
+
+# Run Claude Code with all arguments passed through
+# exec replaces this shell process, so exit code is preserved
+exec claude "$@"
