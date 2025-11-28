@@ -6,46 +6,43 @@ Pensieve replaces the "brain" of the `claude` CLI with a local model running on 
 
 ---
 
-## Quick Start (The "Smart Launcher" Way)
+## Quick Start (One-Line Install)
 
-We provide a single script that handles everything: checks dependencies, downloads the model (if missing), starts the background server, and launches Claude.
-
-### 1. Prerequisites
-- **macOS with Apple Silicon** (M1/M2/M3/M4)
-- **Python 3.9+**
-- **Claude Code** installed (`npm install -g @anthropic-ai/claude-code`)
-
-### 2. Run it
+Copy and run this command. It handles everything: cloning, dependencies, model download, server startup, and launching Claude.
 
 ```bash
-# 1. Get the code
-git clone https://github.com/that-in-rust/pensieve-local-llm-server.git
-cd pensieve-local-llm-server
-
-# 2. Launch (Handles setup, server start, and Claude session)
-./scripts/pensieve
+curl -sL https://raw.githubusercontent.com/that-in-rust/pensieve-local-llm-server/main/scripts/install.sh | bash
 ```
 
-*That's it. The script will download the model (first time only), start the server, and drop you into Claude.*
+*Note: Requires macOS (Apple Silicon), Python 3.9+, and Claude Code.*
 
 ---
 
-## Manual Setup (Under the Hood)
+## Usage
 
-If you prefer to do things manually:
+After installation, you can run it anytime using the alias installed to `~/.local/bin/pensieve`:
 
-1.  **Install Deps**: `pip3 install -r python_bridge/requirements.txt huggingface_hub`
-2.  **Download Model**: `python3 -m huggingface_hub.cli download mlx-community/Phi-3-mini-128k-instruct-4bit --local-dir models/Phi-3-mini-128k-instruct-4bit`
-3.  **Start Server**: `./scripts/start-mlx-server.sh`
-4.  **Run Claude**: `./scripts/claude-local`
+```bash
+# Make sure ~/.local/bin is in your PATH
+pensieve
+```
+
+Or manually run the script from the install directory:
+`~/.local/share/pensieve-server/scripts/pensieve`
+
+---
+
+## How It Works
+
+1.  **Installs** to `~/.local/share/pensieve-server`.
+2.  **Downloads** the Phi-3 model (first run only).
+3.  **Starts** the local inference server in the background.
+4.  **Launches** `claude` configured to talk to localhost.
 
 ## Troubleshooting
 
-**"Connection Refused"**
-- The smart launcher `./scripts/pensieve` attempts to start the server automatically. If it fails, check `server.log`.
-
-**"Model not found"**
-- The script should download it automatically. Check your internet connection.
+**"command not found: pensieve"**
+- Add `export PATH=$PATH:~/.local/bin` to your `~/.zshrc`.
 
 **"claude command not found"**
-- You need to install Claude Code first: `npm install -g @anthropic-ai/claude-code`
+- Install Claude Code: `npm install -g @anthropic-ai/claude-code`
