@@ -20,7 +20,7 @@
 set -e
 
 # Configuration (can be overridden by env vars)
-PENSIEVE_PORT=${PENSIEVE_PORT:-7777}
+PENSIEVE_PORT=${PENSIEVE_PORT:-8765}
 PENSIEVE_TOKEN=${PENSIEVE_TOKEN:-pensieve-local-token}
 PENSIEVE_HOST=${PENSIEVE_HOST:-127.0.0.1}
 

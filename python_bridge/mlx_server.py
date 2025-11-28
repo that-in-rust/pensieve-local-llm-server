@@ -59,6 +59,8 @@ MAX_CONCURRENT_INFERENCES = 2  # Safe default for Apple Silicon
 # Metal cache configuration (optimized for memory efficiency)
 MLX_METAL_CACHE_MB = 256  # Reduced from 1GB to 256MB for better memory profile
 
+import uuid
+from typing import Dict, Any, Optional, List, Union
 
 class GenerateRequest(BaseModel):
     """Request model for /generate endpoint"""
@@ -66,6 +68,95 @@ class GenerateRequest(BaseModel):
     max_tokens: int = Field(default=100, ge=1, le=2048, description="Maximum tokens to generate")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Generation temperature")
     stream: bool = Field(default=False, description="Enable streaming response")
+
+class AnthropicMessage(BaseModel):
+    role: str
+    content: Union[str, List[Dict[str, Any]]]
+
+class AnthropicRequest(BaseModel):
+    model: str
+    messages: List[AnthropicMessage]
+    max_tokens: int = Field(default=1024, ge=1)
+    temperature: float = Field(default=0.7, ge=0.0, le=1.0)
+    stream: bool = False
+    system: Optional[str] = None
+
+def convert_to_phi3_prompt(req: AnthropicRequest) -> str:
+    """Convert Anthropic messages to Phi-3 prompt format"""
+    prompt = ""
+    
+    # Handle system prompt if present
+    if req.system:
+        prompt += f"<|system|>\n{req.system}<|end|>\n"
+        
+    for msg in req.messages:
+        content = msg.content
+        if isinstance(content, list):
+            # Extract text from content blocks
+            text_parts = [block.get("text", "") for block in content if block.get("type") == "text"]
+            content = "".join(text_parts)
+            
+        prompt += f"<|{msg.role}|>\n{content}<|end|>\n"
+        
+    prompt += "<|assistant|>\n"
+    return prompt
+
+async def stream_anthropic_generator(
+    model_data: Dict[str, Any],
+    prompt: str,
+    max_tokens: int,
+    temperature: float,
+    msg_id: str
+):
+    """Yields SSE events in Anthropic format"""
+    loop = asyncio.get_event_loop()
+    chunk_queue = asyncio.Queue()
+
+    def sync_stream():
+        try:
+            for chunk in real_mlx_generate(
+                model_data, prompt, max_tokens, temperature, stream=True
+            ):
+                asyncio.run_coroutine_threadsafe(
+                    chunk_queue.put({"type": "chunk", "text": chunk}), loop
+                )
+            asyncio.run_coroutine_threadsafe(chunk_queue.put({"type": "done"}), loop)
+        except Exception as e:
+            asyncio.run_coroutine_threadsafe(
+                chunk_queue.put({"type": "error", "error": str(e)}), loop
+            )
+
+    loop.run_in_executor(None, sync_stream)
+
+    # 1. message_start
+    yield f"event: message_start\ndata: {json.dumps({'type': 'message_start', 'message': {'id': msg_id, 'type': 'message', 'role': 'assistant', 'content': [], 'model': 'phi-3', 'stop_reason': None, 'stop_sequence': None, 'usage': {'input_tokens': 0, 'output_tokens': 0}}})}\n\n"
+    
+    # 2. content_block_start
+    yield f"event: content_block_start\ndata: {json.dumps({'type': 'content_block_start', 'index': 0, 'content_block': {'type': 'text', 'text': ''}})}\n\n"
+
+    while True:
+        chunk = await chunk_queue.get()
+        
+        if chunk["type"] == "done":
+            break
+        elif chunk["type"] == "error":
+            # Log error but finish stream gracefully to avoid client crash
+            print(f"[ERROR] Streaming failed: {chunk['error']}", file=sys.stderr)
+            break
+        else:
+            text = chunk["text"]
+            if text:
+                # 3. content_block_delta
+                yield f"event: content_block_delta\ndata: {json.dumps({'type': 'content_block_delta', 'index': 0, 'delta': {'type': 'text_delta', 'text': text}})}\n\n"
+
+    # 4. content_block_stop
+    yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': 0})}\n\n"
+
+    # 5. message_delta
+    yield f"event: message_delta\ndata: {json.dumps({'type': 'message_delta', 'delta': {'stop_reason': 'end_turn', 'stop_sequence': None, 'usage': {'output_tokens': 0}}})}\n\n"
+
+    # 6. message_stop
+    yield f"event: message_stop\ndata: {json.dumps({'type': 'message_stop'})}\n\n"
 
 
 class HealthResponse(BaseModel):
@@ -379,6 +470,51 @@ async def clear_cache():
         "memory_available_gb": round(check_memory_status()[1], 2)
     }
 
+
+@app.post("/v1/messages")
+async def create_message(request: AnthropicRequest):
+    """Anthropic-compatible message generation endpoint"""
+    if not _global_model:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+
+    # Memory checks
+    mem_status, mem_available = check_memory_status()
+    if mem_status in ['CRITICAL', 'EMERGENCY']:
+        if mem_status == 'EMERGENCY': clear_mlx_cache()
+        raise HTTPException(status_code=503, detail=f"Memory pressure: {mem_status}")
+
+    prompt = convert_to_phi3_prompt(request)
+    msg_id = f"msg_{uuid.uuid4()}"
+
+    async with _inference_semaphore:
+        print(f"[ANTHROPIC] Request: {prompt[:50].replace(chr(10), ' ')}... | Stream: {request.stream}", file=sys.stderr)
+        
+        if request.stream:
+            return StreamingResponse(
+                stream_anthropic_generator(
+                    _global_model, prompt, request.max_tokens, request.temperature, msg_id
+                ),
+                media_type="text/event-stream"
+            )
+        else:
+            # Non-streaming
+            result = await generate_non_streaming(
+                _global_model, prompt, request.max_tokens, request.temperature
+            )
+            
+            return {
+                "id": msg_id,
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "text", "text": result["text"]}],
+                "model": request.model,
+                "stop_reason": "end_turn",
+                "stop_sequence": None,
+                "usage": {
+                    "input_tokens": len(prompt.split()), # Approx
+                    "output_tokens": result["tokens"]
+                }
+            }
 
 def main():
     """
