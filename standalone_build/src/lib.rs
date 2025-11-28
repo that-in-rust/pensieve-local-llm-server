@@ -1,10 +1,9 @@
-/// STUB Phase: CLI Interface Tests
-/// These tests will fail initially - this is the RED phase of TDD
+# STUB Phase: CLI Interface Tests
+# These tests will fail initially - this is the RED phase of TDD
 
 use clap::Parser;
 use std::path::PathBuf;
 use indicatif::{ProgressBar, ProgressStyle};
-use tokio::io::AsyncWriteExt;
 
 /// CLI arguments following four-word naming convention
 #[derive(Debug, Parser)]
@@ -244,10 +243,9 @@ pub async fn create_unified_server_from_args(args: UnifiedCliArgs) -> Result<Uni
     // Create server configuration
     let server_config = UnifiedServerConfig {
         host: "127.0.0.1".to_string(),
-        port: args.port as u32,
+        port: args.port,
         model_path,
         max_concurrent_requests: args.max_concurrent,
-        cache_dir: args.cache_dir.clone(),
     };
 
     // Initialize unified server
@@ -258,10 +256,9 @@ pub async fn create_unified_server_from_args(args: UnifiedCliArgs) -> Result<Uni
 #[derive(Debug, Clone)]
 pub struct UnifiedServerConfig {
     pub host: String,
-    pub port: u32,
+    pub port: u16,
     pub model_path: std::path::PathBuf,
     pub max_concurrent_requests: usize,
-    pub cache_dir: std::path::PathBuf,
 }
 
 /// Unified LLM server that wires all p01-p09 components together
@@ -287,7 +284,7 @@ impl UnifiedServer {
     /// - Component initialization failure
     pub async fn new(config: UnifiedServerConfig) -> Result<Self, CliError> {
         // TODO: Initialize model manager, inference engine, HTTP server
-        let model_manager = UnifiedModelManager::new(config.model_path.parent().unwrap_or_else(|| std::path::Path::new(".")).to_path_buf())?;
+        let model_manager = UnifiedModelManager::new(config.model_path.parent().unwrap_or_else(|| std::path::PathBuf::from(".")))?;
 
         Ok(Self {
             config,
@@ -401,7 +398,7 @@ impl UnifiedModelManager {
     /// - Network connection error
     /// - Insufficient disk space
     /// - Checksum validation failure
-    pub async fn ensure_model_available(&self, model_url: &str) -> Result<std::path::PathBuf, CliError> {
+    async fn ensure_model_available(&self, model_url: &str) -> Result<std::path::PathBuf, CliError> {
         println!("📥 Checking Phi-4 model availability...");
 
         let model_id = "mlx-community/Phi-4-reasoning-plus-4bit";
@@ -577,7 +574,7 @@ impl UnifiedModelManager {
     /// - Unable to determine disk space
     async fn check_disk_space(&self, model_path: &std::path::Path) -> Result<(), CliError> {
         // For now, implement a simple check - in production, use actual disk space checking
-        let required_space: u64 = 5_000_000_000; // 5GB in bytes
+        let required_space = 5_000_000_000; // 5GB in bytes
 
         // This is a simplified check - real implementation would check actual available space
         // For now, we'll assume sufficient space and let the download fail if needed
@@ -627,7 +624,7 @@ pub struct SystemCheckResult {
 #[derive(Debug, Clone)]
 pub struct ServerConfig {
     pub host: String,           // Fixed: "127.0.0.1"
-    pub port: u32,             // Fixed: 528491
+    pub port: u16,             // Fixed: 528491
     pub max_concurrent_requests: usize,  // Fixed: 10
     pub request_timeout_ms: u64,        // Fixed: 30000
     pub enable_cors: bool,              // Fixed: true
@@ -645,7 +642,24 @@ impl Default for ServerConfig {
     }
 }
 
-// Duplicate CliError removed - using the complete one above
+/// CLI error types following parseltongue patterns
+#[derive(Debug, thiserror::Error)]
+pub enum CliError {
+    #[error("Invalid argument: {0}")]
+    InvalidArgument(String),
+
+    #[error("System check failed: {0}")]
+    SystemCheckFailed(String),
+
+    #[error("Directory creation failed: {0}")]
+    DirectoryCreationFailed(String),
+
+    #[error("Server launch failed: {0}")]
+    ServerLaunchFailed(String),
+
+    #[error("Configuration error: {0}")]
+    ConfigurationError(String),
+}
 
 #[cfg(test)]
 mod tests {

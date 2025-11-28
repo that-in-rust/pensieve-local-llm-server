@@ -45,6 +45,14 @@ candle-transformers = "0.8"
 safetensors = "0.4"
 tokenizers = "0.19"
 
+# Hugging Face integration
+hf-hub = { version = "0.3", features = ["tokio"] }
+indicatif = "0.17"
+dirs = "5.0"
+
+# Progress reporting
+progress = "0.2"
+
 # Async utilities
 futures = "0.3"
 async-stream = "0.3"

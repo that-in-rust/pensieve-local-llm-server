@@ -17,7 +17,7 @@ struct BakedCliArgs {
 
     /// Baked-in: Fixed port 528491 (ignored, always uses 528491)
     #[arg(long, default_value = "528491")]
-    port: u32,
+    port: u16,
 
     /// Baked-in: Default cache directory
     #[arg(long, default_value = "./models")]
@@ -81,9 +81,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// Import from lib.rs for standalone binary
+// Import our four-word functions from lib.rs
 use std::path::PathBuf;
-use pensieve_local_llm_server::{
+
+// Re-export from lib.rs
+pub use {
     parse_cli_arguments_validate,
     check_system_prerequisites_quiet,
     ensure_model_directory_exists,
@@ -91,8 +93,6 @@ use pensieve_local_llm_server::{
     ServerConfig,
     SystemCheckResult,
     CliError,
-    UnifiedModelManager,
-    UnifiedServerConfig,
 };
 
 /// Parse baked CLI arguments with PRD01 defaults
@@ -112,7 +112,7 @@ fn parse_baked_cli_arguments_with_defaults() -> Result<BakedCliArgs, CliError> {
     // PRD01: Enforce fixed configuration regardless of input
     let enforced_args = BakedCliArgs {
         model_url: "mlx-community/Phi-4-reasoning-plus-4bit".to_string(),
-        port: 528491, // Fixed per PRD01
+        port: 528491,
         cache_dir: args.cache_dir, // Allow cache directory override
         max_concurrent: 2,
         skip_download: false,
@@ -147,7 +147,6 @@ fn create_prd01_baked_config() -> Result<UnifiedServerConfig, CliError> {
         port: 528491, // Fixed per PRD01
         model_path: cache_dir.join("Phi-4-reasoning-plus-4bit.gguf"), // Will be populated by model manager
         max_concurrent_requests: 2, // Conservative for Apple Silicon
-        cache_dir,
     })
 }
 

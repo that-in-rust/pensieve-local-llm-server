@@ -1,47 +1,44 @@
-# Pensieve Local LLM Server
 
-**Run Claude Code with a local LLM on Apple Silicon.**
+# pensieve-local-llm-server
 
-Pensieve provides a local "brain" for Claude Code, replacing the Anthropic API with a local Phi-3 model running on your Mac's GPU (via MLX).
+Ultra-minimal Apple Silicon binary that ships a preconfigured Claude-compatible endpoint powered by Phi-4 advanced reasoning model.
 
-## Prerequisites
-1. **macOS with Apple Silicon** (M1/M2/M3/M4)
-2. **Python 3.9+**
-3. **Claude Code** (`npm install -g @anthropic-ai/claude-code`)
-
-## Usage
-
-There is only one script you need: `pensieve`.
-
-### Flow 1: The Happy Path (Daily Usage)
-When you want to work with Claude locally:
+## Quick Start (Raw GitHub shell plan)
 
 ```bash
-./pensieve
+# From any folder
+curl -sSf https://raw.githubusercontent.com/that-in-rust/pensieve-local-llm-server/main/pensieve.sh | bash
 ```
-1. The script checks that everything is ready.
-2. It starts the server (if not already running).
-3. It launches a `claude` session connected to your local model.
-4. **When you are done**, simply press `Ctrl-C` to exit Claude. The server shuts down automatically.
 
-### Flow 2: First Run (Installation)
-The first time you run `./pensieve`, it handles the setup automatically:
+The `pensieve.sh` helper script:
+1. Fetches the latest `pensieve-local-llm-server` binary from GitHub releases.
+2. Ensures the prebuilt `Phi-4-reasoning-plus-4bit` MLX bundle is present (downloads with resume + checksum if missing).
+3. Runs the binary with the baked-in configuration so no extra flags are needed.
 
-1. It detects missing dependencies and installs them (`mlx-lm`, `fastapi`, etc.).
-2. It detects the missing model and downloads `Phi-3-mini-128k-instruct-4bit` (~2.5GB).
-3. Once downloaded, it proceeds to start the server and launch Claude.
+## Zero-Config Behavior
 
-## Architecture
-The project has been simplified for distribution:
+The binary still uses the clap-based CLI stack, but every flag is hard-coded:
+- **Model**: `Phi-4-reasoning-plus-4bit` (advanced reasoning model with MLX optimization in `models/phi-4-reasoning-plus-4bit/`).
+- **Port**: `528491` on localhost.
+- **API surface**: `/v1/messages` (Anthropic-compatible) + `/health`.
 
-- **`pensieve`**: The master launcher script. Handles lifecycle, updates, and execution.
-- **`src/`**: The Python source code for the inference server.
-- **`zz-archive/`**: Legacy Rust code and experiments.
+Running `pensieve-local-llm-server` directly is equivalent to `pensieve.sh`’s final step.
 
-## Troubleshooting
+## User Journey
 
-**"command not found: claude"**
-Install Claude Code: `npm install -g @anthropic-ai/claude-code`
+### First Run
+1. Execute the curl | bash snippet above.
+2. Script verifies Apple Silicon + MLX prerequisites.
+3. Script downloads/releases the binary, fetches the MLX bundle if absent, then launches the server.
+4. Console logs show download progress and conclude with `http://127.0.0.1:528491` ready for requests.
 
-**"Server failed to start"**
-Check `~/.local/share/pensieve/server.log` for details.
+### Subsequent Runs
+1. Re-run `pensieve-local-llm-server` (or the script) from any folder.
+2. Cache hit skips downloads; startup completes in <10 s before serving Anthropic-compatible traffic.
+
+## Implementation Snapshot
+1. **Single Binary Architecture** – p01–p09 crates wired into one binary.
+2. **Hard-Coded CLI Inputs** – clap wiring retained but only the baked-in model + port are honored.
+3. **Prebuilt Model Cache** – Phi-4-reasoning-plus-4bit bundle pulled from mlx-community with checksum verification; advanced reasoning capabilities out-of-the-box.
+4. **Apple Silicon MLX Acceleration** – All inference logic runs in Rust, driving MLX through Rust↔C bindings for Metal execution.
+5. **Anthropic Compatibility** – `/v1/messages` endpoint mirrors Claude API semantics; `/health` for readiness checks.
