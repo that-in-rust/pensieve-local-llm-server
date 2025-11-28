@@ -1,48 +1,47 @@
 # Pensieve Local LLM Server
 
-**Run Claude Code with a local LLM on Apple Silicon - no API fees, complete privacy.**
+**Run Claude Code with a local LLM on Apple Silicon.**
 
-Pensieve replaces the "brain" of the `claude` CLI with a local model running on your Mac's GPU (via MLX).
+Pensieve provides a local "brain" for Claude Code, replacing the Anthropic API with a local Phi-3 model running on your Mac's GPU (via MLX).
 
----
-
-## Quick Start (One-Line Install)
-
-Copy and run this command. It handles everything: cloning, dependencies, model download, server startup, and launching Claude.
-
-```bash
-curl -sL https://raw.githubusercontent.com/that-in-rust/pensieve-local-llm-server/main/scripts/install.sh | bash
-```
-
-*Note: Requires macOS (Apple Silicon), Python 3.9+, and Claude Code.*
-
----
+## Prerequisites
+1. **macOS with Apple Silicon** (M1/M2/M3/M4)
+2. **Python 3.9+**
+3. **Claude Code** (`npm install -g @anthropic-ai/claude-code`)
 
 ## Usage
 
-After installation, you can run it anytime using the alias installed to `~/.local/bin/pensieve`:
+There is only one script you need: `pensieve`.
+
+### Flow 1: The Happy Path (Daily Usage)
+When you want to work with Claude locally:
 
 ```bash
-# Make sure ~/.local/bin is in your PATH
-pensieve
+./pensieve
 ```
+1. The script checks that everything is ready.
+2. It starts the server (if not already running).
+3. It launches a `claude` session connected to your local model.
+4. **When you are done**, simply press `Ctrl-C` to exit Claude. The server shuts down automatically.
 
-Or manually run the script from the install directory:
-`~/.local/share/pensieve-server/scripts/pensieve`
+### Flow 2: First Run (Installation)
+The first time you run `./pensieve`, it handles the setup automatically:
 
----
+1. It detects missing dependencies and installs them (`mlx-lm`, `fastapi`, etc.).
+2. It detects the missing model and downloads `Phi-3-mini-128k-instruct-4bit` (~2.5GB).
+3. Once downloaded, it proceeds to start the server and launch Claude.
 
-## How It Works
+## Architecture
+The project has been simplified for distribution:
 
-1.  **Installs** to `~/.local/share/pensieve-server`.
-2.  **Downloads** the Phi-3 model (first run only).
-3.  **Starts** the local inference server in the background.
-4.  **Launches** `claude` configured to talk to localhost.
+- **`pensieve`**: The master launcher script. Handles lifecycle, updates, and execution.
+- **`src/`**: The Python source code for the inference server.
+- **`zz-archive/`**: Legacy Rust code and experiments.
 
 ## Troubleshooting
 
-**"command not found: pensieve"**
-- Add `export PATH=$PATH:~/.local/bin` to your `~/.zshrc`.
+**"command not found: claude"**
+Install Claude Code: `npm install -g @anthropic-ai/claude-code`
 
-**"claude command not found"**
-- Install Claude Code: `npm install -g @anthropic-ai/claude-code`
+**"Server failed to start"**
+Check `~/.local/share/pensieve/server.log` for details.
