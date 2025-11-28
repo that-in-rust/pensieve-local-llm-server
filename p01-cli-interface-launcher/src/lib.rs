@@ -89,7 +89,7 @@ pub fn check_system_prerequisites_quiet() -> Result<SystemCheckResult, CliError>
     // Check minimum memory requirement (8GB)
     let has_sufficient_memory = true; // TODO: Implement actual memory check
 
-    // Check disk space (5GB for model)
+    // Check disk space (10GB for MLX-optimized Phi-4 model)
     let has_sufficient_disk = true; // TODO: Implement actual disk space check
 
     // Check MLX availability (assume available on Apple Silicon)
@@ -388,7 +388,7 @@ impl UnifiedModelManager {
     ///
     /// # Preconditions
     /// - Network connection available
-    /// - Sufficient disk space (>5GB)
+    /// - Sufficient disk space (>10GB)
     /// - Write permissions in cache directory
     ///
     /// # Postconditions
@@ -404,8 +404,8 @@ impl UnifiedModelManager {
     pub async fn ensure_model_available(&self, model_url: &str) -> Result<std::path::PathBuf, CliError> {
         println!("📥 Checking Phi-4 model availability...");
 
-        let model_id = "bartowski/Phi-4-reasoning-plus-GGUF";
-        let model_file = "Phi-4-reasoning-plus-Q4_K_M.gguf";
+        let model_id = "mlx-community/Phi-4-mini-instruct-mlx";
+        let model_file = "model.safetensors";
         // TODO: Get actual checksum from bartowski repository
         let expected_checksum = "placeholder_checksum"; // Will be validated during download
 
@@ -578,7 +578,7 @@ impl UnifiedModelManager {
     /// - Unable to determine disk space
     async fn check_disk_space(&self, model_path: &std::path::Path) -> Result<(), CliError> {
         // For now, implement a simple check - in production, use actual disk space checking
-        let required_space: u64 = 5_000_000_000; // 5GB in bytes
+        let required_space: u64 = 10_000_000_000; // 10GB in bytes
 
         // This is a simplified check - real implementation would check actual available space
         // For now, we'll assume sufficient space and let the download fail if needed

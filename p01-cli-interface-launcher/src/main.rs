@@ -11,8 +11,8 @@ use clap::Parser;
 #[command(name = "pensieve-local-llm-server")]
 #[command(about = "Zero-config local LLM server powered by Phi-4 reasoning model", long_about = None)]
 struct BakedCliArgs {
-    /// Baked-in: Phi-4-reasoning-plus-GGUF model (ignored, always uses Phi-4)
-    #[arg(long, default_value = "bartowski/Phi-4-reasoning-plus-GGUF")]
+    /// Baked-in: Phi-4-mini-instruct-MLX model (ignored, always uses Phi-4)
+    #[arg(long, default_value = "mlx-community/Phi-4-mini-instruct-mlx")]
     model_url: String,
 
     /// Baked-in: Fixed port 528491 (ignored, always uses 528491)
@@ -60,13 +60,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let server_config = create_prd01_baked_config()?;
 
     println!("🚀 Starting pensieve-local-llm-server...");
-    println!("🤖 Model: Phi-4-reasoning-plus-4bit (MLX optimized)");
+    println!("🤖 Model: Phi-4-mini-instruct-MLX (Apple Silicon native)");
     println!("🌐 Port: 528491 (fixed per PRD01)");
     println!("💾 Cache: {}", server_config.cache_dir.display());
 
     // Ensure Phi-4 model is available (ES001)
     let model_service = UnifiedModelManager::new(server_config.cache_dir.clone())?;
-    let model_path = model_service.ensure_model_available("mlx-community/Phi-4-reasoning-plus-4bit").await?;
+    let model_path = model_service.ensure_model_available("mlx-community/Phi-4-mini-instruct-mlx").await?;
 
     println!("✅ Phi-4 model ready: {}", model_path.display());
 
@@ -111,7 +111,7 @@ fn parse_baked_cli_arguments_with_defaults() -> Result<BakedCliArgs, CliError> {
 
     // PRD01: Enforce fixed configuration regardless of input
     let enforced_args = BakedCliArgs {
-        model_url: "bartowski/Phi-4-reasoning-plus-GGUF".to_string(),
+        model_url: "mlx-community/Phi-4-mini-instruct-mlx".to_string(),
         port: 528491, // Fixed per PRD01
         cache_dir: args.cache_dir, // Allow cache directory override
         max_concurrent: 2,
@@ -145,7 +145,7 @@ fn create_prd01_baked_config() -> Result<UnifiedServerConfig, CliError> {
     Ok(UnifiedServerConfig {
         host: "127.0.0.1".to_string(),
         port: 528491, // Fixed per PRD01
-        model_path: cache_dir.join("Phi-4-reasoning-plus-4bit.gguf"), // Will be populated by model manager
+        model_path: cache_dir.join("model.safetensors"), // Will be populated by model manager
         max_concurrent_requests: 2, // Conservative for Apple Silicon
         cache_dir,
     })
