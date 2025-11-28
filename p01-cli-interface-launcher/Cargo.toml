@@ -8,7 +8,7 @@ license.workspace = true
 description = "Pensieve CLI interface for server management (L3)"
 
 [[bin]]
-name = "pensieve"
+name = "pensieve-local-llm-server"
 path = "src/main.rs"
 
 [dependencies]

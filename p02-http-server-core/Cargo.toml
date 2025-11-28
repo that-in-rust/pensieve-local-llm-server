@@ -1,22 +1,21 @@
 [package]
-name = "."
+name = "p02-http-server-core"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Pensieve HTTP API server with streaming support (L3)"
+description = "Pensieve HTTP API server core with Warp (L3)"
 
 [dependencies]
 # L1 dependencies
-pensieve-07_core = { path = "../pensieve-07" }
+p07-foundation-types = { path = "../p07-foundation-types" }
 # L2 dependencies
-pensieve-04_engine = { path = "../pensieve-04" }
-pensieve-05_models = { path = "../pensieve-05" }
-pensieve-06_metal = { path = "../pensieve-06" }
+p04-inference-engine-core = { path = "../p04-inference-engine-core" }
+p05-model-storage-core = { path = "../p05-model-storage-core" }
+p06-metal-gpu-accel = { path = "../p06-metal-gpu-accel" }
 # L3 dependencies
-pensieve-03 = { path = "../pensieve-03" }
-pensieve-09-anthropic-proxy = { path = "../pensieve-09-anthropic-proxy" }
+p03-api-model-types = { path = "../p03-api-model-types" }
 # External dependencies for L3
 tokio = { workspace = true }
 warp = { workspace = true }
@@ -28,15 +27,16 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 futures = { workspace = true }
 bytes = { workspace = true }
-uuid = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 async-stream = { workspace = true }
-reqwest = { version = "0.11", features = ["json", "stream"] }
-tokio-util = { version = "0.7", features = ["codec"] }
 
 [dev-dependencies]
 proptest = { workspace = true }
-sysinfo = { workspace = true }
-reqwest = { version = "0.11", features = ["json"] }
+tokio-test = { workspace = true }
+criterion = { version = "0.5", features = ["html_reports"] }
 
+[[bench]]
+name = "http_server_benchmarks"
+harness = false

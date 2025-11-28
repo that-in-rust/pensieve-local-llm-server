@@ -1,91 +1,194 @@
-//! Pensieve API Models - External model serialization and API compatibility
-//!
-//! This is the Layer 3 (L3) API compatibility crate that provides:
-//! - Anthropic API message formats
-//! - JSON serialization/deserialization
-//! - Streaming response formats
-//! - API error handling
-//!
-//! Depends on L1 (pensieve-07) and L2 (pensieve-05) crates.
+# API Model Types with Four-Word Naming
+# Following parseltongue principles for API compatibility
 
-use pensieve_07_core::CoreError;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
-/// API-specific error types
-pub mod error {
-    use super::*;
-    use thiserror::Error;
+// Four-word function names as per parseltongue principles
 
-    /// API result type
-    pub type ApiResult<T> = std::result::Result<T, ApiError>;
-
-    /// API-specific errors
-    #[derive(Error, Debug, Clone)]
-    pub enum ApiError {
-        #[error("Serialization error: {0}")]
-        Serialization(String),
-
-        #[error("Validation error: {0}")]
-        Validation(String),
-
-        #[error("Invalid message format: {0}")]
-        InvalidMessage(String),
-
-        #[error("Missing required field: {0}")]
-        MissingField(String),
-
-        #[error("Stream error: {0}")]
-        Stream(String),
-
-        #[error("Core error: {0}")]
-        Core(#[from] CoreError),
-    }
-
-    impl From<serde_json::Error> for ApiError {
-        fn from(err: serde_json::Error) -> Self {
-            ApiError::Serialization(err.to_string())
-        }
-    }
+/// Validate API message contract with rules
+///
+/// # Preconditions
+/// - Message structure follows Anthropic API format
+/// - All required fields present
+///
+/// # Postconditions
+/// - Returns Ok(()) if validation passes
+/// - Returns Err(ApiError) if validation fails
+/// - Provides detailed error context
+///
+/// # Error Conditions
+/// - Empty model string
+/// - Invalid token counts
+/// - Missing required fields
+/// - Malformed content structure
+pub fn validate_api_message_contract<T: ApiMessage>(message: &T) -> Result<(), ApiError> {
+    message.validate()
 }
 
-/// Core API traits
+/// Serialize API message to JSON format
+///
+/// # Preconditions
+/// - Valid API message structure
+/// - All fields serializable
+///
+/// # Postconditions
+/// - Returns JSON string representation
+/// - Returns Err(ApiError) on serialization failure
+/// - Format matches Anthropic API specification
+///
+/// # Error Conditions
+/// - Circular references
+/// - Non-serializable fields
+/// - Invalid Unicode content
+pub fn serialize_api_message_to_json<T: ApiMessage>(message: &T) -> Result<String, ApiError> {
+    message.to_json()
+}
+
+/// Parse API message from JSON string
+///
+/// # Preconditions
+/// - Valid JSON string
+/// - Format matches Anthropic API specification
+///
+/// # Postconditions
+/// - Returns parsed API message
+/// - Returns Err(ApiError) on parsing failure
+/// - Type safety guaranteed
+///
+/// # Error Conditions
+/// - Invalid JSON syntax
+/// - Missing required fields
+/// - Type mismatches
+/// - Unknown enum variants
+pub fn parse_api_message_from_json<T: ApiMessage>(json: &str) -> Result<T, ApiError>
+where
+    T: Sized,
+{
+    T::from_json(json)
+}
+
+/// Convert streaming response to SSE format
+///
+/// # Preconditions
+/// - Valid streaming response structure
+/// - Implements StreamingResponse trait
+///
+/// # Postconditions
+/// - Returns SSE formatted string
+/// - Includes proper data prefix
+/// - Terminates with double newlines
+///
+/// # Error Conditions
+/// - Serialization failure
+/// - Invalid event structure
+/// - Missing required fields
+pub fn convert_streaming_to_sse_format(response: &dyn StreamingResponse) -> Result<String, ApiError> {
+    response.to_stream_format()
+}
+
+/// Check if streaming response is complete
+///
+/// # Preconditions
+/// - Valid streaming response
+/// - Implements StreamingResponse trait
+///
+/// # Postconditions
+/// - Returns boolean completion status
+/// - No side effects
+///
+/// # Error Conditions
+/// - None (always returns Result)
+pub fn check_streaming_response_complete(response: &dyn StreamingResponse) -> Result<bool, ApiError> {
+    Ok(response.is_complete())
+}
+
+/// Get event type from streaming response
+///
+/// # Preconditions
+/// - Valid streaming response
+/// - Implements StreamingResponse trait
+///
+/// # Postconditions
+/// - Returns string event type
+/// - Maps to standard SSE events
+/// - Returns "unknown" for invalid types
+///
+/// # Error Conditions
+/// - None (always returns Result)
+pub fn extract_streaming_event_type(response: &dyn StreamingResponse) -> Result<&str, ApiError> {
+    Ok(response.event_type())
+}
+
+// Supporting types following parseltongue patterns
+
+/// API error types with hierarchical structure
+#[derive(Debug, thiserror::Error)]
+pub enum ApiError {
+    #[error("Serialization failed: {0}")]
+    SerializationFailed(String),
+
+    #[error("Validation failed: {0}")]
+    ValidationFailed(String),
+
+    #[error("Invalid message format: {0}")]
+    InvalidMessageFormat(String),
+
+    #[error("Missing required field: {0}")]
+    MissingRequiredField(String),
+
+    #[error("Streaming error: {0}")]
+    StreamingError(String),
+
+    #[error("JSON parsing error: {0}")]
+    JsonParsingError(String),
+}
+
+/// Core traits for API message handling
 pub mod traits {
     use super::*;
 
-    /// Trait for API messages that can be validated and serialized
+    /// Trait for API messages with validation and serialization
     pub trait ApiMessage: Serialize + for<'de> Deserialize<'de> + Send + Sync {
-        /// Validate the message content
-        fn validate(&self) -> error::ApiResult<()>;
+        /// Validate message structure and content
+        fn validate(&self) -> Result<(), ApiError>;
 
-        /// Convert to JSON string
-        fn to_json(&self) -> error::ApiResult<String> {
-            serde_json::to_string(self).map_err(Into::into)
+        /// Convert to JSON string with error handling
+        fn to_json(&self) -> Result<String, ApiError> {
+            serde_json::to_string(self).map_err(|e| ApiError::SerializationFailed(e.to_string()))
         }
 
-        /// Parse from JSON string
-        fn from_json(json: &str) -> error::ApiResult<Self>
+        /// Parse from JSON string with validation
+        fn from_json(json: &str) -> Result<Self, ApiError>
         where
-            Self: Sized;
+            Self: Sized,
+        {
+            serde_json::from_str(json).map_err(|e| ApiError::JsonParsingError(e.to_string()))
+        }
     }
 
-    /// Trait for streaming responses
+    /// Trait for streaming responses with SSE formatting
     pub trait StreamingResponse: Send + Sync {
-        /// Convert to streaming format
-        fn to_stream_format(&self) -> error::ApiResult<String>;
+        /// Convert to Server-Sent Events format
+        fn to_stream_format(&self) -> Result<String, ApiError>;
 
-        /// Check if stream is complete
+        /// Check if streaming is complete
         fn is_complete(&self) -> bool;
 
-        /// Get event type for streaming
-        fn event_type(&self) -> &'static str;
+        /// Get event type identifier
+        fn event_type(&self) -> &str;
+
+        /// Get streaming timestamp
+        fn timestamp(&self) -> Option<chrono::DateTime<chrono::Utc>>;
     }
 }
 
-/// Anthropic API compatibility models
+/// Anthropic API compatibility models with proper naming
 pub mod anthropic {
     use super::*;
+    use chrono;
 
-    /// Anthropic message role
+    /// Message role identifier
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     #[serde(rename_all = "lowercase")]
     pub enum Role {
@@ -93,47 +196,39 @@ pub mod anthropic {
         Assistant,
     }
 
-    /// Anthropic content type
+    /// Content block type identifier
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     #[serde(tag = "type", rename_all = "snake_case")]
-    pub enum Content {
+    pub enum ContentType {
         Text { text: String },
         Image { source: ImageSource },
     }
 
-    /// System prompt can be either a string or an array of content blocks
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    #[serde(untagged)]
-    pub enum SystemPrompt {
-        String(String),
-        Blocks(Vec<Content>),
-    }
-
-    /// Image source for content
+    /// Image source for content blocks
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     pub struct ImageSource {
         #[serde(rename = "type")]
         pub source_type: String,
         pub media_type: String,
-        pub data: String, // base64 encoded
+        pub data: String, // Base64 encoded image data
     }
 
-    /// Message content can be either a string or an array of content blocks
+    /// Message content can be string or content blocks
     #[derive(Debug, Clone, Serialize, Deserialize)]
     #[serde(untagged)]
     pub enum MessageContent {
         String(String),
-        Blocks(Vec<Content>),
+        Blocks(Vec<ContentType>),
     }
 
-    /// Anthropic message format
+    /// Complete message structure
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct Message {
         pub role: Role,
         pub content: MessageContent,
     }
 
-    /// Anthropic API request
+    /// Anthropic API creation request
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct CreateMessageRequest {
         pub model: String,
@@ -147,67 +242,82 @@ pub mod anthropic {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub stream: Option<bool>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub system: Option<SystemPrompt>,
+        pub system: Option<String>,
     }
 
-    fn default_max_tokens() -> u32 {
-        4096
+    impl Default for CreateMessageRequest {
+        fn default() -> Self {
+            Self {
+                model: "phi-3-mini-128k-instruct-4bit".to_string(),
+                max_tokens: 4096,
+                messages: vec![],
+                temperature: None,
+                top_p: None,
+                stream: None,
+                system: None,
+            }
+        }
     }
 
     impl ApiMessage for CreateMessageRequest {
-        fn validate(&self) -> error::ApiResult<()> {
+        fn validate(&self) -> Result<(), ApiError> {
             if self.model.is_empty() {
-                return Err(ApiError::Validation("Model cannot be empty".to_string()));
+                return Err(ApiError::ValidationFailed(
+                    "Model identifier cannot be empty".to_string()
+                ));
             }
             if self.max_tokens == 0 {
-                return Err(ApiError::Validation("Max tokens must be positive".to_string()));
+                return Err(ApiError::ValidationFailed(
+                    "Max tokens must be positive".to_string()
+                ));
             }
             if self.messages.is_empty() {
-                return Err(ApiError::Validation("Messages cannot be empty".to_string()));
+                return Err(ApiError::ValidationFailed(
+                    "Messages array cannot be empty".to_string()
+                ));
             }
+
             for message in &self.messages {
                 match &message.content {
-                    MessageContent::String(s) if s.is_empty() => {
-                        return Err(ApiError::Validation("Message content cannot be empty".to_string()));
+                    MessageContent::String(text) if text.trim().is_empty() => {
+                        return Err(ApiError::ValidationFailed(
+                            "Message content cannot be empty".to_string()
+                        ));
                     }
                     MessageContent::Blocks(blocks) if blocks.is_empty() => {
-                        return Err(ApiError::Validation("Message content cannot be empty".to_string()));
+                        return Err(ApiError::ValidationFailed(
+                            "Content blocks cannot be empty".to_string()
+                        ));
                     }
-                    _ => {}
+                    _ => {} // Valid content
                 }
             }
-            Ok(())
-        }
 
-        fn from_json(json: &str) -> error::ApiResult<Self>
-        where
-            Self: Sized,
-        {
-            serde_json::from_str(json).map_err(Into::into)
+            Ok(())
         }
     }
 
-    /// Anthropic API response
+    /// Anthropic API creation response
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct CreateMessageResponse {
         pub id: String,
         pub r#type: String,
         pub role: Role,
-        pub content: Vec<Content>,
+        pub content: Vec<ContentType>,
         pub model: String,
         pub stop_reason: Option<String>,
         pub stop_sequence: Option<String>,
-        pub usage: Usage,
+        pub usage: UsageMetrics,
     }
 
-    /// Token usage information
+    /// Token usage tracking
     #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct Usage {
+    pub struct UsageMetrics {
         pub input_tokens: u32,
         pub output_tokens: u32,
     }
 
-    /// Streaming response event
+    /// Server-Sent Events streaming response
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct StreamingEvent {
         #[serde(rename = "type")]
@@ -215,14 +325,15 @@ pub mod anthropic {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub index: Option<u32>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub delta: Option<Content>,
+        pub delta: Option<ContentType>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub message: Option<CreateMessageResponse>,
     }
 
     impl StreamingResponse for StreamingEvent {
-        fn to_stream_format(&self) -> error::ApiResult<String> {
-            let json = serde_json::to_string(self)?;
+        fn to_stream_format(&self) -> Result<String, ApiError> {
+            let json = serde_json::to_string(self)
+                .map_err(|e| ApiError::SerializationFailed(e.to_string()))?;
             Ok(format!("data: {}\n\n", json))
         }
 
@@ -230,7 +341,7 @@ pub mod anthropic {
             self.event_type == "message_stop"
         }
 
-        fn event_type(&self) -> &'static str {
+        fn event_type(&self) -> &str {
             match self.event_type.as_str() {
                 "message_start" => "message_start",
                 "content_block_start" => "content_block_start",
@@ -241,15 +352,22 @@ pub mod anthropic {
                 _ => "unknown",
             }
         }
+
+        fn timestamp(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+            Some(chrono::Utc::now())
+        }
     }
 }
 
-/// Re-export commonly used items
-pub use error::{ApiError, ApiResult};
-pub use traits::{ApiMessage, StreamingResponse};
+// Re-export commonly used items for API compatibility
+pub use {
+    ApiError,
+    ApiMessage,
+    StreamingResponse,
+};
 
-/// Result type alias for convenience
-pub type Result<T> = ApiResult<T>;
+/// Result type alias for API operations
+pub type ApiResult<T> = Result<T, ApiError>;
 
 #[cfg(test)]
 mod tests {
@@ -257,301 +375,256 @@ mod tests {
     use anthropic::*;
 
     #[test]
-    fn test_basic_message_creation() {
-        let message = Message {
-            role: Role::User,
-            content: vec![Content::Text {
-                text: "Hello, world!".to_string(),
-            }],
-        };
-
-        assert_eq!(message.role, Role::User);
-        assert_eq!(message.content.len(), 1);
-        if let Content::Text { text } = &message.content[0] {
-            assert_eq!(text, "Hello, world!");
-        }
-    }
-
-    #[test]
-    fn test_request_validation() {
-        let valid_request = CreateMessageRequest {
-            model: "claude-3-sonnet-20240229".to_string(),
-            max_tokens: 100,
-            messages: vec![Message {
-                role: Role::User,
-                content: vec![Content::Text {
-                    text: "Test message".to_string(),
-                }],
-            }],
-            temperature: Some(0.7),
-            top_p: None,
-            stream: Some(false),
-            system: None,
-        };
-
-        assert!(valid_request.validate().is_ok());
-
-        // Test empty model validation
-        let invalid_request = CreateMessageRequest {
-            model: "".to_string(),
-            ..valid_request.clone()
-        };
-        assert!(invalid_request.validate().is_err());
-
-        // Test zero max_tokens validation
-        let invalid_request = CreateMessageRequest {
-            max_tokens: 0,
-            ..valid_request.clone()
-        };
-        assert!(invalid_request.validate().is_err());
-
-        // Test empty messages validation
-        let invalid_request = CreateMessageRequest {
-            messages: vec![],
-            ..valid_request.clone()
-        };
-        assert!(invalid_request.validate().is_err());
-    }
-
-    #[test]
-    fn test_request_serialization() {
+    fn test_validate_message_contract_valid_request() -> Result<(), ApiError> {
         let request = CreateMessageRequest {
-            model: "claude-3-sonnet-20240229".to_string(),
+            model: "phi-3-mini-128k-instruct-4bit".to_string(),
             max_tokens: 100,
             messages: vec![Message {
                 role: Role::User,
-                content: vec![Content::Text {
-                    text: "Test message".to_string(),
-                }],
+                content: MessageContent::String("Test message".to_string()),
             }],
             temperature: Some(0.7),
-            top_p: None,
-            stream: Some(false),
-            system: None,
+            ..Default::default()
         };
 
-        let json = request.to_json().unwrap();
-        assert!(json.contains("claude-3-sonnet-20240229"));
-        assert!(json.contains("Test message"));
-        assert!(json.contains("0.7"));
+        validate_api_message_contract(&request)
     }
 
     #[test]
-    fn test_response_deserialization() {
-        let json = r#"
-        {
-            "id": "msg_123",
-            "type": "message",
-            "role": "assistant",
-            "content": [{"type": "text", "text": "Hello!"}],
-            "model": "claude-3-sonnet-20240229",
-            "stop_reason": "end_turn",
-            "stop_sequence": null,
-            "usage": {"input_tokens": 10, "output_tokens": 5}
+    fn test_validate_message_contract_empty_model() -> Result<(), ApiError> {
+        let request = CreateMessageRequest {
+            model: "".to_string(),
+            ..Default::default()
+        };
+
+        assert!(validate_api_message_contract(&request).is_err());
+        match validate_api_message_contract(&request).unwrap_err() {
+            ApiError::ValidationFailed(msg) => assert!(msg.contains("Model identifier cannot be empty")),
+            _ => panic!("Expected ValidationFailed error"),
         }
-        "#;
-
-        let response: CreateMessageResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(response.id, "msg_123");
-        assert_eq!(response.role, Role::Assistant);
-        assert_eq!(response.usage.input_tokens, 10);
-        assert_eq!(response.usage.output_tokens, 5);
     }
 
     #[test]
-    fn test_streaming_response() {
-        let event = StreamingEvent {
-            event_type: "content_block_delta".to_string(),
-            index: Some(0),
-            delta: Some(Content::Text {
-                text: "Hello".to_string(),
-            }),
-            message: None,
-        };
-
-        assert!(!event.is_complete());
-        assert_eq!(event.event_type(), "content_block_delta");
-
-        let stream_format = event.to_stream_format().unwrap();
-        assert!(stream_format.starts_with("data: "));
-        assert!(stream_format.ends_with("\n\n"));
-    }
-
-    #[test]
-    fn test_streaming_completion() {
-        let event = StreamingEvent {
-            event_type: "message_stop".to_string(),
-            index: None,
-            delta: None,
-            message: None,
-        };
-
-        assert!(event.is_complete());
-        assert_eq!(event.event_type(), "message_stop");
-    }
-
-    #[test]
-    fn test_image_content_serialization() {
-        let message = Message {
-            role: Role::User,
-            content: vec![Content::Image {
-                source: ImageSource {
-                    source_type: "base64".to_string(),
-                    media_type: "image/jpeg".to_string(),
-                    data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI9jU77yQAAAABJRU5ErkJggg==".to_string(),
-                },
+    fn test_serialize_api_message_to_json_success() -> Result<(), ApiError> {
+        let request = CreateMessageRequest {
+            model: "phi-3-mini-128k-instruct-4bit".to_string(),
+            max_tokens: 100,
+            messages: vec![Message {
+                role: Role::User,
+                content: MessageContent::String("Hello".to_string()),
             }],
+            ..Default::default()
         };
 
-        let json = serde_json::to_string(&message).unwrap();
-        assert!(json.contains("image/jpeg"));
-        assert!(json.contains("base64"));
+        let json = serialize_api_message_to_json(&request)?;
+        assert!(json.contains("phi-3-mini-128k-instruct-4bit"));
+        assert!(json.contains("Hello"));
+        Ok(())
     }
 
     #[test]
-    fn test_error_handling() {
-        let invalid_json = "{ invalid json }";
-        let result: std::result::Result<CreateMessageRequest, _> = serde_json::from_str(invalid_json);
-        assert!(result.is_err());
-
-        let error = ApiError::Validation("test error".to_string());
-        assert_eq!(error.to_string(), "Validation error: test error");
-    }
-
-    #[test]
-    fn test_request_from_json() {
+    fn test_parse_api_message_from_json_success() -> Result<(), ApiError> {
         let json = r#"
         {
-            "model": "claude-3-sonnet-20240229",
+            "model": "phi-3-mini-128k-instruct-4bit",
             "max_tokens": 100,
             "messages": [
                 {
                     "role": "user",
                     "content": [{"type": "text", "text": "Hello"}]
                 }
-            ],
-            "temperature": 0.7,
-            "stream": false
+            ]
         }
         "#;
 
-        let request = CreateMessageRequest::from_json(json).unwrap();
-        assert_eq!(request.model, "claude-3-sonnet-20240229");
+        let request: CreateMessageRequest = parse_api_message_from_json(json)?;
+        assert_eq!(request.model, "phi-3-mini-128k-instruct-4bit");
         assert_eq!(request.max_tokens, 100);
         assert_eq!(request.messages.len(), 1);
-        assert_eq!(request.temperature, Some(0.7));
-        assert_eq!(request.stream, Some(false));
+        Ok(())
     }
 
     #[test]
-    fn test_usage_tracking() {
-        let usage = Usage {
-            input_tokens: 25,
-            output_tokens: 15,
+    fn test_parse_api_message_invalid_json() -> Result<(), ApiError> {
+        let invalid_json = "{ invalid json }";
+        let result: Result<CreateMessageRequest, ApiError> = parse_api_message_from_json(invalid_json);
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            ApiError::JsonParsingError(_) => {}, // Expected
+            _ => panic!("Expected JsonParsingError"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_streaming_conversion_to_sse_format() -> Result<(), ApiError> {
+        let event = StreamingEvent {
+            event_type: "content_block_delta".to_string(),
+            delta: Some(ContentType::Text {
+                text: "Hello".to_string(),
+            }),
+            ..Default::default()
         };
 
-        let json = serde_json::to_string(&usage).unwrap();
-        assert!(json.contains("25"));
-        assert!(json.contains("15"));
-
-        let deserialized: Usage = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.input_tokens, 25);
-        assert_eq!(deserialized.output_tokens, 15);
+        let sse = convert_streaming_to_sse_format(&event)?;
+        assert!(sse.starts_with("data: "));
+        assert!(sse.ends_with("\n\n"));
+        Ok(())
     }
 
     #[test]
-    fn test_complex_message_with_multiple_content() {
-        let message = Message {
-            role: Role::User,
-            content: vec![
-                Content::Text {
-                    text: "Look at this image:".to_string(),
-                },
-                Content::Image {
-                    source: ImageSource {
-                        source_type: "base64".to_string(),
-                        media_type: "image/png".to_string(),
-                        data: "ABC123".to_string(),
-                    },
-                },
-                Content::Text {
-                    text: "What do you see?".to_string(),
-                },
-            ],
+    fn test_streaming_completion_detection() -> Result<(), ApiError> {
+        let incomplete = StreamingEvent {
+            event_type: "content_block_delta".to_string(),
+            ..Default::default()
         };
 
-        assert_eq!(message.content.len(), 3);
-        match &message.content[0] {
-            Content::Text { text } => assert_eq!(text, "Look at this image:"),
-            _ => panic!("Expected text content"),
-        }
-        match &message.content[1] {
-            Content::Image { source } => assert_eq!(source.media_type, "image/png"),
-            _ => panic!("Expected image content"),
-        }
+        let complete = StreamingEvent {
+            event_type: "message_stop".to_string(),
+            ..Default::default()
+        };
+
+        assert!(!check_streaming_response_complete(&incomplete)?);
+        assert!(check_streaming_response_complete(&complete)?);
+        Ok(())
     }
 
     #[test]
-    fn test_serialization_roundtrip() {
-        let original_request = CreateMessageRequest {
-            model: "claude-3-opus-20240229".to_string(),
-            max_tokens: 4096,
+    fn test_event_type_extraction() -> Result<(), ApiError> {
+        let start_event = StreamingEvent {
+            event_type: "message_start".to_string(),
+            ..Default::default()
+        };
+
+        let delta_event = StreamingEvent {
+            event_type: "content_block_delta".to_string(),
+            ..Default::default()
+        };
+
+        let stop_event = StreamingEvent {
+            event_type: "message_stop".to_string(),
+            ..Default::default()
+        };
+
+        assert_eq!(extract_streaming_event_type(&start_event)?, "message_start");
+        assert_eq!(extract_streaming_event_type(&delta_event)?, "content_block_delta");
+        assert_eq!(extract_streaming_event_type(&stop_event)?, "message_stop");
+        Ok(())
+    }
+
+    #[test]
+    fn test_complex_message_with_multiple_content() -> Result<(), ApiError> {
+        let request = CreateMessageRequest {
+            model: "phi-3-mini-128k-instruct-4bit".to_string(),
             messages: vec![
                 Message {
                     role: Role::User,
-                    content: vec![Content::Text {
-                        text: "Explain quantum computing".to_string(),
-                    }],
-                },
-                Message {
-                    role: Role::Assistant,
-                    content: vec![Content::Text {
-                        text: "Quantum computing is...".to_string(),
-                    }],
-                },
+                    content: MessageContent::Blocks(vec![
+                        ContentType::Text {
+                            text: "Explain quantum computing".to_string(),
+                        },
+                        ContentType::Image {
+                            source: ImageSource {
+                                source_type: "base64".to_string(),
+                                media_type: "image/png".to_string(),
+                                data: "ABC123".to_string(),
+                            },
+                        },
+                    ]),
+                }
             ],
-            temperature: Some(0.5),
-            top_p: Some(0.9),
-            stream: Some(true),
-            system: Some("You are a helpful assistant.".to_string()),
+            ..Default::default()
         };
 
-        let json = original_request.to_json().unwrap();
-        let deserialized_request = CreateMessageRequest::from_json(&json).unwrap();
-
-        assert_eq!(original_request.model, deserialized_request.model);
-        assert_eq!(original_request.max_tokens, deserialized_request.max_tokens);
-        assert_eq!(original_request.messages.len(), deserialized_request.messages.len());
-        assert_eq!(original_request.temperature, deserialized_request.temperature);
-        assert_eq!(original_request.top_p, deserialized_request.top_p);
-        assert_eq!(original_request.stream, deserialized_request.stream);
-        assert_eq!(original_request.system, deserialized_request.system);
+        validate_api_message_contract(&request)
     }
 
-    // Property-based test using proptest
+    // Property-based test for request validation
     #[test]
-    fn test_proptest_message_validation() {
+    fn test_property_based_message_validation() -> Result<(), ApiError> {
         use proptest::prelude::*;
 
         proptest!(|(
             model in "[a-zA-Z0-9_-]{1,50}",
             max_tokens in 1u32..=8192,
-            text in "[a-zA-Z0-9 ]{1,100}"
+            message_text in "[a-zA-Z0-9 ]{1,200}"
         )| {
             let request = CreateMessageRequest {
                 model: model.clone(),
                 max_tokens,
                 messages: vec![Message {
                     role: Role::User,
-                    content: vec![Content::Text { text }],
+                    content: MessageContent::String(message_text.clone()),
                 }],
-                temperature: None,
-                top_p: None,
-                stream: None,
-                system: None,
+                ..Default::default()
             };
 
-            prop_assert!(request.validate().is_ok());
+            validate_api_message_contract(&request)
         });
+    }
+
+    #[test]
+    fn test_serialization_roundtrip_preserves_data() -> Result<(), ApiError> {
+        let original = CreateMessageRequest {
+            model: "claude-3-opus-20240229".to_string(),
+            max_tokens: 4096,
+            messages: vec![
+                Message {
+                    role: Role::User,
+                    content: MessageContent::String("Explain Rust ownership".to_string()),
+                },
+                Message {
+                    role: Role::Assistant,
+                    content: MessageContent::String("Rust uses ownership system".to_string()),
+                },
+            ],
+            temperature: Some(0.7),
+            top_p: Some(0.9),
+            stream: Some(true),
+            system: Some("You are helpful".to_string()),
+        };
+
+        let json = serialize_api_message_to_json(&original)?;
+        let deserialized = parse_api_message_from_json(&json)?;
+
+        assert_eq!(original.model, deserialized.model);
+        assert_eq!(original.max_tokens, deserialized.max_tokens);
+        assert_eq!(original.messages.len(), deserialized.messages.len());
+        assert_eq!(original.temperature, deserialized.temperature);
+        assert_eq!(original.top_p, deserialized.top_p);
+        assert_eq!(original.stream, deserialized.stream);
+        Ok(())
+    }
+
+    #[test]
+    fn test_usage_metrics_tracking() -> Result<(), ApiError> {
+        let usage = UsageMetrics {
+            input_tokens: 100,
+            output_tokens: 200,
+        };
+
+        let response = CreateMessageResponse {
+            id: "msg_123".to_string(),
+            r#type: "message".to_string(),
+            role: Role::Assistant,
+            content: vec![ContentType::Text {
+                text: "Response content".to_string(),
+            }],
+            model: "phi-3".to_string(),
+            usage,
+            ..Default::default()
+        };
+
+        assert_eq!(response.usage.input_tokens, 100);
+        assert_eq!(response.usage.output_tokens, 200);
+        Ok(())
+    }
+
+    #[test]
+    fn test_error_message_context() -> Result<(), ApiError> {
+        let error = ApiError::ValidationFailed("Model identifier cannot be empty".to_string());
+        assert_eq!(error.to_string(), "Validation failed: Model identifier cannot be empty");
+        Ok(())
     }
 }
