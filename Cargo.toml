@@ -1,15 +1,15 @@
 [workspace]
 resolver = "2"
 members = [
-    "pensieve-01",
-    "pensieve-02", 
-    "pensieve-03",
-    "pensieve-04",
-    "pensieve-05",
-    "pensieve-06",
-    "pensieve-07",
-    "pensieve-08_claude_core",
-    "pensieve-09-anthropic-proxy",
+    "p01-cli-interface-launcher",
+    "p02-http-server-core",
+    "p03-api-model-types",
+    "p04-inference-engine-core",
+    "p05-model-storage-core",
+    "p06-metal-gpu-accel",
+    "p07-foundation-types",
+    "p08-claude-api-core",
+    "p09-api-proxy-compat",
 ]
 
 [workspace.package]

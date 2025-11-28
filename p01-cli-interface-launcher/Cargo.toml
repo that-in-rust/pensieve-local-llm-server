@@ -1,0 +1,39 @@
+[package]
+name = "p01-cli-interface-launcher"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Pensieve CLI interface for server management (L3)"
+
+[[bin]]
+name = "pensieve"
+path = "src/main.rs"
+
+[dependencies]
+# L1 dependencies
+p07-foundation-types = { path = "../p07-foundation-types" }
+# L2 dependencies
+p04-inference-engine-core = { path = "../p04-inference-engine-core" }
+p05-model-storage-core = { path = "../p05-model-storage-core" }
+p06-metal-gpu-accel = { path = "../p06-metal-gpu-accel" }
+# L3 dependencies
+p02-http-server-core = { path = "../p02-http-server-core" }
+p03-api-model-types = { path = "../p03-api-model-types" }
+# External dependencies for L3
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }
+uuid = { workspace = true }
+async-trait = { workspace = true }
+tempfile = "3.0"
+
+[dev-dependencies]
+proptest = { workspace = true }
+

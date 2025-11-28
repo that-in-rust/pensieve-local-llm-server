@@ -1,15 +1,11 @@
 [package]
-name = "pensieve-01"
+name = "."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Pensieve CLI interface for server management (L3)"
-
-[[bin]]
-name = "pensieve"
-path = "src/main.rs"
+description = "Pensieve HTTP API server with streaming support (L3)"
 
 [dependencies]
 # L1 dependencies
@@ -19,21 +15,28 @@ pensieve-04_engine = { path = "../pensieve-04" }
 pensieve-05_models = { path = "../pensieve-05" }
 pensieve-06_metal = { path = "../pensieve-06" }
 # L3 dependencies
-pensieve-02 = { path = "../pensieve-02" }
 pensieve-03 = { path = "../pensieve-03" }
+pensieve-09-anthropic-proxy = { path = "../pensieve-09-anthropic-proxy" }
 # External dependencies for L3
 tokio = { workspace = true }
+warp = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-clap = { workspace = true }
+futures = { workspace = true }
+bytes = { workspace = true }
 uuid = { workspace = true }
 async-trait = { workspace = true }
-tempfile = "3.0"
+chrono = { workspace = true }
+async-stream = { workspace = true }
+reqwest = { version = "0.11", features = ["json", "stream"] }
+tokio-util = { version = "0.7", features = ["codec"] }
 
 [dev-dependencies]
 proptest = { workspace = true }
+sysinfo = { workspace = true }
+reqwest = { version = "0.11", features = ["json"] }
 

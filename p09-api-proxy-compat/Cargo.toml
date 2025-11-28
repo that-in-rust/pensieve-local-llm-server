@@ -1,5 +1,5 @@
 [package]
-name = "pensieve-09-anthropic-proxy"
+name = "."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

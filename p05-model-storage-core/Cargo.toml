@@ -1,5 +1,5 @@
 [package]
-name = "pensieve-05_models"
+name = "."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
