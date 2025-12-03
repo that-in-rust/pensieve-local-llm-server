@@ -1,0 +1,19 @@
+[package]
+name = "complexity-router-heuristic-classifier"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "2-way routing classifier (Local vs CloudHandoff) for MoA-Lite debate system"
+
+[dependencies]
+agent-role-definition-types = { path = "../agent-role-definition-types" }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

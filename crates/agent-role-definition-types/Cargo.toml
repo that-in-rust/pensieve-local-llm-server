@@ -1,0 +1,17 @@
+[package]
+name = "agent-role-definition-types"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Agent roles, traits, and type definitions for MoA-Lite debate system"
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

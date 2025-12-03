@@ -1,0 +1,29 @@
+[package]
+name = "debate-orchestrator-state-machine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "MoA-Lite state machine orchestrator coordinating debate workflow"
+
+[dependencies]
+agent-role-definition-types = { path = "../agent-role-definition-types" }
+blackboard-handoff-protocol-core = { path = "../blackboard-handoff-protocol-core" }
+complexity-router-heuristic-classifier = { path = "../complexity-router-heuristic-classifier" }
+llama-server-client-streaming = { path = "../llama-server-client-streaming" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+tokio-test = { workspace = true }
+
+[lints]
+workspace = true

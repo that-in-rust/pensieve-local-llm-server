@@ -1,0 +1,30 @@
+[package]
+name = "llama-server-client-streaming"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "HTTP client with SSE streaming for llama.cpp server in MoA-Lite debate system"
+
+[dependencies]
+agent-role-definition-types = { path = "../agent-role-definition-types" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+async-stream = { workspace = true }
+reqwest = { workspace = true }
+eventsource-stream = { workspace = true }
+tracing = { workspace = true }
+bytes = { workspace = true }
+
+[dev-dependencies]
+tokio-test = { workspace = true }
+wiremock = { workspace = true }
+
+[lints]
+workspace = true
