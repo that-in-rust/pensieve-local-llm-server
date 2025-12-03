@@ -1,16 +1,6 @@
 [workspace]
 resolver = "2"
-members = [
-    "p01-cli-interface-launcher",
-    "p02-http-server-core",
-    "p03-api-model-types",
-    "p04-inference-engine-core",
-    "p05-model-storage-core",
-    "p06-metal-gpu-accel",
-    "p07-foundation-types",
-    "p08-claude-api-core",
-    "p09-api-proxy-compat",
-]
+members = ["crates/*"]
 
 [workspace.package]
 version = "0.1.0"
@@ -18,52 +8,105 @@ edition = "2021"
 rust-version = "1.75"
 authors = ["Pensieve Contributors"]
 license = "MIT OR Apache-2.0"
-description = "Local LLM inference server with Anthropic API compatibility"
+repository = "https://github.com/that-in-rust/pensieve-local-llm-server"
+description = "Multi-Agent Debate AI Assistant - Local LLM for OSS coding"
+
+# ============================================================================
+# WORKSPACE DEPENDENCIES
+# Centralized dependency management for all crates
+# ============================================================================
 
 [workspace.dependencies]
-# Core dependencies
-tokio = { version = "1.40", features = ["full"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-thiserror = "1.0"
-anyhow = "1.0"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid = { version = "1.0", features = ["v4", "serde"] }
-async-trait = "0.1"
-clap = { version = "4.5", features = ["derive"] }
-
-# HTTP and networking
-warp = "0.3"
-hyper = { version = "0.14", features = ["full"] }
-reqwest = { version = "0.11", features = ["json", "stream"] }
-
-# ML/Model dependencies
-candle-core = "0.8"
-candle-nn = "0.8"
-candle-transformers = "0.8"
-safetensors = "0.4"
-tokenizers = "0.19"
-
-# Hugging Face integration
-hf-hub = { version = "0.3", features = ["tokio"] }
-indicatif = "0.17"
-dirs = "5.0"
-
-# Progress reporting
-progress = "0.2"
-
-# Async utilities
+# -----------------------------------------------------------------------------
+# Core Runtime
+# -----------------------------------------------------------------------------
+tokio = { version = "1.41", features = ["full"] }
+tokio-stream = "0.1"
 futures = "0.3"
+async-trait = "0.1"
 async-stream = "0.3"
 
+# -----------------------------------------------------------------------------
+# Serialization
+# -----------------------------------------------------------------------------
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# -----------------------------------------------------------------------------
+# Error Handling
+# -----------------------------------------------------------------------------
+thiserror = "2.0"
+anyhow = "1.0"
+
+# -----------------------------------------------------------------------------
+# HTTP Client/Server
+# -----------------------------------------------------------------------------
+reqwest = { version = "0.12", features = ["json", "stream"] }
+axum = { version = "0.7", features = ["macros"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# -----------------------------------------------------------------------------
+# Observability
+# -----------------------------------------------------------------------------
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+metrics = "0.24"
+metrics-exporter-prometheus = "0.16"
+
+# -----------------------------------------------------------------------------
+# CLI
+# -----------------------------------------------------------------------------
+clap = { version = "4.5", features = ["derive", "env"] }
+
+# -----------------------------------------------------------------------------
+# Utilities
+# -----------------------------------------------------------------------------
+uuid = { version = "1.11", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+dashmap = "6.1"
+tiktoken-rs = "0.6"
+bytes = "1.8"
+
+# -----------------------------------------------------------------------------
+# Configuration
+# -----------------------------------------------------------------------------
+config = "0.14"
+dotenvy = "0.15"
+
+# -----------------------------------------------------------------------------
 # Testing
-proptest = "1.9"
-criterion = "0.5"
+# -----------------------------------------------------------------------------
 tokio-test = "0.4"
+wiremock = "0.6"
+proptest = "1.5"
+criterion = { version = "0.5", features = ["async_tokio"] }
 
-# System monitoring
-sysinfo = "0.30"
+# -----------------------------------------------------------------------------
+# Internal Crates (will be added as they're created)
+# -----------------------------------------------------------------------------
+# llama-client = { path = "crates/llama-client" }
+# blackboard = { path = "crates/blackboard" }
+# agent-core = { path = "crates/agent-core" }
+# complexity-router = { path = "crates/complexity-router" }
+# debate-orchestrator = { path = "crates/debate-orchestrator" }
+# web-search = { path = "crates/web-search" }
+# pensieve-cli = { path = "crates/pensieve-cli" }
+# pensieve-server = { path = "crates/pensieve-server" }
 
-# Time/Date
-chrono = "0.4"
+# ============================================================================
+# WORKSPACE LINTS
+# ============================================================================
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+# Allow some pedantic lints that are too strict
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
