@@ -2,6 +2,10 @@
 resolver = "2"
 members = ["crates/*"]
 
+# ============================================================================
+# WORKSPACE PACKAGE METADATA
+# ============================================================================
+
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
@@ -12,13 +16,44 @@ repository = "https://github.com/that-in-rust/pensieve-local-llm-server"
 description = "Multi-Agent Debate AI Assistant - Local LLM for OSS coding"
 
 # ============================================================================
+# CRATE NAMING CONVENTION (4-WORD PARSELTONGUE)
+# ============================================================================
+#
+# ALL crate names: EXACTLY 4 words (hyphens separate)
+# Pattern: noun-noun-noun-noun OR verb-noun-noun-qualifier
+#
+# Planned crates (L1 → L2 → L3 architecture):
+#
+# L1 CORE (no external deps):
+#   - agent-role-definition-types     : Agent roles, traits, type definitions
+#   - blackboard-handoff-protocol-core: Structured handoff JSON schema (150-300 tok)
+#
+# L2 ENGINE (std + internal deps):
+#   - llama-server-client-streaming   : HTTP client for llama.cpp server
+#   - complexity-router-heuristic-classifier: Query complexity classification
+#   - debate-orchestrator-state-machine: MoA-Lite state machine coordination
+#   - web-search-parallel-integration : Tavily/Brave parallel search
+#
+# L3 APPLICATION (external deps):
+#   - pensieve-cli-debate-launcher    : Zero-config CLI entry point
+#   - pensieve-http-api-server        : HTTP API server (Axum)
+#
+# ============================================================================
+
+# ============================================================================
 # WORKSPACE DEPENDENCIES
-# Centralized dependency management for all crates
+# Centralized dependency management - use `dep.workspace = true` in crates
 # ============================================================================
 
 [workspace.dependencies]
+
 # -----------------------------------------------------------------------------
-# Core Runtime
+# L1 CORE: No external dependencies (no_std compatible where possible)
+# -----------------------------------------------------------------------------
+# (none - L1 uses only std primitives)
+
+# -----------------------------------------------------------------------------
+# L2 ENGINE: Async Runtime + Internal Logic
 # -----------------------------------------------------------------------------
 tokio = { version = "1.41", features = ["full"] }
 tokio-stream = "0.1"
@@ -26,56 +61,49 @@ futures = "0.3"
 async-trait = "0.1"
 async-stream = "0.3"
 
-# -----------------------------------------------------------------------------
 # Serialization
-# -----------------------------------------------------------------------------
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-# -----------------------------------------------------------------------------
-# Error Handling
-# -----------------------------------------------------------------------------
+# Error handling (thiserror for libs, anyhow for apps)
 thiserror = "2.0"
 anyhow = "1.0"
 
 # -----------------------------------------------------------------------------
-# HTTP Client/Server
+# L3 APPLICATION: HTTP, CLI, External APIs
 # -----------------------------------------------------------------------------
+
+# HTTP Client (llama-server, web search APIs)
 reqwest = { version = "0.12", features = ["json", "stream"] }
+eventsource-stream = "0.2"
+
+# HTTP Server (Axum - modern, tokio-native)
 axum = { version = "0.7", features = ["macros"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace"] }
 
-# -----------------------------------------------------------------------------
-# Observability
-# -----------------------------------------------------------------------------
+# CLI
+clap = { version = "4.5", features = ["derive", "env"] }
+
+# Observability (tracing + metrics)
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 metrics = "0.24"
 metrics-exporter-prometheus = "0.16"
 
-# -----------------------------------------------------------------------------
-# CLI
-# -----------------------------------------------------------------------------
-clap = { version = "4.5", features = ["derive", "env"] }
-
-# -----------------------------------------------------------------------------
 # Utilities
-# -----------------------------------------------------------------------------
 uuid = { version = "1.11", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 dashmap = "6.1"
 tiktoken-rs = "0.6"
 bytes = "1.8"
 
-# -----------------------------------------------------------------------------
 # Configuration
-# -----------------------------------------------------------------------------
 config = "0.14"
 dotenvy = "0.15"
 
 # -----------------------------------------------------------------------------
-# Testing
+# TESTING: TDD-First (STUB → RED → GREEN → REFACTOR)
 # -----------------------------------------------------------------------------
 tokio-test = "0.4"
 wiremock = "0.6"
@@ -83,19 +111,20 @@ proptest = "1.5"
 criterion = { version = "0.5", features = ["async_tokio"] }
 
 # -----------------------------------------------------------------------------
-# Internal Crates (will be added as they're created)
+# INTERNAL CRATES (uncomment as created)
 # -----------------------------------------------------------------------------
-# llama-client = { path = "crates/llama-client" }
-# blackboard = { path = "crates/blackboard" }
-# agent-core = { path = "crates/agent-core" }
-# complexity-router = { path = "crates/complexity-router" }
-# debate-orchestrator = { path = "crates/debate-orchestrator" }
-# web-search = { path = "crates/web-search" }
-# pensieve-cli = { path = "crates/pensieve-cli" }
-# pensieve-server = { path = "crates/pensieve-server" }
+# agent-role-definition-types = { path = "crates/agent-role-definition-types" }
+# blackboard-handoff-protocol-core = { path = "crates/blackboard-handoff-protocol-core" }
+# llama-server-client-streaming = { path = "crates/llama-server-client-streaming" }
+# complexity-router-heuristic-classifier = { path = "crates/complexity-router-heuristic-classifier" }
+# debate-orchestrator-state-machine = { path = "crates/debate-orchestrator-state-machine" }
+# web-search-parallel-integration = { path = "crates/web-search-parallel-integration" }
+# pensieve-cli-debate-launcher = { path = "crates/pensieve-cli-debate-launcher" }
+# pensieve-http-api-server = { path = "crates/pensieve-http-api-server" }
 
 # ============================================================================
 # WORKSPACE LINTS
+# Enforce code quality across all crates
 # ============================================================================
 
 [workspace.lints.rust]
@@ -106,7 +135,7 @@ missing_docs = "warn"
 all = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
 nursery = { level = "warn", priority = -1 }
-# Allow some pedantic lints that are too strict
+# Allow some pedantic lints that conflict with 4-word naming
 module_name_repetitions = "allow"
 must_use_candidate = "allow"
 missing_errors_doc = "allow"
