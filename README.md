@@ -22,8 +22,75 @@ git clone https://github.com/that-in-rust/pensieve-local-llm-server
 cd pensieve-local-llm-server
 cargo build --release
 
-# Run tests (106 tests)
+# Run tests (113 tests)
 cargo test
+```
+
+## Usage
+
+### HTTP Server (OpenAI-Compatible API)
+
+```bash
+# Start server (connects to llama-server at localhost:8080)
+./target/release/pensieve-server
+
+# Start in mock mode (for testing without llama-server)
+./target/release/pensieve-server --mock
+
+# Custom port
+./target/release/pensieve-server --port 8000
+
+# Custom llama-server URL
+./target/release/pensieve-server --llm-url http://localhost:9000
+```
+
+**API Endpoints:**
+
+```bash
+# Health check
+curl http://localhost:3000/health
+
+# Chat completion (OpenAI-compatible)
+curl -X POST http://localhost:3000/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"messages": [{"role": "user", "content": "Who is the Home Minister of India?"}]}'
+```
+
+**Example Response:**
+```json
+{
+  "id": "chatcmpl-...",
+  "object": "chat.completion",
+  "model": "pensieve-moa-lite",
+  "choices": [{
+    "message": {
+      "role": "assistant",
+      "content": "The current Home Minister of India is **Amit Shah**..."
+    },
+    "finish_reason": "stop"
+  }],
+  "pensieve_metadata": {
+    "source": "LocalDebate",
+    "proposal_count": 3,
+    "latency_ms": 15000
+  }
+}
+```
+
+### CLI (Interactive Mode)
+
+```bash
+# Interactive REPL
+./target/release/pensieve
+
+# Single query
+./target/release/pensieve --query "Explain ownership in Rust"
+
+# Mock mode (no llama-server required)
+./target/release/pensieve --mock --query "Who is the Home Minister of India?"
+
+# JSON output
+./target/release/pensieve --mock --json --query "What is async/await?"
 ```
 
 ## Architecture: MoA-Lite 2-Layer Debate
@@ -88,9 +155,9 @@ crates/
 │   ├── llama-server-client-streaming           # HTTP + SSE to llama-server
 │   └── debate-orchestrator-state-machine       # MoA-Lite state machine
 │
-└── L3 APPLICATION (External Dependencies) - Coming Soon
-    ├── pensieve-cli-debate-launcher     # Zero-config CLI
-    └── pensieve-http-api-server         # Axum HTTP API
+└── L3 APPLICATION (External Dependencies)
+    ├── pensieve-cli-debate-launcher     # Zero-config CLI (pensieve binary)
+    └── pensieve-http-api-server         # Axum HTTP API (pensieve-server binary)
 ```
 
 ### Naming Convention
@@ -166,17 +233,18 @@ let result = orchestrator
 
 - Rust 1.75+
 - Mac with Apple Silicon (M1/M2/M3/M4) recommended
-- llama-server running locally (for integration tests)
+- llama-server running locally (for real inference)
 
 ### Running Tests
 
 ```bash
-# Run all 106 tests
+# Run all 113 tests
 cargo test
 
 # Run specific crate tests
 cargo test -p agent-role-definition-types
 cargo test -p debate-orchestrator-state-machine
+cargo test -p pensieve-http-api-server
 ```
 
 ### Code Quality
@@ -193,7 +261,7 @@ cargo clippy --all-targets
 
 - [x] L1 Core: Agent types and blackboard protocol
 - [x] L2 Engine: Router, LLM client, orchestrator
-- [ ] L3 Application: CLI and HTTP API
+- [x] L3 Application: CLI and HTTP API
 - [ ] Web search integration
 - [ ] Claude API integration for cloud handoff
 - [ ] Metrics and observability

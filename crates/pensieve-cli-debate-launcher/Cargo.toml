@@ -1,0 +1,43 @@
+[package]
+name = "pensieve-cli-debate-launcher"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Zero-config CLI for MoA-Lite debate system"
+
+[[bin]]
+name = "pensieve"
+path = "src/main.rs"
+
+[dependencies]
+# Internal crates
+agent-role-definition-types = { path = "../agent-role-definition-types" }
+blackboard-handoff-protocol-core = { path = "../blackboard-handoff-protocol-core" }
+complexity-router-heuristic-classifier = { path = "../complexity-router-heuristic-classifier" }
+llama-server-client-streaming = { path = "../llama-server-client-streaming" }
+debate-orchestrator-state-machine = { path = "../debate-orchestrator-state-machine" }
+
+# Async runtime
+tokio = { workspace = true }
+
+# CLI
+clap = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+
+# Observability
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+tokio-test = { workspace = true }
+
+[lints]
+workspace = true
